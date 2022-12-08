@@ -1,7 +1,7 @@
 <head>
 </head>
 <body>
-  <h1>Codetations</h1>
+  <h1>Codetations (<a href="https://observablehq.com/d/88e85f5624523df6">demo</a>)</h1>
   <h4>Edward Misback, University of Washington</h4>
   <h2>Summary</h2>
   <p>
@@ -11,33 +11,60 @@
   <h2>Motivation & Significance for Scholarly Communication</h2>
   <p>
     In order to talk about something, we must have a way to refer to it. When we informally discuss and think about code in an existing library, 
-    we often do so at the level of code expressions, asking "what does this line do?". However, we are typically limited to describing code executions
-    at the level of functions: even though one can copy a line and test it in a REPL, even if we keep track of our test somewhere, it has become independent
-    of the original code. But what if we could instead persistently refer to and execute code in place at the line or expression level? 
+    we often do so at the level of code expressions, asking "what does this line do?". However, when we want to run code in a library,
+    we are typically limited to describing code executions
+    at the level of functions--you can't run just one line of a program. Sometimes we solve this by copying lines into a REPL, but the copy cannot
+    respond to changes in the original code. But what if we could instead persistently refer to and execute code in place at the line or expression level? 
     This would expand our ability to understand and specify how code behaves. After all, code is easiest to run and make "live" if it's just a couple of lines.
   </p>
+  <h3>Applications</h3>
   <p>
     Besides being generally useful for programming tools, expression-level annotation 
     has special application to fields like education and programming languages, where the meaning and behavior of individual expressions is studied carefully.
     Tools for these fields can take advantage of persistent annotation points to offer extensive commentary without interrupting the view of the code, or
-    to attach expression debuggers that visualize data flowing through an expression.
+    to attach expression debuggers that visualize data flowing through an expression even if the rest of the program won't compile.
   </p>
   <p>
     In the long term, execution data gathered from user interactions with annotation points might be used to understand how data flows through the program as a whole.
   </p>
   <h2>Project progress</h2>
+  <ul>
+    <li>I've implemented a client for watching the values of expressions as an example of the kind of tool that will benefit from persistent annotations.</li>
+    <li>I implemented a program for automatically updating stored annotation positions using diffs and anchor information 
+      if the code was edited without a connection to the annotation server, but it is well behind state-of-the-art based on some papers I recently found.</li>
+      <ul>
+        <li>I informally tested mixtures of different algorithms and heuristics for this tool.</li>
+        <li>I determined that my first purely diff-based approach is:
+          <ul>
+            <li> excellent for predictability, handling annotations uniformly regardless of their length, and good at handling additional/removed lines, but</li>
+            <li> bad at correctly resolving the new position for in-line changes that are adjacent to an annotation start/end, and</li>
+            <li> incapable of changing the order of annotations if code is moved around.</li>
+          </ul>
+        <li>Heuristics can be used on diffs to improve results in a predictable way.</li>
+        <li>String similarity can be used (as suggested by Rástočný and Bieliková 2013) for decent but much less predictable results.</li>
+        <li>String similarity performance requires much more attention than diffing to avoid blowups, and includes parameters that must be tuned, like the amount of context to consider. 
+          It's also not immediately clear why the algorithm suggested (Jaro-Winkler) is good for finding positions in documents, since it gives higher weight to earlier characters.
+          I wrote and tested a two-sided variant that didn't seem to improve things.</li>
+      </ul>
+    <li>AST parse information is not yet considered, and the codetations server (which should react to edits and provide an interface for accessing annotations) is not yet complete.</li>
+  </ul>
+  <h2>Related prior work</h2>
   <p>
-    I implemented a program for automatically updating stored annotation positions using diffs and anchor information 
-    if the code was edited without a connection to the annotation server.
+    Rástočný, Karol, and Mária Bieliková. "Metadata anchoring for source code: Robust location descriptor definition, building and interpreting." International Conference on Database and Expert Systems Applications. Springer, Berlin, Heidelberg, 2013.
   </p>
-  <h2>Related Work</h2>
+  <ul>
+    <li>The authors evaluate the effectiveness of various string similarity algorithms for anchoring on a some test cases. 
+      Diffing is faster and stabler than string similarity, but struggles to handle changes in annotation order.</li>
+  </ul>
   <p>
-    
-  
+    Brush, Alice Jane Bernheim. Annotating digital documents for asynchronous collaboration. University of Washington, 2002.
   </p>
-  <a href="/index.html">Interactive prototype</a>
+  <ul>
+    <li>Brush presents a method for robustly attaching annotations to digital documents using multiple sources of metadata and context. 
+      Natural language and HTML have different characteristics from source code, but we can take as an analogy from this work the notion 
+      of paths through a loosely-parsed AST as possible anchoring information.</li>
+  </ul>
+  <a href="https://observablehq.com/d/88e85f5624523df6">Interactive prototype</a>
   <br>
   <a href="https://github.com/elmisback/codetations">Github repo</a>
-  <br>
-  <a href="https://observablehq.com/d/88e85f5624523df6">Messy Observable notebook where the code was developed</a>
 </body>
