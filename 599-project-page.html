@@ -3,11 +3,14 @@
       body {
        font-family: verdana,sans-serif;
        margin:40px auto;
-       max-width:650px;
+       /*max-width:650px;*/
        line-height:1.6;
-       font-size:22px;
+       font-size:18px;
        color:#444;
        padding:0 10px
+      }
+      p, a {
+       font-family: "Source Serif Pro", Iowan Old Style, Apple Garamond, Palatino Linotype, Times New Roman, "Droid Serif", Times, serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
       }
   </style>
 </head>
@@ -19,6 +22,7 @@
     Codetations are location anchors for code that allow referencing a particular location even after the code has been changed. 
     It is possible for these anchors to live separately from the code to avoid affecting the editing experience.
   </p>
+  <img src="/codetations.gif"/>
   <h2>Motivation & Significance for Scholarly Communication</h2>
   <p>
     In order to talk about something, we must have a way to refer to it. When we informally discuss and think about code in an existing library, 
@@ -40,6 +44,7 @@
   </p>
   <h2>Project progress</h2>
   <ul>
+    <img src="/viviquote.png"/>
     <li>I've implemented a client for watching the values of expressions as an example of the kind of tool that will benefit from persistent annotations.</li>
     <li>I implemented a program for automatically updating stored annotation positions using diffs and anchor information 
       if the code was edited without a connection to the annotation server, but it is well behind state-of-the-art based on some papers I recently found.</li>
