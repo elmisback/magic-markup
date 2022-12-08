@@ -1,1 +1,43 @@
-test page
+<head>
+</head>
+<body>
+  <h1>Codetations</h1>
+  <h4>Edward Misback, University of Washington</h4>
+  <h2>Summary</h2>
+  <p>
+    Codetations are location anchors for code that allow referencing a particular location even after the code has been changed. 
+    It is possible for these anchors to live separately from the code to avoid affecting the editing experience.
+  </p>
+  <h2>Motivation & Significance for Scholarly Communication</h2>
+  <p>
+    In order to talk about something, we must have a way to refer to it. When we informally discuss and think about code in an existing library, 
+    we often do so at the level of code expressions, asking "what does this line do?". However, we are typically limited to describing code executions
+    at the level of functions: even though one can copy a line and test it in a REPL, even if we keep track of our test somewhere, it has become independent
+    of the original code. But what if we could instead persistently refer to and execute code in place at the line or expression level? 
+    This would expand our ability to understand and specify how code behaves. After all, code is easiest to run and make "live" if it's just a couple of lines.
+  </p>
+  <p>
+    Besides being generally useful for programming tools, expression-level annotation 
+    has special application to fields like education and programming languages, where the meaning and behavior of individual expressions is studied carefully.
+    Tools for these fields can take advantage of persistent annotation points to offer extensive commentary without interrupting the view of the code, or
+    to attach expression debuggers that visualize data flowing through an expression.
+  </p>
+  <p>
+    In the long term, execution data gathered from user interactions with annotation points might be used to understand how data flows through the program as a whole.
+  </p>
+  <h2>Project progress</h2>
+  <p>
+    I implemented a program for automatically updating stored annotation positions using diffs and anchor information 
+    if the code was edited without a connection to the annotation server.
+  </p>
+  <h2>Related Work</h2>
+  <p>
+    
+  
+  </p>
+  <a href="/index.html">Interactive prototype</a>
+  <br>
+  <a href="https://github.com/elmisback/codetations">Github repo</a>
+  <br>
+  <a href="https://observablehq.com/d/88e85f5624523df6">Messy Observable notebook where the code was developed</a>
+</body>
