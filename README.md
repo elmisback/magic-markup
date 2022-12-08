@@ -7,7 +7,7 @@ It is possible for these anchors to live separately from the code to avoid affec
 
 A live demo of this behavior is available [here](https://elmisback.github.io/codetations/).
 
-
+<img src="/codetations.gif"/>
 
 This repository includes
 * a server for interacting with the stored annotations intended for editor plugins and visualization clients
