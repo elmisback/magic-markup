@@ -24,8 +24,13 @@
   <h4>Edward Misback, University of Washington</h4>
   <h2>Summary</h2>
   <p>
-    Codetations are location anchors for code that allow referencing a particular location even after the code has been changed. 
+    Codetations are annotation location anchors for code that allow referencing a particular location even after the code has been changed. 
     It is possible for these anchors to live separately from the code to avoid affecting the editing experience.
+  </p>
+  <p>
+    In the gif below, edits occur on the upper buffer, and the lower buffer is resolved by comparing the upper buffer to an annotated version of 
+    the initial state (at the beginning of the edit session) of the upper buffer. <strong>No edit information other than the final output is used</strong>,
+    demonstrating that locations can be tracked with some success without edit session access.
   </p>
   <div id="headline-image">
     <img src="/codetations/codetations.gif" alt="A demonstration of codetations maintaining proper annotation positions."/>
