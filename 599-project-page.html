@@ -3,14 +3,17 @@
       body {
        font-family: verdana,sans-serif;
        margin:40px auto;
-       /*max-width:650px;*/
+       max-width:750px;
        line-height:1.6;
        font-size:18px;
        color:#444;
        padding:0 10px
       }
-      p, a {
-       font-family: "Source Serif Pro", Iowan Old Style, Apple Garamond, Palatino Linotype, Times New Roman, "Droid Serif", Times, serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
+      #headline-image img {
+       display:block;
+       max-width:750px;
+       border: 3px solid gray;
+       margin: auto;
       }
   </style>
 </head>
@@ -22,7 +25,9 @@
     Codetations are location anchors for code that allow referencing a particular location even after the code has been changed. 
     It is possible for these anchors to live separately from the code to avoid affecting the editing experience.
   </p>
-  <img src="/codetations.gif"/>
+  <div id="headline-image">
+    <img src="/codetations/codetations.gif" alt="A demonstration of codetations maintaining proper annotation positions."/>
+  </div>
   <h2>Motivation & Significance for Scholarly Communication</h2>
   <p>
     In order to talk about something, we must have a way to refer to it. When we informally discuss and think about code in an existing library, 
@@ -43,9 +48,13 @@
     In the long term, execution data gathered from user interactions with annotation points might be used to understand how data flows through the program as a whole.
   </p>
   <h2>Project progress</h2>
+  <img style="max-width:750px" src="/codetations/viviquote.png" alt="A picture of viviquote, with code shown side-by-side with expression watch statements."/>
   <ul>
-    <img src="/viviquote.png"/>
-    <li>I've implemented a client for watching the values of expressions as an example of the kind of tool that will benefit from persistent annotations.</li>
+    <li>I've already implemented a VSCode client (<a href="https://github.com/elmisback/viviquote">viviquote</a>) for watching the values of expressions as an example of the kind of tool that will benefit from persistent annotations.</li>
+  </ul>
+  <br>
+  (See gif above.)
+  <ul>
     <li>I implemented a program for automatically updating stored annotation positions using diffs and anchor information 
       if the code was edited without a connection to the annotation server, but it is well behind state-of-the-art based on some papers I recently found.</li>
       <ul>
@@ -64,14 +73,8 @@
       </ul>
     <li>AST parse information is not yet considered, and the codetations server (which should react to edits and provide an interface for accessing annotations) is not yet complete.</li>
   </ul>
-  <h2>Related prior work</h2>
-  <p>
-    Rástočný, Karol, and Mária Bieliková. "Metadata anchoring for source code: Robust location descriptor definition, building and interpreting." International Conference on Database and Expert Systems Applications. Springer, Berlin, Heidelberg, 2013.
-  </p>
-  <ul>
-    <li>The authors evaluate the effectiveness of various string similarity algorithms for anchoring on a some test cases. 
-      Diffing is faster and stabler than string similarity, but struggles to handle changes in annotation order.</li>
-  </ul>
+  
+  <h2>Related work</h2>
   <p>
     Brush, Alice Jane Bernheim. Annotating digital documents for asynchronous collaboration. University of Washington, 2002.
   </p>
@@ -79,6 +82,23 @@
     <li>Brush presents a method for robustly attaching annotations to digital documents using multiple sources of metadata and context. 
       Natural language and HTML have different characteristics from source code, but we can take as an analogy from this work the notion 
       of paths through a loosely-parsed AST as possible anchoring information.</li>
+  </ul>
+  <p>
+    Juhár, Ján. "Supporting source code annotations with metadata-aware development environment." 2019 Federated Conference on Computer Science and Information Systems (FedCSIS). IEEE, 2019.
+  </p>
+  <ul>
+    <li>Juhar introduces a tool called Connotator that supports a variety of annotation types. 
+      This is a significant paper for distinguishing different types of annotations--
+      above, we have described what Juhar calls External Annotations, but other kinds of annotations (for example, comments with metadata) are possible too. 
+      Juhar's tool is specific to JetBrains IntelliJ platform-based IDEs, and Juhar claims that EAs require an external tool for maintenance.
+      While this is technically true, we have tried to show here that it may be possible for the annotations to survive "offline" periods.</li>
+  </ul>
+    <p>
+    Rástočný, Karol, and Mária Bieliková. "Metadata anchoring for source code: Robust location descriptor definition, building and interpreting." International Conference on Database and Expert Systems Applications. Springer, Berlin, Heidelberg, 2013.
+  </p>
+  <ul>
+    <li>The authors evaluate the effectiveness of various string similarity algorithms for anchoring on a set of 12 test cases. 
+      Our diffing approach is faster and stabler than string similarity for the kinds of annotations we are considering from our preliminary tests, but it struggles to handle changes in annotation order.</li>
   </ul>
   <a href="https://observablehq.com/d/88e85f5624523df6">Interactive prototype</a>
   <br>
