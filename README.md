@@ -26,8 +26,6 @@ For more information, see the project [goals](https://github.com/elmisback/codet
 ## Connected projects
 * [Viviquote](https://github.com/elmisback/viviquote), a client that executes quoted regions. Includes a VSCode extension.
 
-### What kind of stuff belongs in an annotation?
-
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
 * Juhár 2019, *Supporting Source Code Annotations with Metadata-Aware Development Environment*
