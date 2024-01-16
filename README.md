@@ -8,3 +8,4 @@ It is possible for these anchors to live separately from the code to avoid affec
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
 * Juhár 2019, *Supporting Source Code Annotations with Metadata-Aware Development Environment*
+* Walenstein, Andrew, et al. 2007. "Similarity in programs."
