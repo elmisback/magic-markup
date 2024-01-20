@@ -11,3 +11,5 @@ Observable demo: https://observablehq.com/d/9f772e010064bd3e
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
 * Juhár 2019, *Supporting Source Code Annotations with Metadata-Aware Development Environment*
 * Walenstein, Andrew, et al. 2007. "Similarity in programs."
+* Basman, Lewis, and Clark 2018. *The Open Authorial Principle: Supporting Networks of Authors in Creating Externalisable Designs* (section 6)
+* A.J. Bernheim Brush and David Bargeron 2001. *Robustly Anchoring Annotations Using Keywords*
