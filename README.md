@@ -13,3 +13,6 @@ Observable demo: https://observablehq.com/d/9f772e010064bd3e
 * Walenstein, Andrew, et al. 2007. "Similarity in programs."
 * Basman, Lewis, and Clark 2018. *The Open Authorial Principle: Supporting Networks of Authors in Creating Externalisable Designs* (section 6)
 * A.J. Bernheim Brush and David Bargeron 2001. *Robustly Anchoring Annotations Using Keywords*
+* Horvath et al. 2022. *Using Annotations for Sensemaking About Code* (catseye)
+* Horvath et al. 2023. *Support for Long-Form Documentation Authoring and Maintenance* (sodalite)
+* Horvath et al. 2024. *Meta-Manager: A Tool for Collecting and Exploring Meta Information about Code*
