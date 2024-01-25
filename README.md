@@ -2,7 +2,7 @@
 
 :construction: **Under construction! Don't use this library yet unless you are ready to hack on things.** :construction:
 
-Codetations are *location anchors* for code that allow referencing a particular location even after the code has been changed. 
+Codetations are *location anchors* for code that allow referencing a particular snippet even after the code has been changed. 
 It is possible for these anchors to live separately from the code to avoid affecting the editing experience.
 
 Observable demo: https://observablehq.com/d/9f772e010064bd3e
