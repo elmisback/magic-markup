@@ -16,3 +16,4 @@ Observable demo: https://observablehq.com/d/9f772e010064bd3e
 * Horvath et al. 2022. *Using Annotations for Sensemaking About Code* (catseye)
 * Horvath et al. 2023. *Support for Long-Form Documentation Authoring and Maintenance* (sodalite)
 * Horvath et al. 2024. *Meta-Manager: A Tool for Collecting and Exploring Meta Information about Code*
+* Berners-Lee, Tim, James Hendler, and Ora Lassila. "The semantic web." Scientific american 284.5 (2001): 34-43.
