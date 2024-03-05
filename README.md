@@ -26,7 +26,7 @@ The JSON file is managed by a **state server**, similar in function to the docum
 * Annotation viewer: tools for viewing sets of tags (wizard of oz example is https://github.com/elmisback/magic-markup/blob/main/codetations-react/src/App.tsx)
 
 ## TODO
-* **Find collaborators**
+* **Find collaborators?**
 * Work on infrastructure and basic applications above
 * Look for more advanced applications
 
