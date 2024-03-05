@@ -19,6 +19,8 @@ The JSON file is managed by a **state server**, similar in function to the docum
 
 **Annotation viewers** are UIs that display the state and let the user edit metadata.
 
+The **tag update function** is a stateless function that takes an old tagged document and an updated untagged document, and re-applies tags in parallel to obtain an updated tagged document.
+
 * Tag update function (exists at https://observablehq.com/@elmisback/magic-markup-retag, should be hosted somewhere)
 * Document server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/document-server.ts)
 * Tag state + State server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/state-server.ts)
