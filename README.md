@@ -6,7 +6,7 @@
 * Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
 * Evaluation results: https://observablehq.com/@elmisback/magic-markup-eval
 
-# IN PROGRESS -- Applications (How will this work in practice, and how will it be used?)
+# IN PROGRESS -- Applications (How will this work in practice?)
 
 The system models document interactions with a websocket-based **document server** that enables clients to access and receive document texts and updates.
 
