@@ -6,12 +6,25 @@
 * Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
 * Evaluation results: https://observablehq.com/@elmisback/magic-markup-eval
 
-# IN PROGRESS
+# IN PROGRESS -- Applications (How will this work in practice, and how will it be used?)
+
+The system models document interactions with a websocket-based **document server** that enables clients to access and receive document texts and updates.
+
+Tags are managed separately from the document itself, stored in a JSON **state** file where each tag is associated with metadata and (for now) the full document text at the time of tagging.
+This ensures independence between tags and avoids losing version information.
+
+The JSON file is managed by a **state server**, similar in function to the document server.
+
+**Tag editors** are tools (probably in the editor UI, but can be independent/CLI) that talk with the state server to create tags.
+
+**Annotation viewers** are UIs that display the state and let the user edit metadata.
+
+* **Find collaborators**
 * Tag update function (exists at https://observablehq.com/@elmisback/magic-markup-retag, should be hosted somewhere)
 * Document server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/document-server.ts)
 * Tag state + State server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/state-server.ts)
-* Tagger: tools for adding tags to the document (space for an example is https://github.com/elmisback/magic-markup/tree/main/annotator)
-* Tag viewer: tools for viewing sets of tags (wizard of oz example is https://github.com/elmisback/magic-markup/blob/main/codetations-react/src/App.tsx)
+* Tag editor: tools for adding tags to the document (space for an example is https://github.com/elmisback/magic-markup/tree/main/annotator)
+* Annotation viewer: tools for viewing sets of tags (wizard of oz example is https://github.com/elmisback/magic-markup/blob/main/codetations-react/src/App.tsx)
 
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
