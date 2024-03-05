@@ -6,6 +6,13 @@
 * Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
 * Evaluation results: https://observablehq.com/@elmisback/magic-markup-eval
 
+# IN PROGRESS
+* Tag update function (exists at https://observablehq.com/@elmisback/magic-markup-retag, should be hosted somewhere)
+* Document server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/document-server.ts)
+* Tag state + State server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/state-server.ts)
+* Tagger: tools for adding tags to the document (space for an example is https://github.com/elmisback/magic-markup/tree/main/annotator)
+* Tag viewer: tools for viewing sets of tags (wizard of oz example is https://github.com/elmisback/magic-markup/blob/main/codetations-react/src/App.tsx)
+
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
 * Juhár 2019, *Supporting Source Code Annotations with Metadata-Aware Development Environment*
