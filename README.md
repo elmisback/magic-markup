@@ -1,10 +1,10 @@
 # :anchor: Magic Markup
 
-Observable demo: https://observablehq.com/@elmisback/re-annotate-v0
-Retagging function: https://observablehq.com/@elmisback/magic-markup-retag
-Benchmark generation tools: https://observablehq.com/@elmisback/tcu-benchmark-generator
-Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
-Evaluation results: https://observablehq.com/@elmisback/magic-markup-eval
+* Observable demo: https://observablehq.com/@elmisback/re-annotate-v0
+* Retagging function: https://observablehq.com/@elmisback/magic-markup-retag
+* Benchmark generation tools: https://observablehq.com/@elmisback/tcu-benchmark-generator
+* Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
+* Evaluation results: https://observablehq.com/@elmisback/magic-markup-eval
 
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
