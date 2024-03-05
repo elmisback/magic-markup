@@ -1,4 +1,4 @@
-# :anchor: Codetations 
+# :anchor: Magic Markup
 
 :construction: **Under construction! Don't use this library yet unless you are ready to hack on things.** :construction:
 
