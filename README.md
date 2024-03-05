@@ -19,12 +19,16 @@ The JSON file is managed by a **state server**, similar in function to the docum
 
 **Annotation viewers** are UIs that display the state and let the user edit metadata.
 
-* **Find collaborators**
 * Tag update function (exists at https://observablehq.com/@elmisback/magic-markup-retag, should be hosted somewhere)
 * Document server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/document-server.ts)
 * Tag state + State server (untested, exists in some state at https://github.com/elmisback/magic-markup/blob/main/codetations-react/state-server.ts)
 * Tag editor: tools for adding tags to the document (space for an example is https://github.com/elmisback/magic-markup/tree/main/annotator)
 * Annotation viewer: tools for viewing sets of tags (wizard of oz example is https://github.com/elmisback/magic-markup/blob/main/codetations-react/src/App.tsx)
+
+## TODO
+* **Find collaborators**
+* Work on infrastructure and basic applications above
+* Look for more advanced applications
 
 ## Related research
 * Rástočný and Bieliková 2015, *Metadata Anchoring for Source Code: Robust Location Descriptor Definition, Building and Interpreting*
