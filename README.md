@@ -1,4 +1,4 @@
-# :anchor: Magic Markup
+# 🪄⚓ Magic Markup
 
 * Observable demo (needs an update): https://observablehq.com/@elmisback/re-annotate-v0
 * Retagging function: https://observablehq.com/@elmisback/magic-markup-retag
