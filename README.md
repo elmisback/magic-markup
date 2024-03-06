@@ -29,7 +29,7 @@ The **tag update function** is a stateless function that takes an old tagged doc
 
 ## TODO
 * **Find collaborators?**
-  * Andres Erbsen: mentioned tying proofs to code is currently a minor challenge--for example, mapping https://github.com/PrincetonUniversity/VST/blob/0c4670d01127d5f6eb13a86df4500d025437bb21/progs64/verif_append2.v#L88C7-L88C18 to part of a C program like https://github.com/PrincetonUniversity/VST/blob/0c4670d01127d5f6eb13a86df4500d025437bb21/progs64/append.c#L12 (idk if that's actually the right part, we'd need a domain expert for this)
+  * Andres Erbsen: mentioned tying proofs to code is currently a pain point--for example, mapping https://github.com/PrincetonUniversity/VST/blob/0c4670d01127d5f6eb13a86df4500d025437bb21/progs64/verif_append2.v#L88C7-L88C18 to part of a C program like https://github.com/PrincetonUniversity/VST/blob/0c4670d01127d5f6eb13a86df4500d025437bb21/progs64/append.c#L12 (idk if that's actually the right part, we'd need a domain expert for this)
     * we could also look for other proofs people if Andres is busy, seems like this might be a general issue
 * Work on infrastructure and basic applications above
 * Look for more advanced applications
