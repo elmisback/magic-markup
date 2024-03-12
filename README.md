@@ -1,6 +1,6 @@
 # 🪄⚓ Magic Markup
 
-* Observable demo (needs an update): https://observablehq.com/@elmisback/re-annotate-v0
+* Observable demo: https://observablehq.com/@elmisback/magic-markup-demo
 * Retagging function: https://observablehq.com/@elmisback/magic-markup-retag
 * Benchmark generation tools: https://observablehq.com/@elmisback/tcu-benchmark-generator
 * Tagged Code Updates benchmark: https://observablehq.com/@elmisback/tagged-code-updates-benchmark
