@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import DocumentViewer from './DocumentViewer';
 
 import JsxParser from 'react-jsx-parser'
 
@@ -113,6 +114,7 @@ function App() {
           <AnnotationEditor value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} />
         ))}
       </div>
+      <DocumentViewer serverUrl='ws://localhost:3002' />
     </div>
   );
 }

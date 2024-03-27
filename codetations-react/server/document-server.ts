@@ -14,7 +14,7 @@ import WebSocket from 'ws';
 // Create a WebSocket server
 const wss = new WebSocket.Server({ port: 3002 })
 
-function validate(documentURI) {
+function validate(documentURI: string) {
   // we only access files that exist, and are in the directory where this server is running.
   return documentURI.startsWith(process.cwd()) && fs.existsSync(documentURI);
 }
@@ -30,17 +30,18 @@ wss.on('connection', (ws: MySocket) => {
     if (messageObj.type === 'listen') {
       const documentURI = path.resolve(messageObj.documentURI);
       if (!validate(documentURI)) {
-        console.log('invalid document URI');
+        console.log('invalid document URI:', documentURI, 'current working directory:', process.cwd());
         return;
       }
       ws.documentURI = documentURI;
 
       const watcher = chokidar.watch(documentURI, {
         persistent: true,
-        awaitWriteFinish: true,
+        awaitWriteFinish: false,
       });
 
       watcher.on('change', (path, stats) => {
+        console.log('file changed');
         const state = fs.readFileSync(documentURI, 'utf8');
         ws.send(state)
 
