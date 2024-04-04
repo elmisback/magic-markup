@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import logo from './logo.svg';
+// import logo from './logo.svg';
 import './App.css';
 import DocumentViewer from './DocumentViewer';
 import Annotation from './Annotation';
+import ReactDiffViewer from 'react-diff-viewer-continued';
 
-import retag from './retag';
+// import retag from './retag';
 
 // import JsxParser from 'react-jsx-parser'
 
@@ -41,14 +42,13 @@ interface AnnotationEditorProps {
 }
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+  console.log('color', JSON.stringify(props.utils.getText()));
   return (
     <input type="color"
       value={props.utils.getText()}
       onChange={e => props.utils.setText(e.target.value)} />
   );
 }
-
-type ToolTypes = "colorPicker";
 
 function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void }) {
   const { value, setValue } = props;
@@ -129,10 +129,10 @@ function Main() {
   const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
     console.log('setting annotation', index, annotationUpdate);
     // if the document is out of date, disable setting the annotation
-    // if (documentOutOfDate) {
-    //   console.error('Document is out of date');
-    //   return;
-    // }
+    if (documentOutOfDate) {
+      console.error('Document is out of date');
+      return;
+    }
     // if the annotation involves setting the document, first we need to do that
     if (annotationUpdate.document && annotationUpdate.document !== documentContent) {
       // set the document content
@@ -157,7 +157,7 @@ function Main() {
     if (documentContent === oldDocumentContent) {
       setDocumentOutOfDate(false);
     }
-  }, [documentContent])
+  }, [documentContent, diskState?.annotations])
 
   const handleRetag = async () => {
     // send message to server to retag
@@ -176,11 +176,18 @@ function Main() {
       const delimiter = '★';
       const codeWithSnippetDelimited = codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
       const updatedCodeWithoutDelimiters = documentContent
-      const output = await retag(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter);
+      const output = await fetch('http://localhost:3004/retag',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter })
+        }).then(res => res.json());
 
       // update the annotation
       console.log('Output:', output);
-      const updatedAnnotation = { ...annotation, document: updatedCodeWithoutDelimiters, start:  output.gptRetaggingJSON[1], end: output.gptRetaggingJSON[2] };
+      const updatedAnnotation = { ...annotation, document: updatedCodeWithoutDelimiters, start:  output.out.leftIdx, end: output.out.rightIdx };
       setDiskState({ annotations: annotations.map((value, j) => j === i ? updatedAnnotation : value) });
     }
     
@@ -197,7 +204,14 @@ function Main() {
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
       </div>
-      <hr></hr>
+          <hr></hr>
+          {/* if document is out of date, show a warning */}
+          {documentOutOfDate && <div style={{ color: 'red' }}>Document is out of date! Annotation updates are disabled. Re-apply tags to enable updates.</div>}
+          {documentOutOfDate &&
+            <ReactDiffViewer
+              oldValue={diskState?.annotations[0]?.document || ''}
+              newValue={documentContent || ''}
+              splitView={true} />}
       <div>Retag document</div>
       <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
@@ -235,7 +249,7 @@ function Main() {
       
         </div>
         {/* show the disk state */}
-        <pre>{JSON.stringify(diskState)}</pre>
+        <pre>{JSON.stringify(diskState, undefined, 2)}</pre>
     </DocumentProvider>
     </DiskStateProvider>
   );

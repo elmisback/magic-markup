@@ -4,7 +4,6 @@ import dotenv from 'dotenv'
 
 const openai = new OpenAI({
   apiKey: dotenv.config().parsed?.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true  // TODO set up a server for this
 })
 
 function normalizeStringAndMapPositions(str: string) {
@@ -117,7 +116,7 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
     });
     console.log(gptOutCompletion)
 
-    gptOut = gptOutCompletion.choices[0].message.content || ''
+    gptOut = gptOutCompletion.choices[0]?.message.content || ''
     console.log(gptOut)
   } catch (e) {
     return {error: e, errorType: 'model'}
@@ -186,7 +185,11 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
     // const snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence)
     const leftIdx = lenUpToSection + snippetIdxInSection.start
     const rightIdx = leftIdx + snippetIdxInSection.end - snippetIdxInSection.start
-    return code.slice(0, leftIdx) + delimiterStart + code.slice(leftIdx, rightIdx) + delimiterEnd + code.slice(rightIdx, code.length)
+    return {
+      updatedCodeWithDelimiters: code.slice(0, leftIdx) + delimiterStart + code.slice(leftIdx, rightIdx) + delimiterEnd + code.slice(rightIdx, code.length),
+      leftIdx,
+      rightIdx
+    }
   }
   try {
     const out = computeUpdatedCodeWithSnippetRetagged({
