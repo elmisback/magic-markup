@@ -1,13 +1,13 @@
 {
   "annotations": [
     {
-      "document": "test original document #0000FF\n",
+      "document": "test original document #0000FF",
       "start": 23,
       "end": 31,
       "tool": "colorPicker",
       "metadata": {},
       "original": {
-        "document": "test original document #0000FF\n",
+        "document": "test original document #0000FF",
         "start": 23,
         "end": 31
       }

@@ -4,10 +4,8 @@ import './App.css';
 import DocumentViewer from './DocumentViewer';
 import Annotation from './Annotation';
 import ReactDiffViewer from 'react-diff-viewer-continued';
-
-// import retag from './retag';
-
-// import JsxParser from 'react-jsx-parser'
+import Split from 'react-split'
+import './App.css'
 
 import { useContext } from 'react';
 import { DocumentContext, DocumentProvider } from './DocumentContext';
@@ -118,12 +116,6 @@ function Main() {
   const { diskState, setDiskState } = useDiskState();
   const [continuousRetag, setContinuousRetag] = useState(false);
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
-  // const [annotations, setAnnotations] = useState<Annotation[]>([
-  //   new Annotation(23, 31, 'test note', [], 'test explanation', 'test function', (content: any, editText: (arg0: any) => void) => <div>
-  //     <input type="color" value={content} onChange={e => {console.log('input'); editText(e.target.value)}} />
-  // </div>, 'test original document #0000FF'),
-  //   new Annotation(5, 14, 'test note', [], 'test explanation', 'test function', () => "hi", 'test original document #0000FF'),
-  // ]);
   const annotations = diskState?.annotations;
 
   const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
@@ -196,6 +188,10 @@ function Main() {
   return (
     <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
       <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
+      <Split className="split">
+          <div className="document">
+            <DocumentViewer serverUrl='ws://localhost:3002'  />
+          </div>
     <div className="App">
       {/* Document path to open */}
       <div>Document URI: &nbsp;
@@ -222,37 +218,20 @@ function Main() {
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
       </div>
       <hr></hr>
-      {/* <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header> */}
-      
       <div> 
         {/* list of annotations */}
         <h1>Annotations</h1>
         {annotations?.map((annotation, index) => (
           <AnnotationEditorContainer value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} />
         ))}
-      </div>
-        <DocumentViewer serverUrl='ws://localhost:3002' />
-        <SomeComponent />
-      
+            </div>
         </div>
         {/* show the disk state */}
-        <pre>{JSON.stringify(diskState, undefined, 2)}</pre>
+          </Split>
     </DocumentProvider>
     </DiskStateProvider>
   );
 }
+
 
 export default App;

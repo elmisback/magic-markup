@@ -12,7 +12,7 @@ interface DiskStateContextType {
 }
 
 // Create the context with an empty default value
-const DiskStateContext = createContext<DiskStateContextType | undefined>(undefined);
+const DiskStateContext = createContext<DiskStateContextType>({diskState: undefined, setDiskState: () => {}});
 
 // Define the provider props type
 interface DiskStateProviderProps {
