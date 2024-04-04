@@ -10,7 +10,7 @@ import fs from 'fs';
 import WebSocket from 'ws';
 
 // Create a WebSocket server
-const wss = new WebSocket.Server({ port: 3001 })
+const wss = new WebSocket.Server({ port: 3003 })
 
 let stateURI = '';
 

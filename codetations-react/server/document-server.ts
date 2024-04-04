@@ -62,7 +62,7 @@ wss.on('connection', (ws: MySocket) => {
       ws.documentURI = documentURI;
     
       // open the file and save the new state
-      fs.writeFile(documentURI, JSON.stringify(state), (err: any) => {
+      fs.writeFile(documentURI, state, (err: any) => {
         if (err) {
           console.error(err);
           return;

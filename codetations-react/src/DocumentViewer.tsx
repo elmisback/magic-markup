@@ -17,7 +17,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ serverUrl }) => {
       // Send a message to start listening to the document updates
       ws.send(JSON.stringify({
         type: 'listen',
-        documentURI: 'temp/sample.txt'
+        documentURI: 'example/sample.txt'
       }));
     };
 

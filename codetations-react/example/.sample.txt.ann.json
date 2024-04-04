@@ -1,0 +1,30 @@
+{
+  "annotations": [
+    {
+      "document": "test original document #38c738",
+      "start": 23,
+      "end": 31,
+      "tool": "colorPicker",
+      "metadata": {},
+      "original": {
+        "document": "test original document #0000FF",
+        "start": 23,
+        "end": 31
+      }
+    },
+    {
+      "document": "test original document #0000FF",
+      "start": 5,
+      "end": 14,
+      "tool": "codeReview",
+      "metadata": {
+        "comment": "This is a comment"
+      },
+      "original": {
+        "document": "test original document #0000FF",
+        "start": 5,
+        "end": 14
+      }
+    }
+  ]
+}

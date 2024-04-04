@@ -1,90 +1,170 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import DocumentViewer from './DocumentViewer';
+import Annotation from './Annotation';
 
-import JsxParser from 'react-jsx-parser'
+// import JsxParser from 'react-jsx-parser'
 
-class Annotation {
-  // start (index)
-  // stop (index)
-  // note (string)
-  // comments (string [])
-  // explanation (string)
-  // test_function (string -- function)
-  // editor (string -- react component with setValue argument)
-  // original_document (string)
-  constructor(
-    public start: number=0,
-    public stop: number=0,
-    public note: string='default note',
-    public comments: string[]=[],
-    public explanation: string='',
-    public test_function: string='',
-    public editor: any=``, // this string is a react component that we need to eval
-    public original_document: string=''
-  ) {}
+import { useContext } from 'react';
+import { DocumentContext, DocumentProvider } from './DocumentContext';
+import { DiskStateContext, DiskStateProvider } from './DiskStateContext';
+
+function useDocument() {
+  const context = useContext(DocumentContext);
+  if (context === undefined) {
+    throw new Error('useDocument must be used within a DocumentProvider');
+  }
+  return context;
 }
 
-function AnnotationEditor(props: { value: Annotation, setValue: (value: Annotation) => void }) {
-  const { value, setValue } = props;
-  // show all properties of the annotation and allow editing
-  // content is document from start to stop
-  const content = value.original_document.slice(value.start, value.stop);
-  const setNote = (note: string) => {
-    setValue(new Annotation(value.start, value.stop, note, value.comments, value.explanation, value.test_function, value.editor, value.original_document));
+function useDiskState() {
+  const context = useContext(DiskStateContext);
+  console.log('using disk state', context)
+  if (context === undefined) {
+    throw new Error('useDiskState must be used within a DiskStateProvider');
   }
+  return context;
+}
 
-  // const [note, setNote] = useState(value.note);
-  const addComment = () => {
-    // add comment to annotation
-  }
-  // for now, the "editor" is just a button that calls the edit server with the editor's value
-  const editText = (newValue: string) => {
-    // call edit server
-    console.log("TODO call edit server", newValue);
+interface AnnotationUpdate {
+  document?: string;
+  metadata?: any;
+}
+
+interface AnnotationEditorProps {
+  value: Annotation,
+  setValue: (value: AnnotationUpdate) => void,
+  utils?: any;
+}
+
+const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+  return (
+    <input type="color"
+      value={props.utils.getText()}
+      onChange={e => props.utils.setText(e.target.value)} />
+  );
+}
+
+type ToolTypes = "colorPicker";
+
+function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void }) {
+  const { value, setValue } = props;
+
+  type ToolTypes = {
+    [key: string]: React.FC<AnnotationEditorProps>;
+  };
+
+  const toolTypes : ToolTypes  = {
+    colorPicker: ColorPicker,
   }
 
   return (
     <div>
       <h2>Annotation</h2>
-      {/* <p>Start: {value.start}</p>
-      <p>Stop: {value.stop}</p> */}
-      <p>Content: { content }</p>
-      <p>Note:</p>
-      <textarea value={value.note} onChange={e => setNote(e.target.value)} />
-      {/* <button onClick={() => setNoteClick(note)}>Set Note</button> */}
-      <p>Comments: {value.comments}</p>
-      {/* <p>Explanation: {value.explanation}</p>
-      <p>Test Function: {value.test_function}</p> */}
-      {/* editor: we eval the editor string to get a react component that calls editText */}
-      {/* <JsxParser
-        bindings={{ setValue: editText }}
-        jsx={value.editor}
-        renderError={err => <div>{err.toString()}</div>}
-      /> */}
-      {value.editor(content, editText)}
-      <p>Original Document: {value.original_document}</p>
+      <div>Start: {value.start}</div>
+      <div>End: {value.end}</div>
+      <div>Document: {value.document}</div>
+      <div>Tool: {value.tool}</div>
+      <div>Metadata: {JSON.stringify(value.metadata)}</div>
+      <div>Original Document: {value.original.document}</div>
+      <div>Original Start: {value.original.start}</div>
+      <div>Original End: {value.original.end}</div>
+      <div>Editor:</div>
+      {toolTypes[value.tool]?.({
+        value,
+        setValue:
+          (v: AnnotationUpdate) =>
+            setValue({ ...value, document: v.document, metadata: v.metadata }),
+        utils: {
+          getText: () => value.document.slice(value.start, value.end),
+          setText: (newText: string) => {
+            setValue({
+              document: value.document.slice(0, value.start) + newText + value.document.slice(value.end),
+              metadata: value.metadata
+            });
+          }
+        }
+      })}
     </div>
   )
 }
 
-function App() {
-
-  const [annotations, setAnnotations] = useState<Annotation[]>([
-    new Annotation(23, 31, 'test note', [], 'test explanation', 'test function', (content: any, editText: (arg0: any) => void) => <div>
-      <input type="color" value={content} onChange={e => {console.log('input'); editText(e.target.value)}} />
-  </div>, 'test original document #0000FF'),
-    new Annotation(5, 14, 'test note', [], 'test explanation', 'test function', () => "hi", 'test original document #0000FF'),
-  ]);
-
-  const setAnnotation = (index: number, annotation: Annotation) => {
-    setAnnotations(annotations.map((value, i) => i === index ? annotation : value));
-  }
-  const [documentURI, setDocumentURI] = useState('/home/elm/codetations/codetations-react/temp/sample.txt');
-  const [stateURI, setStateURI] = useState('/home/elm/codetations/codetations-react/temp/.sample.txt.codetations');
-
+const SomeComponent: React.FC = () => {
+  const { documentContent } = useDocument();
+  
   return (
+    <div>
+      <h3>Document Content:</h3>
+      <pre>{documentContent}</pre>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI='example/.sample.txt.ann.json'>
+      <DocumentProvider serverUrl='ws://localhost:3002' documentURI='example/sample.txt'>
+        <Main />
+      </DocumentProvider>
+    </DiskStateProvider>
+  );
+}
+
+function Main() {
+  const { documentContent, setDocumentContent } = useDocument();
+  const { diskState, setDiskState } = useDiskState();
+  const [continuousRetag, setContinuousRetag] = useState(false);
+  const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
+  // const [annotations, setAnnotations] = useState<Annotation[]>([
+  //   new Annotation(23, 31, 'test note', [], 'test explanation', 'test function', (content: any, editText: (arg0: any) => void) => <div>
+  //     <input type="color" value={content} onChange={e => {console.log('input'); editText(e.target.value)}} />
+  // </div>, 'test original document #0000FF'),
+  //   new Annotation(5, 14, 'test note', [], 'test explanation', 'test function', () => "hi", 'test original document #0000FF'),
+  // ]);
+  const annotations = diskState?.annotations;
+
+  const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
+    console.log('setting annotation', index, annotationUpdate);
+    // if the document is out of date, disable setting the annotation
+    // if (documentOutOfDate) {
+    //   console.error('Document is out of date');
+    //   return;
+    // }
+    // if the annotation involves setting the document, first we need to do that
+    if (annotationUpdate.document && annotationUpdate.document !== documentContent) {
+      // set the document content
+      setDocumentContent(annotationUpdate.document);
+    }
+    setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
+  }
+
+  const [documentURI, setDocumentURI] = useState('/home/elm/codetations/codetations-react/example/sample.txt');
+  const [stateURI, setStateURI] = useState('/home/elm/codetations/codetations-react/example/.sample.txt.ann');
+
+  useEffect(() => {
+    // check if the document is out of date
+    // compare the document content to the state file
+    // if the document is out of date, setDocumentOutOfDate(true)
+    // if the document is up to date, setDocumentOutOfDate(false)
+    console.log('Checking if document is out of date');
+    const oldDocumentContent = diskState?.annotations[0]?.document;
+    if (documentContent !== oldDocumentContent) {
+      setDocumentOutOfDate(true);
+    }
+    if (documentContent === oldDocumentContent) {
+      setDocumentOutOfDate(false);
+    }
+  }, [documentContent])
+
+  const handleRetag = () => {
+    // send message to server to retag
+    console.log('Retagging document');
+  }
+  
+  return (
+    <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
+      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
     <div className="App">
       {/* Document path to open */}
       <div>Document URI: &nbsp;
@@ -93,6 +173,17 @@ function App() {
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
       </div>
+      <hr></hr>
+      <div>Retag document</div>
+      <button onClick={handleRetag} disabled={
+        !documentOutOfDate || continuousRetag || documentURI === ''
+        || stateURI === ''
+       }>Retag</button>
+
+      <div>Continuous Retag: &nbsp;
+        <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
+      </div>
+      <hr></hr>
       {/* <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <p>
@@ -107,42 +198,23 @@ function App() {
           Learn React
         </a>
       </header> */}
+      
       <div> 
         {/* list of annotations */}
         <h1>Annotations</h1>
-        {annotations.map((annotation, index) => (
-          <AnnotationEditor value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} />
+        {annotations?.map((annotation, index) => (
+          <AnnotationEditorContainer value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} />
         ))}
       </div>
-      <DocumentViewer serverUrl='ws://localhost:3002' />
-    </div>
+        <DocumentViewer serverUrl='ws://localhost:3002' />
+        <SomeComponent />
+      
+        </div>
+        {/* show the disk state */}
+        <pre>{JSON.stringify(diskState)}</pre>
+    </DocumentProvider>
+    </DiskStateProvider>
   );
 }
-
-// Create a WebSocket connection to the server
-const socket = new WebSocket('ws://localhost:8080');
-
-// Connection opened
-socket.addEventListener('open', (event) => {
-  console.log('WebSocket connection opened');
-  // can use socket.send to send messages to the server
-});
-
-// Listen for messages
-socket.addEventListener('message', (event) => {
-    console.log('Message from server: ', event.data);
-    const state = JSON.parse(event.data);
-    // Now you can use the state object to update your application
-});
-
-// Connection closed
-socket.addEventListener('close', (event) => {
-    console.log('WebSocket connection closed');
-});
-
-// Connection error
-socket.addEventListener('error', (event) => {
-    console.log('WebSocket error: ', event);
-});
 
 export default App;
