@@ -4,6 +4,8 @@ import './App.css';
 import DocumentViewer from './DocumentViewer';
 import Annotation from './Annotation';
 
+import retag from './retag';
+
 // import JsxParser from 'react-jsx-parser'
 
 import { useContext } from 'react';
@@ -157,9 +159,31 @@ function Main() {
     }
   }, [documentContent])
 
-  const handleRetag = () => {
+  const handleRetag = async () => {
     // send message to server to retag
     console.log('Retagging document');
+    if (!annotations) {
+      console.error('Error: no annotations');
+      return;
+    }
+    for (let i = 0; i < annotations.length; i++) {
+      const annotation = annotations[i];
+      console.log('Annotation:', annotation);
+      const oldDocumentContent = annotation.document;
+      const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
+      const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
+      const annotationText = oldDocumentContent.slice(annotation.start, annotation.end);
+      const delimiter = '★';
+      const codeWithSnippetDelimited = codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
+      const updatedCodeWithoutDelimiters = documentContent
+      const output = await retag(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter);
+
+      // update the annotation
+      console.log('Output:', output);
+      const updatedAnnotation = { ...annotation, document: updatedCodeWithoutDelimiters, start:  output.gptRetaggingJSON[1], end: output.gptRetaggingJSON[2] };
+      setDiskState({ annotations: annotations.map((value, j) => j === i ? updatedAnnotation : value) });
+    }
+    
   }
   
   return (
