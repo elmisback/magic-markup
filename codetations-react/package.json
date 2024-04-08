@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",
+    "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/state": "^6.4.1",
     "@codemirror/tooltip": "^0.19.16",
     "@codemirror/view": "^6.26.1",
