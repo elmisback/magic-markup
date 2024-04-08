@@ -1,10 +1,9 @@
-import React from 'react'
 import ColorPicker from './ColorPicker'
 
 function Main() {
   return (<div>
     <h1>Test App</h1>
-    <ColorPicker value={ {
+    <ColorPicker value={{
       "document": "test original document #0000ff",
       "start": 23,
       "end": 31,
@@ -15,8 +14,10 @@ function Main() {
         "start": 23,
         "end": 31
       }
-    }} setValue={ () => undefined} />
-    <p>Test app for testing the framework</p>
+    }} setValue={() => undefined} utils={{ getText: () => '#0000ff', setText: (v: string) => console.log('Got value', v) }} />
+    
+    {/* Add your applications here */}
+    
   </div>)
 }
 

@@ -1,6 +1,6 @@
-import AnnotationEditorProps from '../codetations-react/src/AnnotationEditorProps';
+import AnnotationEditorProps from '../../AnnotationEditorProps';
 
-import NoCodeTool from './lib/NoCodeTool/NoCodeTool';
+import NoCodeTool from '../lib/NoCodeTool/NoCodeTool';
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   console.log('color', JSON.stringify(props.utils.getText()));

@@ -6,10 +6,106 @@ import Annotation from './Annotation';
 import ReactDiffViewer from 'react-diff-viewer-continued';
 import Split from 'react-split'
 import './App.css'
+import CodeMirror, { Decoration, EditorState, EditorView, RangeSetBuilder, basicSetup } from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+
+
 
 import { useContext } from 'react';
 import { DocumentContext, DocumentProvider } from './DocumentContext';
 import { DiskStateContext, DiskStateProvider } from './DiskStateContext';
+
+function App3(props: { documentContent: string, annotations: Annotation[] }) {
+  // just render the document content with the annotations highlighted
+  // write it all out here
+  const { documentContent, annotations } = props;
+  // const contentWithAnnotations = annotations.reduce((acc, annotation) => {
+    
+  return (
+    <div>
+      <h1>Document Content</h1>
+      <pre>{documentContent}</pre>
+      <h1>Annotations</h1>
+      {annotations.map((annotation, index) => (
+        <div key={index}>
+          <div>Start: {annotation.start}</div>
+          <div>End: {annotation.end}</div>
+          <div>Document: {annotation.document}</div>
+          <div>Tool: {annotation.tool}</div>
+          <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// function App2(props: { documentContent: string, annotations: Annotation[]}) {
+//   // get document from props
+//   const { documentContent, annotations } = props;
+
+//   // const [value, setValue] = React.useState("console.log('hello world!');");
+
+//   // readonly, so we don't need to update the document
+//   // const onChange = React.useCallback((val:any, viewUpdate:any) => {
+//   //   console.log('val:', val);
+//   //   setValue(val);
+//   // }, []);
+
+//   // Define decorations for highlighting annotations
+//   const createDecorations = (annotations: Annotation[]) => {
+//     const builder = new RangeSetBuilder<Decoration>();
+//     annotations.forEach((annotation) => {
+//       const { start, end } = annotation;
+//       builder.add(start, end, Decoration.mark({ class: 'highlight-annotation' }));
+//     });
+//     return builder.finish();
+//   };
+
+//   // Create a plugin to add the decoration to the view
+//   const highlightLinePlugin = ViewPlugin.fromClass(class {
+//     constructor(view: any) {
+//       this.decorations = [lineDecoration];
+//       this.update = this.update.bind(this);
+//       this.decorationsPlugin = Decoration.plugin(this.decorations);
+//       this.decorationsPlugin(view);
+//     }
+
+//     update(update) {
+//       const oldRanges = this.decorations.map(d => d.range);
+//       const updatedRanges = update.state.doc.lines.map((_, i) => ({
+//         anchor: i,
+//         head: i
+//       }));
+//       const diff = Decoration.diff(oldRanges, updatedRanges);
+//       this.decorations = this.decorations
+//         .filter(d => !diff.deletions.includes(d))
+//         .concat(diff.additions.map(range => Decoration.line({
+//           attributes: {
+//             style: 'background-color: red;'
+//           },
+//           range
+//         })));
+//       this.decorationsPlugin.update({
+//         decorations: this.decorations
+//       });
+//     }
+//   });
+
+
+//   // Editor state, initialized with decorations for annotations
+//   const [editorState, setEditorState] = useState(() => EditorState.create({
+//     doc: annotations[0]?.document || '',
+//     extensions: [
+//       basicSetup(),
+//       EditorState.readOnly.of(true),
+//       // EditorView.updateListener.of(handleEditorUpdate),
+//       // EditorView.decorations.of(createDecorations(annotations)),
+//       EditorView.decorations.compute([], state => createDecorations(annotations))
+//     ]
+//   }));
+
+//   return <CodeMirror value={documentContent} height="200px" extensions={[javascript({ jsx: true })]} />;
+// }
 
 function useDocument() {
   const context = useContext(DocumentContext);
@@ -184,14 +280,17 @@ function Main() {
     }
     
   }
+
+  if (annotations === undefined) {
+    console.error("Error: annotations couldn't be read", diskState);
+    return <div>Error: annotations couldn't be read</div>;
+  }
   
   return (
     <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
       <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
-      <Split className="split">
-          <div className="document">
-            <DocumentViewer serverUrl='ws://localhost:3002'  />
-          </div>
+        <Split className="split">
+          {/* <App2 documentContent={documentContent} annotations={ annotations }></App2> */}
     <div className="App">
       {/* Document path to open */}
       <div>Document URI: &nbsp;
