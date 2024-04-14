@@ -1,3 +1,4 @@
 .env
 **/lib/*.js
 **/lib/*.js.map
+codetations-react/src/applications/src/config.js
