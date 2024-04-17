@@ -1,4 +1,6 @@
 import ColorPicker from './ColorPicker'
+import FPAnalyzer from './FPAnalyzer'
+import { API_KEY } from './config'; // Make sure you have a config.ts file next to this that exports your Gemini API_KEY
 
 function Main() {
   return (<div>
@@ -16,7 +18,7 @@ function Main() {
       }
     }} setValue={() => undefined} utils={{ getText: () => '#0000ff', setText: (v: string) => console.log('Got value', v) }} />
     
-    {/* Add your applications here */}
+    <FPAnalyzer apiKey={API_KEY}/>
     
   </div>)
 }
