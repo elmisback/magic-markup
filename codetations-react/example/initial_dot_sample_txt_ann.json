@@ -1,9 +1,9 @@
 {
   "annotations": [
     {
-      "document": "test original document #0000FF",
-      "start": 23,
-      "end": 31,
+      "document": "This hex code has a color picker: #80ffff\nRun Codetations to use the color picker.\nAnnotations are saved in ./.<filename>.ann.json.",
+      "start": 34,
+      "end": 41,
       "tool": "colorPicker",
       "metadata": {},
       "original": {

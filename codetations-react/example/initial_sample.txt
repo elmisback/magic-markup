@@ -1,1 +1,3 @@
-test original document #0000FF
+This hex code has a color picker: #80ffff
+Run Codetations to use the color picker.
+Annotations are saved in ./.<filename>.ann.json.
