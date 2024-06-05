@@ -4,16 +4,6 @@ Codetations is an application of Magic Markup to the problem of tool attachment.
 
 TODO further description
 
-## Quick start in VSCode
-
-1. Clone the repository
-2. Run `npm i` to install dependencies
-3. In the codetations-react directory, create a `.env` file with the following content:
-```
-OPENAI_API_KEY=your_openai_api_key
-```
-4. Go to `Run and Debug` and select `Launch Codetations`
-
 ## Development
 
 Codetations has three parts that have to be run in parallel:
@@ -21,6 +11,19 @@ Codetations has three parts that have to be run in parallel:
 1. The frontend, which is a React application.
 2. The Node.js document server, which handles interaction with the disk where application state and documents are stored.
 3. The Node.js retagging server, which handles retagging requests.
+
+## Quick start in VSCode
+
+1. Clone the repository with `git clone git@github.com:elmisback/magic-markup`
+2. Run `npm i` to install dependencies
+3. (Not needed now, but you may need to do this if you modify the server parts.) Switch to the `server` directory and run `tsc` to compile the servers (make sure you have TypeScript installed first, recommend installing via [`nvm`](https://github.com/nvm-sh/nvm)). It will compile with errors, but that's fine.
+4. In the codetations-react directory, create a `.env` file with the following content:
+```
+OPENAI_API_KEY=your_openai_api_key
+```
+5. In VSCode, go to `Run and Debug` and select `Launch Codetations`. This runs a script (in `.vscode/launch.json`) that starts the frontend, document server, and retagging server on ports 3000, 3002, and 3004 respectively. They can also be started individually; see `package.json` scripts for the commands.
+
+
 
 
 

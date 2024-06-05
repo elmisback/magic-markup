@@ -1,6 +1,7 @@
 import ColorPicker from './ColorPicker'
 import FPAnalyzer from './FPAnalyzer'
-import { API_KEY } from './config'; // Make sure you have a config.ts file next to this that exports your Gemini API_KEY
+// import { API_KEY } from './config'; // Make sure you have a config.ts file next to this that exports your Gemini API_KEY
+const API_KEY = 'TODO' // TODO we need to figure out how to pass in an API key; we can probably use the same method as the OPENAI_API_KEY, but it's a little different for third-party apps
 
 function Main() {
   return (<div>
