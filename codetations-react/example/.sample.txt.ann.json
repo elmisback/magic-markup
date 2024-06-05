@@ -1,0 +1,28 @@
+{
+  "annotations": [
+    {
+      "document": "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd",
+      "start": 34,
+      "end": 41,
+      "tool": "colorPicker",
+      "metadata": {},
+      "original": {
+        "document": "test original document #0000FF",
+        "start": 23,
+        "end": 31
+      }
+    },
+    {
+      "start": 60,
+      "end": 67,
+      "document": "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd",
+      "tool": "colorPicker",
+      "metadata": {},
+      "original": {
+        "document": "This hex code has a color picker: #80ffff\nSo does this one: #80ffff\nAnd this one: #80ffff",
+        "start": 60,
+        "end": 67
+      }
+    }
+  ]
+}

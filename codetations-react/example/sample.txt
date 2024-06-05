@@ -1,0 +1,3 @@
+This hex code has a color picker: #80ffff
+So does this one: #a8d7bd
+(added a new line)
