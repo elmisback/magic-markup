@@ -15,7 +15,7 @@ import { DocumentContext, DocumentProvider } from './DocumentContext';
 import { DiskStateContext, DiskStateProvider } from './DiskStateContext';
 import { hover } from '@testing-library/user-event/dist/hover';
 
-function App3(props: { documentContent: string, annotations: Annotation[] }) {
+function App3(props) {
   // just render the document content with the annotations highlighted
   // write it all out here
   const { documentContent, annotations } = props;
@@ -84,7 +84,7 @@ document.body.onmouseup = function() {
   --mouseDown;
 }
 
-const HTMLEditor = (props: { documentContent: string, annotations: Annotation[], setAnnotations: (anns: Annotation[]) => void, hoveredAnnotation: Annotation|null, setHoveredAnnotation: (ann: Annotation|null) => void, selectedAnnotation: Annotation|undefined, setSelectedAnnotation: (ann: Annotation|undefined) => void}) => {
+const HTMLEditor = (props) => {
   const { documentContent, annotations, setAnnotations,
     hoveredAnnotation, setHoveredAnnotation,
     selectedAnnotation, setSelectedAnnotation
@@ -100,10 +100,10 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
 
   // const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
   // const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
-  const [addStartEnd, setAddStartEnd] = useState<[number, number, boolean] | null>(null);
-  const [addTool, setAddTool] = useState<string>('colorPicker');
+  const [addStartEnd, setAddStartEnd] = useState(null);
+  const [addTool, setAddTool] = useState('colorPicker');
   
-  const handleMouseEnter = (index: number) => {
+  const handleMouseEnter = (index) => {
     const annotation = annotations.find(annotation => index >= annotation.start && index <= annotation.end);
     if (!annotation) {
       return;
@@ -115,7 +115,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
     setHoveredAnnotation(null);
   };
 
-  const handleClick = (index: number) => {
+  const handleClick = (index) => {
     const annotation = annotations.find(annotation => index >= annotation.start && index <= annotation.end);
     if (!annotation) {
       setSelectedAnnotation(undefined)
@@ -124,7 +124,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
     setSelectedAnnotation(annotation);
   };
 
-  const numOverlappingAnnotations = (index: number) => {
+  const numOverlappingAnnotations = (index) => {
     return annotations.filter(annotation => index >= annotation.start && index <= annotation.end).length;
   }
 
@@ -133,7 +133,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
     return numOverlapping > acc ? numOverlapping : acc;
   }, 0);
 
-  const getOpacity = (index: number) => {
+  const getOpacity = (index) => {
     const maxOpacity = 1;
     const minOpacity = .3;
     // handle case of no overlapping annotations
@@ -144,7 +144,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
     return numOverlapping === 0 ? 0 : minOpacity + (maxOpacity - minOpacity) * (numOverlapping / maxOverlappingAnnotations);
   };
 
-  const handleSelection = (e: any) => {
+  const handleSelection = (e) => {
     
     const selection = window.getSelection();
     if (!selection) {
@@ -176,7 +176,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
     }
     let [start, end] = addStartEnd;
     end = end + 1;  // HACK fix off-by-one error
-    const newAnnotation: Annotation = {
+    const newAnnotation = {
       start,
       end,
       document: documentContent,
@@ -196,10 +196,10 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
   /* TODO handle case where the selected character is the end of the line (can't do inline-block) */
 
   return (
-    <div className="html-editor">
+    <div>
       <div style={{ display: 'flex' }}>
         <div style={{ flex: 1 }}>
-          <div className="document-view-title">Document view</div>
+          <h1>Document Content</h1>
           <div className="html-annotator" style={{ whiteSpace: 'pre-wrap', fontFamily: 'Source Code Pro' }}>
             {documentContent.split('').map((char, index) => {
               let style = {}
@@ -252,9 +252,8 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
         </div> */}
       </div>
       <div>
-        <div className="add-annotation-title">Add Annotation</div>
-        <div className="add-annotation">
-        <div >Tool: &nbsp;
+        <h1>Add Annotation</h1>
+        <div>Tool: &nbsp;
           {/* select with dropdown */}
           {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
           <select value={addTool} onChange={e => setAddTool(e.target.value)}>
@@ -265,13 +264,10 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
         <div>Start: {addStartEnd?.[0]}</div>
         <div>End: {addStartEnd?.[1]}</div>
         <button onClick={handleAddAnnotationClick}>Add</button>
-
-        </div>
-        
       </div>
       {/* delete annotation button if there's a selected annotation */}
       {selectedAnnotation && <div>
-        <h4>Delete Annotation</h4>
+        <h1>Delete Annotation</h1>
         <button onClick={() => setAnnotations(annotations.filter(annotation => annotation !== selectedAnnotation))}>Delete</button>
       </div>}
       
@@ -314,18 +310,12 @@ function useDiskState() {
   return context;
 }
 
-interface AnnotationUpdate {
-  document?: string;
-  metadata?: any;
-}
 
-interface AnnotationEditorProps {
-  value: Annotation,
-  setValue: (value: AnnotationUpdate) => void,
-  utils?: any;
-}
 
-const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+
+
+const ColorPicker= (props) => {
+  console.log('color', JSON.stringify(props.utils.getText()));
   return (
     <input type="color"
       value={props.utils.getText()}
@@ -333,23 +323,22 @@ const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   );
 }
 
-function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void, hoveredAnnotation: Annotation|null, selectedAnnotation: Annotation|undefined }) {
+function ContainerDisplay(props) {
   const { value, setValue } = props;
 
-  type ToolTypes = {
-    [key: string]: React.FC<AnnotationEditorProps>;
-  };
-
-  const toolTypes : ToolTypes  = {
+  const toolTypes  = {
     colorPicker: ColorPicker,
   }
   const style = {
-    backgroundColor: props.selectedAnnotation === value ? 'lightgreen' : props.hoveredAnnotation === value ? 'lightgray' : 'transparent'
+    backgroundColor:
+      props.selected === value ? '#005500'
+        : props.hovered === value ? '#777777'
+          : 'transparent'
   }
 
   return (
-    <div className="annotation-container" style={ style }>
-      {/* <h2>Annotation</h2>*/}
+    <div style={ style }>
+      <h2>Container</h2>
       {/* <div>Start: {value.start}</div>
       <div>End: {value.end}</div>
       <div>Document: {value.document}</div>
@@ -358,15 +347,15 @@ function AnnotationEditorContainer(props: { value: Annotation, setValue: (value:
       <div>Original Document: {value.original.document}</div>
       <div>Original Start: {value.original.start}</div>
       <div>Original End: {value.original.end}</div> */}
-      {/* <div>Editor:</div> */}
+      <div>Editor:</div>
       {toolTypes[value.tool]?.({
         value,
         setValue:
-          (v: AnnotationUpdate) =>
+          (v) =>
             setValue({ ...value, document: v.document, metadata: v.metadata }),
         utils: {
           getText: () => value.document.slice(value.start, value.end),
-          setText: (newText: string) => {
+          setText: (newText) => {
             setValue({
               document: value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata
@@ -378,7 +367,7 @@ function AnnotationEditorContainer(props: { value: Annotation, setValue: (value:
   )
 }
 
-const SomeComponent: React.FC = () => {
+const SomeComponent = () => {
   const { documentContent } = useDocument();
   
   return (
@@ -408,7 +397,7 @@ function Main() {
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | undefined>(undefined);
   const annotations = diskState?.annotations;
 
-  const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
+  const setAnnotation = (index, annotationUpdate) => {
     console.log('setting annotation', index, annotationUpdate);
     // if the document is out of date, disable setting the annotation
     if (documentOutOfDate) {
@@ -480,18 +469,16 @@ function Main() {
     return <div>Error: annotations couldn't be read</div>;
   }
 
-  const setAnnotations = (anns: Annotation[]) => {
+  const setAnnotations = (anns) => {
     setDiskState({ annotations: anns });
   }
   
   return (
-    <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
-      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
+    <DiskStateProvider stateURI='codetations-react/example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
+      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='codetations-react/example/sample.txt'>
         <Split className="split">
           <HTMLEditor documentContent={documentContent} annotations={annotations} setAnnotations={ setAnnotations }  hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} setHoveredAnnotation={setHoveredAnnotation} setSelectedAnnotation={setSelectedAnnotation}></HTMLEditor>
-          <div className="App">
-          <div className="annotation-view-title">Annotation settings</div>
-
+    <div className="App">
       {/* Document path to open */}
       <div>Document URI: &nbsp;
         <input type="text" value={documentURI} onChange={e => setDocumentURI(e.target.value)} />
@@ -507,25 +494,22 @@ function Main() {
               oldValue={diskState?.annotations[0]?.document || ''}
               newValue={documentContent || ''}
               splitView={true} />}
-      
-        <div className="retag-document">Retag document: <button onClick={handleRetag} disabled={
+      <div>Retag document</div>
+      <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
         || stateURI === ''
-       }>Retag</button></div>
+       }>Retag</button>
+
       <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
       </div>
-      <div className="section-divider"></div>
-            
-            <div className="annotation-list">
-              <div className="annotation-list-title">Annotations</div>
+      <hr></hr>
+      <div> 
         {/* list of annotations */}
-        {annotations?.map((annotation, index) => (<div>
-          <AnnotationEditorContainer value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} />
-          <div className="annotation-separator"></div>
-          </div>
+        <h1>Annotations</h1>
+        {annotations?.map((annotation, index) => (
+          <ContainerDisplay value={annotation} setValue={(a) => setAnnotation(index, a)} key={index} hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} />
         ))}
-              <div className="bottom-space"></div>
             </div>
         </div>
         {/* show the disk state */}

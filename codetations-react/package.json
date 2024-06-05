@@ -32,7 +32,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "retag-server": "node ./server/lib/retag-server.js",
+    "document-server": "node ./server/lib/document-server.js"
   },
   "eslintConfig": {
     "extends": [

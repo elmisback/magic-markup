@@ -1,6 +1,28 @@
-# Getting Started with Create React App
+# Codetations
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Codetations is an application of Magic Markup to the problem of tool attachment.
+
+TODO further description
+
+## Quick start in VSCode
+
+1. Clone the repository
+2. Run `npm i` to install dependencies
+3. In the codetations-react directory, create a `.env` file with the following content:
+```
+OPENAI_API_KEY=your_openai_api_key
+```
+4. Go to `Run and Debug` and select `Launch Codetations`
+
+## Development
+
+Codetations has three parts that have to be run in parallel:
+
+1. The frontend, which is a React application.
+2. The Node.js document server, which handles interaction with the disk where application state and documents are stored.
+3. The Node.js retagging server, which handles retagging requests.
+
+
 
 ## Available Scripts
 

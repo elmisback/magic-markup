@@ -1,5 +1,6 @@
 import React from 'react';
 import AnnotationEditorProps from '../../AnnotationEditorProps';
+
 type Tool = React.FC<AnnotationEditorProps>;
 const ColorPicker: Tool = (props) => {
   return (<input type="color"

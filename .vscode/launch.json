@@ -1,0 +1,52 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "default": "Launch Codetations",
+  "compounds": [
+    {
+      "name": "Launch Codetations",
+      "configurations": ["Launch Chrome against localhost", "Start React App", "Retag Server", "Document Server"],
+      "stopAll": true,
+    }
+  ],
+  "configurations": [ 
+      {
+          "name": "Launch Chrome against localhost",
+          "type": "chrome",
+          "request": "launch",
+          "url": "http://localhost:3000",      // create-react-app's default port 3000
+          "webRoot": "${workspaceRoot}/src",
+      },
+      {
+        "name": "Start React App",
+        // run npm start in the codetations-react folder
+        "cwd": "${workspaceFolder}/codetations-react",
+        "type": "node",
+        "request": "launch",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": [
+          "start"
+        ],
+        "console": "integratedTerminal",
+        "env":{ "BROWSER": "none"}
+      },
+      {
+        "name": "Document Server",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/codetations-react/server/lib/document-server.js",
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Retag Server",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/codetations-react/server/lib/retag-server.js",
+        "console": "integratedTerminal"
+      }
+    
+  ],
+  
+}
