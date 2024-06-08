@@ -15,7 +15,7 @@ Codetations has three parts that have to be run in parallel:
 ## Quick start in VSCode
 
 1. Clone the repository with `git clone git@github.com:elmisback/magic-markup`
-2. Run `npm i` to install dependencies
+2. Change directory to `codetations-react` and run `npm i` to install dependencies
 3. (Not needed now, but you may need to do this if you modify the server parts.) Switch to the `server` directory and run `tsc` to compile the servers (make sure you have TypeScript installed first, recommend installing via [`nvm`](https://github.com/nvm-sh/nvm)). It will compile with errors, but that's fine.
 4. In the codetations-react directory, create a `.env` file with the following content:
 ```
