@@ -19,6 +19,7 @@
     "@types/react-dom": "^18.2.18",
     "@uiw/react-codemirror": "^4.21.25",
     "chokidar": "^3.5.3",
+    "concurrently": "^8.2.2",
     "openai": "^4.51.0",
     "react": "^18.2.0",
     "react-diff-viewer-continued": "^3.4.0",
@@ -35,7 +36,9 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "retag-server": "node ./server/lib/retag-server.js",
-    "document-server": "node ./server/lib/document-server.js"
+    "document-server": "node ./server/lib/document-server.js",
+    "codetations-ui": "node ./node_modules/react-scripts/bin/react-scripts.js start",
+    "codetations": "concurrently \"npm run codetations-ui\" \"npm run retag-server\" \"npm run document-server\""
   },
   "eslintConfig": {
     "extends": [
