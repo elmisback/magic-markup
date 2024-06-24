@@ -380,8 +380,8 @@ const SomeComponent = () => {
 
 function App() {
   return (
-    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI='codetations-react/example/.sample.txt.ann.json'>
-      <DocumentProvider serverUrl='ws://localhost:3002' documentURI='codetations-react/example/sample.txt'>
+    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI='example/.sample.txt.ann.json'>
+      <DocumentProvider serverUrl='ws://localhost:3002' documentURI='example/sample.txt'>
         <Main />
       </DocumentProvider>
     </DiskStateProvider>
@@ -412,8 +412,8 @@ function Main() {
     setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
   }
 
-  const [documentURI, setDocumentURI] = useState('/home/elm/codetations/codetations-react/example/sample.txt');
-  const [stateURI, setStateURI] = useState('/home/elm/codetations/codetations-react/example/.sample.txt.ann');
+  const [documentURI, setDocumentURI] = useState('');
+  const [stateURI, setStateURI] = useState('');
 
   useEffect(() => {
     // check if the document is out of date
@@ -464,20 +464,20 @@ function Main() {
     
   }
 
-  if (annotations === undefined) {
-    console.error("Error: annotations couldn't be read", diskState);
-    return <div>Error: annotations couldn't be read</div>;
-  }
+  // if (annotations === undefined) {
+  //   console.error("Error: annotations couldn't be read", diskState);
+  //   return <div>Error: annotations couldn't be read</div>;
+  // }
 
   const setAnnotations = (anns) => {
     setDiskState({ annotations: anns });
   }
   
   return (
-    <DiskStateProvider stateURI='codetations-react/example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
-      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='codetations-react/example/sample.txt'>
+    <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
+      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
         <Split className="split">
-          <HTMLEditor documentContent={documentContent} annotations={annotations} setAnnotations={ setAnnotations }  hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} setHoveredAnnotation={setHoveredAnnotation} setSelectedAnnotation={setSelectedAnnotation}></HTMLEditor>
+          {annotations !== undefined && <HTMLEditor documentContent={documentContent} annotations={annotations} setAnnotations={setAnnotations} hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} setHoveredAnnotation={setHoveredAnnotation} setSelectedAnnotation={setSelectedAnnotation}></HTMLEditor>}
     <div className="App">
       {/* Document path to open */}
       <div>Document URI: &nbsp;
