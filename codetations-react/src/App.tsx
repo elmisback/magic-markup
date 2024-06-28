@@ -390,16 +390,26 @@ const SomeComponent: React.FC = () => {
 };
 
 function App() {
+  const [stateURI, setStateURI] = useState('example/.sample.txt.ann.json');
+  const [documentURI, setDocumentURI] = useState('example/sample.txt');
+
   return (
-    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI='example/.sample.txt.ann.json'>
-      <DocumentProvider serverUrl='ws://localhost:3002' documentURI='example/sample.txt'>
-        <Main />
+    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
+      <DocumentProvider serverUrl='ws://localhost:3002' documentURI={documentURI}>
+        <Main stateURI={stateURI} documentURI={documentURI} setStateURI={setStateURI} setDocumentURI={setDocumentURI}/>
       </DocumentProvider>
     </DiskStateProvider>
   );
 }
 
-function Main() {
+type MainProps = {
+  documentURI: string,
+  stateURI: string,
+  setStateURI: (newURI: string) => void,
+  setDocumentURI: (newURI: string) => void
+}
+
+function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const { documentContent, setDocumentContent } = useDocument();
   const { diskState, setDiskState } = useDiskState();
   const [continuousRetag, setContinuousRetag] = useState(false);
@@ -422,9 +432,6 @@ function Main() {
     }
     setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
   }
-
-  const [documentURI, setDocumentURI] = useState('');
-  const [stateURI, setStateURI] = useState('');
 
   useEffect(() => {
     // check if the document is out of date
@@ -480,8 +487,8 @@ function Main() {
   }
   
   return (
-    <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
-      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
+    <DiskStateProvider stateURI={stateURI} serverUrl='ws://localhost:3002'>
+      <DocumentProvider serverUrl="ws://localhost:3002" documentURI={documentURI}>
         <Split className="split">
           {annotations !== undefined && <HTMLEditor documentContent={documentContent} annotations={annotations} setAnnotations={setAnnotations} hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} setHoveredAnnotation={setHoveredAnnotation} setSelectedAnnotation={setSelectedAnnotation}></HTMLEditor>}
           <div className="App">
