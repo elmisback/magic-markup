@@ -1,7 +1,6 @@
 {
-  "name": "codetations",
+  "name": "@evank05/codetations",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",
@@ -57,5 +56,21 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "description": "NPM package for the Codetations project.",
+  "main": "index.js",
+  "directories": {
+    "example": "example"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmisback/magic-markup.git"
+  },
+  "author": "Edward Misback",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/elmisback/magic-markup/issues"
+  },
+  "homepage": "https://github.com/elmisback/magic-markup#readme"
 }
