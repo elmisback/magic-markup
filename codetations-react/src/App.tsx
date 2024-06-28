@@ -390,8 +390,8 @@ const SomeComponent: React.FC = () => {
 };
 
 function App() {
-  const [stateURI, setStateURI] = useState('example/.sample.txt.ann.json');
-  const [documentURI, setDocumentURI] = useState('example/sample.txt');
+  const [stateURI, setStateURI] = useState('codetations-react/example/.sample.txt.ann.json');
+  const [documentURI, setDocumentURI] = useState('codetations-react/example/sample.txt');
 
   return (
     <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
@@ -412,6 +412,7 @@ type MainProps = {
 function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const { documentContent, setDocumentContent } = useDocument();
   const { diskState, setDiskState } = useDiskState();
+  // const {diskState, setDiskState} = useContext(DiskStateContext)
   const [continuousRetag, setContinuousRetag] = useState(false);
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
