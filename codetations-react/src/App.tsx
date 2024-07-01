@@ -417,6 +417,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | undefined>(undefined);
+  const [APIKey, setAPIKey] = useState('');
   const annotations = diskState?.annotations;
 
   const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
@@ -472,7 +473,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter })
+          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, apiKey: APIKey })
         }).then(res => res.json());
 
       // update the annotation
@@ -502,6 +503,9 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
       </div>
+      <div>API Key: &nbsp;
+        <input type="text" value={APIKey} onChange={e => setAPIKey(e.target.value)} />
+      </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
           {documentOutOfDate && <div style={{ color: 'red' }}>Document is out of date! Annotation updates are disabled. Re-apply tags to enable updates.</div>}
@@ -513,7 +517,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
       
         <div className="retag-document">Retag document: <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
-        || stateURI === ''
+        || stateURI === '' || APIKey === ''
        }>Retag</button></div>
       <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />

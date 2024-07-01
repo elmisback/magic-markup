@@ -11,8 +11,8 @@ import express from 'express';
 import retagUpdate from './retag.js';
 const serverRetagEndpoint = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     console.log('Retagging document');
-    const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body;
-    const out = yield retagUpdate(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter);
+    const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, apiKey } = req.body;
+    const out = yield retagUpdate(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, apiKey);
     res.json(out);
 });
 const app = express();

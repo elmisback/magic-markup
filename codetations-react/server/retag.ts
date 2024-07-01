@@ -1,10 +1,6 @@
 import OpenAI from 'openai'
 
-import dotenv from 'dotenv'
-
-const openai = new OpenAI({
-  apiKey: dotenv.config().parsed?.OPENAI_API_KEY,
-})
+// import dotenv from 'dotenv'
 
 function normalizeStringAndMapPositions(str: string) {
   let normalized = '';
@@ -90,7 +86,7 @@ The object must look like: {1: <code>, 2: <number>, 3: <number>, 4: <number>}
 
 The answer to 1 should be a code string only, without markdown formatting or extra notes.`
 
-const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutDelimiters:string, delimiter:string) => {
+const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutDelimiters:string, delimiter:string, apiKey:string) => {
   console.log(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter)
   // const gptOut = await getFirstChoice(await getChatCompletion(
   //   'gpt-4-turbo-preview', 
@@ -99,6 +95,12 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
   //                                 updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
   //                                 delimiter})}]))
   // console.log(gptOut)
+
+  // Initialize OpenAI object
+  const openai = new OpenAI({
+    apiKey: apiKey,
+  });
+
   let gptOut='';
   try {
     const gptOutCompletion = await openai.chat.completions.create({
