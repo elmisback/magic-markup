@@ -473,7 +473,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, apiKey: APIKey })
+          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey })
         }).then(res => res.json());
 
       // update the annotation

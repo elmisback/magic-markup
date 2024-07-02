@@ -113,7 +113,7 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
                                     updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
                                     delimiter })}
       ],
-      model: "gpt-4-0125-preview",
+      model: "gpt-3.5-turbo",
       response_format: { type: "json_object" },
     });
     console.log(gptOutCompletion)

@@ -4,9 +4,10 @@ import retagUpdate from './retag.js'
 
 const serverRetagEndpoint = async (req: express.Request, res: express.Response) => {
   console.log('Retagging document')
-  const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body
+  const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey } = req.body
   
-  const out = await retagUpdate(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter)
+  const out = await retagUpdate(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey)
+
   res.json(out)
 }
 
