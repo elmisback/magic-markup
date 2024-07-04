@@ -51,7 +51,7 @@ const DiskStateProvider: React.FC<DiskStateProviderProps> = ({ serverUrl, stateU
     return () => {
       ws.close();
     };
-  }, [serverUrl]);
+  }, [documentURI, serverUrl]);
 
   const handleSetDiskState = (newState: any) => {
     if (!ws) {return}

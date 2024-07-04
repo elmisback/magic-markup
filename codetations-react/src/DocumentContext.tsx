@@ -41,7 +41,7 @@ const DocumentProvider: React.FC<DocumentProviderProps> = ({ serverUrl, document
     return () => {
       ws.close();
     };
-  }, [serverUrl]);
+  }, [documentURI, serverUrl]);
 
   const handleSetDocument = (documentContent: any) => {
     if (!ws) {return}
