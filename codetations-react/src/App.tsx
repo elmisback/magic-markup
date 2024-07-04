@@ -518,7 +518,9 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
         <div className="retag-document">Retag document: <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
         || stateURI === '' || APIKey === ''
-       }>Retag</button></div>
+       }>Retag</button>
+            {APIKey === '' && <div style={{ color: 'red' }}>(API key is required)</div>}
+            </div>
       <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
       </div>
