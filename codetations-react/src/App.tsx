@@ -457,8 +457,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
       console.error('Error: no annotations');
       return;
     }
-    for (let i = 0; i < annotations.length; i++) {
-      const annotation = annotations[i];
+    const updatedAnnotations = await Promise.all(annotations.map(async (annotation) => {
       console.log('Annotation:', annotation);
       const oldDocumentContent = annotation.document;
       const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
@@ -478,10 +477,9 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
 
       // update the annotation
       console.log('Output:', output);
-      const updatedAnnotation = { ...annotation, document: updatedCodeWithoutDelimiters, start:  output.out.leftIdx, end: output.out.rightIdx };
-      setDiskState({ annotations: annotations.map((value, j) => j === i ? updatedAnnotation : value) });
-    }
-    
+      return { ...annotation, document: updatedCodeWithoutDelimiters, start: output.out.leftIdx, end: output.out.rightIdx };
+    }))
+    setDiskState({ annotations: updatedAnnotations});
   }
 
   const setAnnotations = (anns: Annotation[]) => {
