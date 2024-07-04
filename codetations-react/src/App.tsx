@@ -5,7 +5,7 @@ import Annotation from './Annotation';
 import ReactDiffViewer from 'react-diff-viewer-continued';
 import Split from 'react-split'
 import './App.css'
-import {additionalTools} from './tools';
+import {tools} from './tools';
 import CodeMirror, { Decoration, EditorState, EditorView, RangeSetBuilder, ViewPlugin, basicSetup } from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 
@@ -259,7 +259,6 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
           {/* select with dropdown */}
           {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
           <select value={addTool} onChange={e => setAddTool(e.target.value)}>
-            <option value="colorPicker">Color Picker</option>
             {Object.keys(toolTypes).map(toolKey => (
           <option key={toolKey} value={toolKey}>
             {toolKey}
@@ -331,22 +330,14 @@ export interface AnnotationEditorProps {
   utils?: any;
 }
 
-// TODO: Add other tools
-const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
-  return (
-    <input type="color"
-      value={props.utils.getText()}
-      onChange={e => props.utils.setText(e.target.value)} />
-  );
-}
+
 
 type ToolTypes = {
   [key: string]: React.FC<AnnotationEditorProps>;
 };
 
 const toolTypes : ToolTypes  = {
-  colorPicker: ColorPicker,
-  ...additionalTools
+  ...tools
 }
 
 function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void, hoveredAnnotation: Annotation|null, selectedAnnotation: Annotation|undefined }) {
