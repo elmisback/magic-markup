@@ -258,6 +258,7 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
           {/* select with dropdown */}
           {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
           <select value={addTool} onChange={e => setAddTool(e.target.value)}>
+            {/* TODO: add other tools */}
             <option value="colorPicker">Color Picker</option>
           </select>
           
@@ -325,6 +326,7 @@ interface AnnotationEditorProps {
   utils?: any;
 }
 
+// TODO: Add other tools
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
     <input type="color"
@@ -340,6 +342,7 @@ function AnnotationEditorContainer(props: { value: Annotation, setValue: (value:
     [key: string]: React.FC<AnnotationEditorProps>;
   };
 
+  // TODO: add other tools
   const toolTypes : ToolTypes  = {
     colorPicker: ColorPicker,
   }
