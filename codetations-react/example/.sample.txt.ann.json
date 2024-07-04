@@ -23,6 +23,20 @@
         "start": 60,
         "end": 67
       }
+    },
+    {
+      "start": 77,
+      "end": 80,
+      "document": "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+      "tool": "comment",
+      "metadata": {
+        "comment": "abcde"
+      },
+      "original": {
+        "document": "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+        "start": 77,
+        "end": 80
+      }
     }
   ]
 }

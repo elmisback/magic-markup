@@ -12,12 +12,13 @@ const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
 }
 
 const Comment: React.FC<AnnotationEditorProps> = (props) => {
-    return (
-      <input type="text"
-        value={props.utils.getText()}
-        onChange={e => props.utils.setText(e.target.value)} />
-    );
-  }
+  return (
+    <textarea
+      value={props.value.metadata.comment || ""}
+      onChange={e =>
+        props.utils.setMetadata({comment: e.target.value})} />
+  );
+}
   
 
 /* TODO: Add all tools to be used here. */

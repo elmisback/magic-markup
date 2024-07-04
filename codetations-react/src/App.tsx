@@ -371,6 +371,13 @@ function AnnotationEditorContainer(props: { value: Annotation, setValue: (value:
               document: value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata
             });
+          },
+          setMetadata: (newMetadata: any) => {
+            setValue({
+              document: value.document,
+              metadata:
+                { ...value.metadata, ...newMetadata }
+            });
           }
         }
       })}
