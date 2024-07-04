@@ -5,6 +5,7 @@ import Annotation from './Annotation';
 import ReactDiffViewer from 'react-diff-viewer-continued';
 import Split from 'react-split'
 import './App.css'
+import {additionalTools} from './tools';
 import CodeMirror, { Decoration, EditorState, EditorView, RangeSetBuilder, ViewPlugin, basicSetup } from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 
@@ -258,8 +259,12 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
           {/* select with dropdown */}
           {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
           <select value={addTool} onChange={e => setAddTool(e.target.value)}>
-            {/* TODO: add other tools */}
             <option value="colorPicker">Color Picker</option>
+            {Object.keys(toolTypes).map(toolKey => (
+          <option key={toolKey} value={toolKey}>
+            {toolKey}
+          </option>
+        ))}
           </select>
           
         </div>
@@ -320,7 +325,7 @@ interface AnnotationUpdate {
   metadata?: any;
 }
 
-interface AnnotationEditorProps {
+export interface AnnotationEditorProps {
   value: Annotation,
   setValue: (value: AnnotationUpdate) => void,
   utils?: any;
@@ -335,17 +340,18 @@ const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   );
 }
 
+type ToolTypes = {
+  [key: string]: React.FC<AnnotationEditorProps>;
+};
+
+const toolTypes : ToolTypes  = {
+  colorPicker: ColorPicker,
+  ...additionalTools
+}
+
 function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void, hoveredAnnotation: Annotation|null, selectedAnnotation: Annotation|undefined }) {
   const { value, setValue } = props;
 
-  type ToolTypes = {
-    [key: string]: React.FC<AnnotationEditorProps>;
-  };
-
-  // TODO: add other tools
-  const toolTypes : ToolTypes  = {
-    colorPicker: ColorPicker,
-  }
   const style = {
     backgroundColor: props.selectedAnnotation === value ? 'lightgreen' : props.hoveredAnnotation === value ? 'lightgray' : 'transparent'
   }

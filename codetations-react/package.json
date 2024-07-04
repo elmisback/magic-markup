@@ -58,7 +58,7 @@
     ]
   },
   "description": "NPM package for the Codetations project.",
-  "main": "index.js",
+  "main": "index.tsx",
   "directories": {
     "example": "example"
   },
