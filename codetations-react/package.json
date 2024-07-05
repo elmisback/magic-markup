@@ -39,6 +39,9 @@
     "codetations-ui": "node ./node_modules/react-scripts/bin/react-scripts.js start",
     "codetations": "concurrently -c auto -n \"webpack,retag-server,document-server\" \"npm run codetations-ui\" \"npm run retag-server\" \"npm run document-server\""
   },
+  "bin": {
+    "codetations": "./run-codetations.js"
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
