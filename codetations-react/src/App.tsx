@@ -526,9 +526,9 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
        }>Retag</button>
             {APIKey === '' && <div style={{ color: 'red' }}>(API key is required)</div>}
             </div>
-      <div>Continuous Retag: &nbsp;
+      {/* <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
-      </div>
+      </div> */}
       <div className="section-divider"></div>
             
             <div className="annotation-list">
