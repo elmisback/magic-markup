@@ -5,6 +5,7 @@ import Annotation from './Annotation';
 import ReactDiffViewer from 'react-diff-viewer-continued';
 import Split from 'react-split'
 import './App.css'
+import {tools} from './tools';
 import CodeMirror, { Decoration, EditorState, EditorView, RangeSetBuilder, ViewPlugin, basicSetup } from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 
@@ -258,7 +259,11 @@ const HTMLEditor = (props: { documentContent: string, annotations: Annotation[],
           {/* select with dropdown */}
           {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
           <select value={addTool} onChange={e => setAddTool(e.target.value)}>
-            <option value="colorPicker">Color Picker</option>
+            {Object.keys(toolTypes).map(toolKey => (
+          <option key={toolKey} value={toolKey}>
+            {toolKey}
+          </option>
+        ))}
           </select>
           
         </div>
@@ -319,30 +324,25 @@ interface AnnotationUpdate {
   metadata?: any;
 }
 
-interface AnnotationEditorProps {
+export interface AnnotationEditorProps {
   value: Annotation,
   setValue: (value: AnnotationUpdate) => void,
   utils?: any;
 }
 
-const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
-  return (
-    <input type="color"
-      value={props.utils.getText()}
-      onChange={e => props.utils.setText(e.target.value)} />
-  );
+
+
+type ToolTypes = {
+  [key: string]: React.FC<AnnotationEditorProps>;
+};
+
+const toolTypes : ToolTypes  = {
+  ...tools
 }
 
 function AnnotationEditorContainer(props: { value: Annotation, setValue: (value: AnnotationUpdate) => void, hoveredAnnotation: Annotation|null, selectedAnnotation: Annotation|undefined }) {
   const { value, setValue } = props;
 
-  type ToolTypes = {
-    [key: string]: React.FC<AnnotationEditorProps>;
-  };
-
-  const toolTypes : ToolTypes  = {
-    colorPicker: ColorPicker,
-  }
   const style = {
     backgroundColor: props.selectedAnnotation === value ? 'lightgreen' : props.hoveredAnnotation === value ? 'lightgray' : 'transparent'
   }
@@ -371,6 +371,13 @@ function AnnotationEditorContainer(props: { value: Annotation, setValue: (value:
               document: value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata
             });
+          },
+          setMetadata: (newMetadata: any) => {
+            setValue({
+              document: value.document,
+              metadata:
+                { ...value.metadata, ...newMetadata }
+            });
           }
         }
       })}
@@ -390,22 +397,34 @@ const SomeComponent: React.FC = () => {
 };
 
 function App() {
+  const [stateURI, setStateURI] = useState('codetations-react/example/.sample.txt.ann.json');
+  const [documentURI, setDocumentURI] = useState('codetations-react/example/sample.txt');
+
   return (
-    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI='example/.sample.txt.ann.json'>
-      <DocumentProvider serverUrl='ws://localhost:3002' documentURI='example/sample.txt'>
-        <Main />
+    <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
+      <DocumentProvider serverUrl='ws://localhost:3002' documentURI={documentURI}>
+        <Main stateURI={stateURI} documentURI={documentURI} setStateURI={setStateURI} setDocumentURI={setDocumentURI}/>
       </DocumentProvider>
     </DiskStateProvider>
   );
 }
 
-function Main() {
+type MainProps = {
+  documentURI: string,
+  stateURI: string,
+  setStateURI: (newURI: string) => void,
+  setDocumentURI: (newURI: string) => void
+}
+
+function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const { documentContent, setDocumentContent } = useDocument();
   const { diskState, setDiskState } = useDiskState();
+  // const {diskState, setDiskState} = useContext(DiskStateContext)
   const [continuousRetag, setContinuousRetag] = useState(false);
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | undefined>(undefined);
+  const [APIKey, setAPIKey] = useState('');
   const annotations = diskState?.annotations;
 
   const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
@@ -422,9 +441,6 @@ function Main() {
     }
     setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
   }
-
-  const [documentURI, setDocumentURI] = useState('');
-  const [stateURI, setStateURI] = useState('');
 
   useEffect(() => {
     // check if the document is out of date
@@ -448,8 +464,7 @@ function Main() {
       console.error('Error: no annotations');
       return;
     }
-    for (let i = 0; i < annotations.length; i++) {
-      const annotation = annotations[i];
+    const updatedAnnotations = await Promise.all(annotations.map(async (annotation) => {
       console.log('Annotation:', annotation);
       const oldDocumentContent = annotation.document;
       const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
@@ -464,15 +479,14 @@ function Main() {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter })
+          body: JSON.stringify({ codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey })
         }).then(res => res.json());
 
       // update the annotation
       console.log('Output:', output);
-      const updatedAnnotation = { ...annotation, document: updatedCodeWithoutDelimiters, start:  output.out.leftIdx, end: output.out.rightIdx };
-      setDiskState({ annotations: annotations.map((value, j) => j === i ? updatedAnnotation : value) });
-    }
-    
+      return { ...annotation, document: updatedCodeWithoutDelimiters, start: output.out.leftIdx, end: output.out.rightIdx };
+    }))
+    setDiskState({ annotations: updatedAnnotations});
   }
 
   const setAnnotations = (anns: Annotation[]) => {
@@ -480,8 +494,8 @@ function Main() {
   }
   
   return (
-    <DiskStateProvider stateURI='example/.sample.txt.ann.json' serverUrl='ws://localhost:3002'>
-      <DocumentProvider serverUrl="ws://localhost:3002" documentURI='example/sample.txt'>
+    <DiskStateProvider stateURI={stateURI} serverUrl='ws://localhost:3002'>
+      <DocumentProvider serverUrl="ws://localhost:3002" documentURI={documentURI}>
         <Split className="split">
           {annotations !== undefined && <HTMLEditor documentContent={documentContent} annotations={annotations} setAnnotations={setAnnotations} hoveredAnnotation={hoveredAnnotation} selectedAnnotation={selectedAnnotation} setHoveredAnnotation={setHoveredAnnotation} setSelectedAnnotation={setSelectedAnnotation}></HTMLEditor>}
           <div className="App">
@@ -494,6 +508,9 @@ function Main() {
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
       </div>
+      <div>API Key: &nbsp;
+        <input type="text" value={APIKey} onChange={e => setAPIKey(e.target.value)} />
+      </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
           {documentOutOfDate && <div style={{ color: 'red' }}>Document is out of date! Annotation updates are disabled. Re-apply tags to enable updates.</div>}
@@ -505,11 +522,13 @@ function Main() {
       
         <div className="retag-document">Retag document: <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
-        || stateURI === ''
-       }>Retag</button></div>
-      <div>Continuous Retag: &nbsp;
+        || stateURI === '' || APIKey === ''
+       }>Retag</button>
+            {APIKey === '' && <div style={{ color: 'red' }}>(API key is required)</div>}
+            </div>
+      {/* <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
-      </div>
+      </div> */}
       <div className="section-divider"></div>
             
             <div className="annotation-list">

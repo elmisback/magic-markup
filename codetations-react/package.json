@@ -1,7 +1,6 @@
 {
-  "name": "codetations",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@evank05/codetations",
+  "version": "0.2.0",
   "type": "module",
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",
@@ -40,6 +39,9 @@
     "codetations-ui": "node ./node_modules/react-scripts/bin/react-scripts.js start",
     "codetations": "concurrently -c auto -n \"webpack,retag-server,document-server\" \"npm run codetations-ui\" \"npm run retag-server\" \"npm run document-server\""
   },
+  "bin": {
+    "codetations": "./run-codetations.js"
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -57,5 +59,21 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "description": "NPM package for the Codetations project.",
+  "main": "index.tsx",
+  "directories": {
+    "example": "example"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmisback/magic-markup.git"
+  },
+  "author": "Edward Misback",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/elmisback/magic-markup/issues"
+  },
+  "homepage": "/"
 }
