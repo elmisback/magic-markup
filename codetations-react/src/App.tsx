@@ -399,7 +399,7 @@ const SomeComponent: React.FC = () => {
 
 function App() {
   const [stateURI, setStateURI] = useState(localStorage.getItem('StateURI') || '');
-  const [documentURI, setDocumentURI] = useState(getDocURI(localStorage.getItem('StateURI')));
+  const [documentURI, setDocumentURI] = useState(getStateURI(localStorage.getItem('StateURI')));
 
   return (
     <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
@@ -417,10 +417,10 @@ type MainProps = {
   setDocumentURI: (newURI: string) => void
 }
 
-function getDocURI(stateURI: string | null): string {
-  if (!stateURI) return '';
+function getStateURI(docURI: string | null): string {
+  if (!docURI) return '';
   const re: RegExp = /^(.*\/)([^\/]+)$/;
-        const match: RegExpMatchArray | null = stateURI.match(re);
+        const match: RegExpMatchArray | null = docURI.match(re);
         if (match && match.length === 3) {
           return match[1] + '.' + match[2] + '.ann.json';
         }
@@ -452,9 +452,9 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
     setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
   }
 
-  function updateURIs(stateURI: string) {
-    setStateURI(stateURI);
-    setDocumentURI(getDocURI(stateURI));
+  function updateURIs(documentURI: string) {
+    setDocumentURI(documentURI);
+    setStateURI(getStateURI(documentURI));
   }
 
   useEffect(() => {
@@ -508,10 +508,6 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const setAnnotations = (anns: Annotation[]) => {
     setDiskState({ annotations: anns });
   }
-
-  if (APIKey === '') {
-    return <div>Set API key in localStorage!</div>
-  }
   
   return (
     <DiskStateProvider stateURI={stateURI} serverUrl='ws://localhost:3002'>
@@ -522,8 +518,14 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
           <div className="annotation-view-title">Annotation settings</div>
 
       {/* Document path to open */}
+      <div>Document URI: 
+        <input type="text" value={documentURI} onChange={e => updateURIs(e.target.value)} />
+      </div>
       <div>State URI: &nbsp;
-        <input type="text" value={stateURI} onChange={e => updateURIs(e.target.value)} />
+        <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
+      </div>
+      <div>API Key: 
+        <input type="text" value={APIKey} onChange={e => setAPIKey(e.target.value)} />
       </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
