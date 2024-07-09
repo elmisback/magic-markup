@@ -451,6 +451,11 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
     setDiskState({ annotations: annotations?.map((value, i) => i === index ? {...annotations[i], ...annotationUpdate} : value) });
   }
 
+  function updateURIs(stateURI: string) {
+    setStateURI(stateURI);
+    setDocumentURI(getDocURI(stateURI));
+  }
+
   useEffect(() => {
     console.log('Loading data from localStorage...')
     const lsAPIKey: string | null = localStorage.getItem('APIKey');
@@ -528,11 +533,8 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
           <div className="annotation-view-title">Annotation settings</div>
 
       {/* Document path to open */}
-      <div>Document URI: &nbsp;
-        <input type="text" value={documentURI} onChange={e => setDocumentURI(e.target.value)} />
-      </div>
       <div>State URI: &nbsp;
-        <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
+        <input type="text" value={stateURI} onChange={e => updateURIs(e.target.value)} />
       </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
