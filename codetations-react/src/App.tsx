@@ -518,13 +518,13 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
           <div className="annotation-view-title">Annotation settings</div>
 
       {/* Document path to open */}
-      <div>Document URI: 
+      <div>Document URI: &nbsp;
         <input type="text" value={documentURI} onChange={e => updateURIs(e.target.value)} />
       </div>
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
       </div>
-      <div>API Key: 
+      <div>API Key: &nbsp;
         <input type="text" value={APIKey} onChange={e => setAPIKey(e.target.value)} />
       </div>
           <hr></hr>
