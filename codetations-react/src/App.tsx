@@ -398,8 +398,8 @@ const SomeComponent: React.FC = () => {
 };
 
 function App() {
-  const [stateURI, setStateURI] = useState('codetations-react/example/.sample.txt.ann.json');
-  const [documentURI, setDocumentURI] = useState('codetations-react/example/sample.txt');
+  const [stateURI, setStateURI] = useState('');
+  const [documentURI, setDocumentURI] = useState('');
 
   return (
     <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
@@ -415,6 +415,15 @@ type MainProps = {
   stateURI: string,
   setStateURI: (newURI: string) => void,
   setDocumentURI: (newURI: string) => void
+}
+
+function getDocURI(stateURI: string): string {
+  const re: RegExp = /^(.*\/)([^\/]+)$/;
+        const match: RegExpMatchArray | null = stateURI.match(re);
+        if (match && match.length === 3) {
+          return match[1] + '.' + match[2] + '.ann.json';
+        }
+  return '';
 }
 
 function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
@@ -449,7 +458,13 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
     const lsDocumentURI: string | null = localStorage.getItem('DocumentURI');
     if (lsAPIKey) setAPIKey(lsAPIKey);
     if (lsStateURI) setStateURI(lsStateURI);
-    if (lsDocumentURI) setDocumentURI(lsDocumentURI);
+    if (lsDocumentURI) {
+      setDocumentURI(lsDocumentURI);
+    } else {
+      if (lsStateURI) {
+        setDocumentURI(getDocURI(lsStateURI));
+      }
+    }
     // check if the document is out of date
     // compare the document content to the state file
     // if the document is out of date, setDocumentOutOfDate(true)
@@ -518,9 +533,6 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
       </div>
       <div>State URI: &nbsp;
         <input type="text" value={stateURI} onChange={e => setStateURI(e.target.value)} />
-      </div>
-      <div>API Key: &nbsp;
-        <input type="text" value={APIKey} onChange={e => setAPIKey(e.target.value)} />
       </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
