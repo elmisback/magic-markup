@@ -15,6 +15,7 @@ import { useContext } from 'react';
 import { DocumentContext, DocumentProvider } from './DocumentContext';
 import { DiskStateContext, DiskStateProvider } from './DiskStateContext';
 import { hover } from '@testing-library/user-event/dist/hover';
+import { isDisabled } from '@testing-library/user-event/dist/utils';
 
 function App3(props: { documentContent: string, annotations: Annotation[] }) {
   // just render the document content with the annotations highlighted
@@ -431,7 +432,6 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
     console.log('setting annotation', index, annotationUpdate);
     // if the document is out of date, disable setting the annotation
     if (documentOutOfDate) {
-      console.error('Document is out of date');
       return;
     }
     // if the annotation involves setting the document, first we need to do that
@@ -443,6 +443,13 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   }
 
   useEffect(() => {
+    console.log('Loading data from localStorage...')
+    const lsAPIKey: string | null = localStorage.getItem('APIKey');
+    const lsStateURI: string | null = localStorage.getItem('StateURI');
+    const lsDocumentURI: string | null = localStorage.getItem('DocumentURI');
+    if (lsAPIKey) setAPIKey(lsAPIKey);
+    if (lsStateURI) setStateURI(lsStateURI);
+    if (lsDocumentURI) setDocumentURI(lsDocumentURI);
     // check if the document is out of date
     // compare the document content to the state file
     // if the document is out of date, setDocumentOutOfDate(true)
@@ -492,6 +499,10 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const setAnnotations = (anns: Annotation[]) => {
     setDiskState({ annotations: anns });
   }
+
+  if (APIKey === '') {
+    return <div>Set API key in localStorage!</div>
+  }
   
   return (
     <DiskStateProvider stateURI={stateURI} serverUrl='ws://localhost:3002'>
@@ -513,7 +524,6 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
       </div>
           <hr></hr>
           {/* if document is out of date, show a warning */}
-          {documentOutOfDate && <div style={{ color: 'red' }}>Document is out of date! Annotation updates are disabled. Re-apply tags to enable updates.</div>}
           {documentOutOfDate &&
             <ReactDiffViewer
               oldValue={diskState?.annotations[0]?.document || ''}
@@ -523,7 +533,10 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
         <div className="retag-document">Retag document: <button onClick={handleRetag} disabled={
         !documentOutOfDate || continuousRetag || documentURI === ''
         || stateURI === '' || APIKey === ''
-       }>Retag</button>
+       } style={{
+        backgroundColor: documentOutOfDate && !(continuousRetag || documentURI === ''
+          || stateURI === '' || APIKey === '') ? 'chartreuse' : 'initial',
+      }}>Retag</button>
             {APIKey === '' && <div style={{ color: 'red' }}>(API key is required)</div>}
             </div>
       {/* <div>Continuous Retag: &nbsp;
