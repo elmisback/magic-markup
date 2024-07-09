@@ -398,8 +398,8 @@ const SomeComponent: React.FC = () => {
 };
 
 function App() {
-  const [stateURI, setStateURI] = useState('');
-  const [documentURI, setDocumentURI] = useState('');
+  const [stateURI, setStateURI] = useState(localStorage.getItem('StateURI') || '');
+  const [documentURI, setDocumentURI] = useState(getDocURI(localStorage.getItem('StateURI')));
 
   return (
     <DiskStateProvider serverUrl='ws://localhost:3002' stateURI={stateURI}>
@@ -417,7 +417,8 @@ type MainProps = {
   setDocumentURI: (newURI: string) => void
 }
 
-function getDocURI(stateURI: string): string {
+function getDocURI(stateURI: string | null): string {
+  if (!stateURI) return '';
   const re: RegExp = /^(.*\/)([^\/]+)$/;
         const match: RegExpMatchArray | null = stateURI.match(re);
         if (match && match.length === 3) {
@@ -434,7 +435,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | undefined>(undefined);
-  const [APIKey, setAPIKey] = useState('');
+  const [APIKey, setAPIKey] = useState(localStorage.getItem('APIKey') || '');
   const annotations = diskState?.annotations;
 
   const setAnnotation = (index: number, annotationUpdate: AnnotationUpdate) => {
@@ -457,19 +458,7 @@ function Main({documentURI, stateURI, setStateURI, setDocumentURI}: MainProps) {
   }
 
   useEffect(() => {
-    console.log('Loading data from localStorage...')
-    const lsAPIKey: string | null = localStorage.getItem('APIKey');
-    const lsStateURI: string | null = localStorage.getItem('StateURI');
-    const lsDocumentURI: string | null = localStorage.getItem('DocumentURI');
-    if (lsAPIKey) setAPIKey(lsAPIKey);
-    if (lsStateURI) setStateURI(lsStateURI);
-    if (lsDocumentURI) {
-      setDocumentURI(lsDocumentURI);
-    } else {
-      if (lsStateURI) {
-        setDocumentURI(getDocURI(lsStateURI));
-      }
-    }
+
     // check if the document is out of date
     // compare the document content to the state file
     // if the document is out of date, setDocumentOutOfDate(true)
