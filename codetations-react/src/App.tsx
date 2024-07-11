@@ -470,23 +470,12 @@ function AnnotationEditorContainer(props: {
   );
 }
 
-const SomeComponent: React.FC = () => {
-  const { documentContent } = useDocument();
-
-  return (
-    <div>
-      <h3>Document Content:</h3>
-      <pre>{documentContent}</pre>
-    </div>
-  );
-};
-
 function App() {
   const [stateURI, setStateURI] = useState(
     localStorage.getItem("StateURI") || ""
   );
   const [documentURI, setDocumentURI] = useState(
-    getStateURI(localStorage.getItem("StateURI"))
+    localStorage.getItem("DocumentURI") || ""
   );
 
   return (
@@ -496,8 +485,8 @@ function App() {
         documentURI={documentURI}
       >
         <Main
-          stateURI={stateURI}
           documentURI={documentURI}
+          stateURI={stateURI}
           setStateURI={setStateURI}
           setDocumentURI={setDocumentURI}
         />
@@ -566,6 +555,7 @@ function Main({
 
   function updateURIs(documentURI: string) {
     setDocumentURI(documentURI);
+    localStorage.setItem("StateURI", getStateURI(documentURI));
     setStateURI(getStateURI(documentURI));
   }
 
@@ -666,7 +656,10 @@ function Main({
               <input
                 type="text"
                 value={documentURI}
-                onChange={(e) => updateURIs(e.target.value)}
+                onChange={(e) => {
+                  localStorage.setItem("DocumentURI", e.target.value);
+                  updateURIs(e.target.value)
+                }}
               />
             </div>
             <div>
@@ -674,7 +667,10 @@ function Main({
               <input
                 type="text"
                 value={stateURI}
-                onChange={(e) => setStateURI(e.target.value)}
+                onChange={(e) => {
+                  localStorage.setItem("StateURI", e.target.value);
+                  setStateURI(e.target.value)
+                }}
               />
             </div>
             <div>
@@ -682,7 +678,10 @@ function Main({
               <input
                 type="text"
                 value={APIKey}
-                onChange={(e) => setAPIKey(e.target.value)}
+                onChange={(e) => {
+                  localStorage.setItem("APIKey", e.target.value);
+                  setAPIKey(e.target.value)
+                }}
               />
             </div>
             <hr></hr>
