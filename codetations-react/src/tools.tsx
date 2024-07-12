@@ -1,6 +1,6 @@
 import { AnnotationEditorProps } from "./App";
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
@@ -22,27 +22,39 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
-  const [response, setResponse] = useState(null);
-  const [error, setError] = useState("");
+  const [code, setCode] = useState(props.utils.getText());
 
   function runCode(): void {
     try {
-      const result = new Function(props.utils.getText())();
-      setResponse(result);
-      setError("");
+      const result = new Function(code)();
+      props.utils.setMetadata({ response: result, error: null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setResponse(null);
+      props.utils.setMetadata({
+        response: null,
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
   return (
     <div>
-      {error && <div style={{ color: "red" }}>An error occured: {error}</div>}
-      {response && <div>Response: &nbsp; {response}</div>}
-      <input type="text" value={props.utils.getText()} />
-      &nbsp;
+      {props.value.metadata.error && (
+        <div style={{ color: "red" }}>
+          An error occured: {props.value.metadata.error}
+        </div>
+      )}
+      {props.value.metadata.response && (
+        <div>Response: &nbsp; {props.value.metadata.response}</div>
+      )}
+      <textarea value={code} onChange={(e) => setCode(e.target.value)} />
+      <br></br>
       <button onClick={runCode}>Run Highlighted Code</button>
+      <br></br>
+      <button
+        onClick={() => props.utils.setMetadata({ response: null, error: null })}
+      >
+        Clear Output
+      </button>
     </div>
   );
 };
