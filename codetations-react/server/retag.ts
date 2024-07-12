@@ -1,73 +1,103 @@
-import OpenAI from 'openai'
+import OpenAI from "openai";
 
 // import dotenv from 'dotenv'
 
 function normalizeStringAndMapPositions(str: string) {
-  let normalized = '';
+  let normalized = "";
   let positionMap = [];
   let originalPosition = 0;
 
   for (let i = 0; i < str.length; i++) {
-      if (str[i].match(/\s/) && (i === 0 || str[i-1].match(/\s/))) {
-          // Skip multiple whitespaces
-          continue;
-      }
-      // Add character to normalized string and map its position
-      normalized += str[i].match(/\s/) ? ' ' : str[i];
-      positionMap.push(originalPosition);
-      originalPosition = i + 1;
+    if (str[i].match(/\s/) && (i === 0 || str[i - 1].match(/\s/))) {
+      // Skip multiple whitespaces
+      continue;
+    }
+    // Add character to normalized string and map its position
+    normalized += str[i].match(/\s/) ? " " : str[i];
+    positionMap.push(originalPosition);
+    originalPosition = i + 1;
   }
 
   return { normalized, positionMap };
 }
 
-function findOriginalPositions(originalStr:string, matchStart:number, matchEnd:number, positionMap:number[]) {
+function findOriginalPositions(
+  originalStr: string,
+  matchStart: number,
+  matchEnd: number,
+  positionMap: number[]
+) {
   // Adjust the positions based on the position map
   const originalStart = positionMap[matchStart + 1] - 1;
-  const originalEnd = positionMap[matchEnd] + (originalStr[positionMap[matchEnd]] === ' ' ? 0 : 1);
+  const originalEnd =
+    positionMap[matchEnd] +
+    (originalStr[positionMap[matchEnd]] === " " ? 0 : 1);
 
   return { originalStart, originalEnd };
 }
 
-function findStartAndEndNormalized(largerString:string, substring:string, nthOccurence=0) {
+function findStartAndEndNormalized(
+  largerString: string,
+  substring: string,
+  nthOccurence = 0
+) {
   // Normalize and map positions
-  const {normalized: normalizedLargerString, positionMap} = normalizeStringAndMapPositions(largerString);
-  const {normalized: normalizedSubstring} = normalizeStringAndMapPositions(substring);
-  
+  const { normalized: normalizedLargerString, positionMap } =
+    normalizeStringAndMapPositions(largerString);
+  const { normalized: normalizedSubstring } =
+    normalizeStringAndMapPositions(substring);
+
   // Assume we found the match in the normalized strings (example positions)
   let matchStart = normalizedLargerString.indexOf(normalizedSubstring);
   let matchEnd = matchStart + normalizedSubstring.length - 1;
-  
+
   // Find original positions
-  const {originalStart, originalEnd} = findOriginalPositions(largerString, matchStart, matchEnd, positionMap);
+  const { originalStart, originalEnd } = findOriginalPositions(
+    largerString,
+    matchStart,
+    matchEnd,
+    positionMap
+  );
   return {
     start: originalStart,
-    end: originalEnd
-  }
+    end: originalEnd,
+  };
 }
 
 type CodeUpdate = {
-  codeWithSnippetDelimited: string,
-  updatedCodeWithSnippetDelimited: string,
-  delimiter: string
-}
+  codeWithSnippetDelimited: string;
+  updatedCodeWithSnippetDelimited: string;
+  delimiter: string;
+};
 
 const prompt_breakdown11 = (t: CodeUpdate) => `Consider the following file:
 
 <INPUT>
-${t.codeWithSnippetDelimited.split('\n').map((l, i) => i+1 + ':' + l).join('\n')}
+${t.codeWithSnippetDelimited
+  .split("\n")
+  .map((l, i) => i + 1 + ":" + l)
+  .join("\n")}
 </INPUT>
 
-A specific segment of code has been marked with "${t.delimiter}". The segment refers to ONLY THE TEXT BETWEEN THE "${t.delimiter}" marks:
+A specific segment of code has been marked with "${
+  t.delimiter
+}". The segment refers to ONLY THE TEXT BETWEEN THE "${t.delimiter}" marks:
 
 <SEGMENT>
-${t.codeWithSnippetDelimited.slice(t.codeWithSnippetDelimited.indexOf(t.delimiter) + 1, t.codeWithSnippetDelimited.lastIndexOf(t.delimiter))}
+${t.codeWithSnippetDelimited.slice(
+  t.codeWithSnippetDelimited.indexOf(t.delimiter) + 1,
+  t.codeWithSnippetDelimited.lastIndexOf(t.delimiter)
+)}
 </SEGMENT>
 
 Next, consider the following updated file:
 
 <UPDATED>
-${t.updatedCodeWithSnippetDelimited.replaceAll(t.delimiter, '').split('\n').map((l, i) => i+1 + ':' + l).join('\n')}
+${t.updatedCodeWithSnippetDelimited
+  .replaceAll(t.delimiter, "")
+  .split("\n")
+  .map((l, i) => i + 1 + ":" + l)
+  .join("\n")}
 </UPDATED>
 
 You are responsible for placing an identical annotation on this updated file. It is extremely important that you place the annotation in the correct place. Important metadata is attached to this segment.
@@ -84,14 +114,23 @@ Describe possible sections the specific segment could be said to be located in. 
 
 The object must look like: {1: <code>, 2: <number>, 3: <number>, 4: <number>}
 
-The answer to 1 should be a code string only, without markdown formatting or extra notes.`
+The answer to 1 should be a code string only, without markdown formatting or extra notes.`;
 
-const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutDelimiters:string, delimiter:string, apiKey:string) => {
-  console.log(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter)
+const retagUpdate = async (
+  codeWithSnippetDelimited: string,
+  updatedCodeWithoutDelimiters: string,
+  delimiter: string,
+  apiKey: string
+) => {
+  console.log(
+    codeWithSnippetDelimited,
+    updatedCodeWithoutDelimiters,
+    delimiter
+  );
   // const gptOut = await getFirstChoice(await getChatCompletion(
-  //   'gpt-4-turbo-preview', 
-  //   [{role: 'user', 
-  //     content: prompt_breakdown9({codeWithSnippetDelimited, 
+  //   'gpt-4-turbo-preview',
+  //   [{role: 'user',
+  //     content: prompt_breakdown9({codeWithSnippetDelimited,
   //                                 updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
   //                                 delimiter})}]))
   // console.log(gptOut)
@@ -101,7 +140,7 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
     apiKey: apiKey,
   });
 
-  let gptOut='';
+  let gptOut = "";
   try {
     const gptOutCompletion = await openai.chat.completions.create({
       messages: [
@@ -109,35 +148,40 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
           role: "system",
           content: "You are a helpful assistant designed to output JSON.",
         },
-        { role: "user", content: prompt_breakdown11({codeWithSnippetDelimited, 
-                                    updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
-                                    delimiter })}
+        {
+          role: "user",
+          content: prompt_breakdown11({
+            codeWithSnippetDelimited,
+            updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
+            delimiter,
+          }),
+        },
       ],
       model: "gpt-3.5-turbo",
       response_format: { type: "json_object" },
     });
-    console.log(gptOutCompletion)
+    console.log(gptOutCompletion);
 
-    gptOut = gptOutCompletion.choices[0]?.message.content || ''
-    console.log(gptOut)
+    gptOut = gptOutCompletion.choices[0]?.message.content || "";
+    console.log(gptOut);
   } catch (e) {
-    return {error: e, errorType: 'model'}
+    return { error: e, errorType: "model" };
   }
   let gptRetaggingJSON;
   try {
-    gptRetaggingJSON = JSON.parse(gptOut)
-    console.log(gptRetaggingJSON)
+    gptRetaggingJSON = JSON.parse(gptOut);
+    console.log(gptRetaggingJSON);
   } catch (e) {
     // (This should never happen based on the OpenAI documentation.)
-    return {error: e, errorType: 'JSON parse', gptOut}
+    return { error: e, errorType: "JSON parse", gptOut };
   }
   // console.log(completion.choices[0].message.content);
   /* Unhandled issues:
-      * the response may be incorrect; could check across several tries to mitigate
-      * the response may be correct but there may be multiple correct responses; disambiguation needed
-      * the response may have an unreadable format, leading to failure in the next part
-  */
-  
+   * the response may be incorrect; could check across several tries to mitigate
+   * the response may be correct but there may be multiple correct responses; disambiguation needed
+   * the response may have an unreadable format, leading to failure in the next part
+   */
+
   // const gptRetaggingJSONString = (await askMX([
   //       { role: 'system',
   //         content: 'You are a text parser designed to output JSON.'},
@@ -147,21 +191,29 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
   // console.log(gptRetaggingJSONString)
   // const gptRetaggingJSON = JSON.parse(gptRetaggingJSONString)
   /* Unhandled issues:
-      * the response may be incorrect given the input
-      * failure to parse
-  */
-  
+   * the response may be incorrect given the input
+   * failure to parse
+   */
+
   type UpdateParameters = {
-    code: string,
-    snippet: string,
-    lineStart: number,
-    lineEnd: number,
-    nthOccurrence: number,
-    delimiterStart: string,
-    delimiterEnd: string
-  }
-  
-  const computeUpdatedCodeWithSnippetRetagged = ({code, snippet, lineStart, lineEnd, nthOccurrence, delimiterStart, delimiterEnd}: UpdateParameters) => {
+    code: string;
+    snippet: string;
+    lineStart: number;
+    lineEnd: number;
+    nthOccurrence: number;
+    delimiterStart: string;
+    delimiterEnd: string;
+  };
+
+  const computeUpdatedCodeWithSnippetRetagged = ({
+    code,
+    snippet,
+    lineStart,
+    lineEnd,
+    nthOccurrence,
+    delimiterStart,
+    delimiterEnd,
+  }: UpdateParameters) => {
     // Note lineStart and lineEnd are 1-indexed.
     /* We expand the search by one line if it fails on the identified segment to handle off-by-one issues. */
     /* NOTE expanded search was introduced after the initial evaluation.
@@ -171,44 +223,78 @@ const retagUpdate = async (codeWithSnippetDelimited: string, updatedCodeWithoutD
         would guarantee placement in the "intended" location,
         but this is slow
     */
-    
-    let sectionString = code.split('\n').slice(lineStart - 1, lineEnd).join('\n')
-    let lenUpToSection = code.split('\n').slice(0, lineStart - 1).map(s=>s + '\n').join('').length
-    let snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence)
+
+    let sectionString = code
+      .split("\n")
+      .slice(lineStart - 1, lineEnd)
+      .join("\n");
+    let lenUpToSection = code
+      .split("\n")
+      .slice(0, lineStart - 1)
+      .map((s) => s + "\n")
+      .join("").length;
+    let snippetIdxInSection = findStartAndEndNormalized(
+      sectionString,
+      snippet,
+      nthOccurrence
+    );
     if (snippetIdxInSection.start === -1) {
-      lineStart = Math.max(0, lineStart - 1)
-      lineEnd = Math.min(lineEnd + 1, code.split('\n').length)
-      sectionString = code.split('\n').slice(lineStart - 1, lineEnd).join('\n')
-      lenUpToSection = code.split('\n').slice(0, lineStart - 1).map(s=>s + '\n').join('').length
-      snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence)
+      lineStart = Math.max(0, lineStart - 1);
+      lineEnd = Math.min(lineEnd + 1, code.split("\n").length);
+      sectionString = code
+        .split("\n")
+        .slice(lineStart - 1, lineEnd)
+        .join("\n");
+      lenUpToSection = code
+        .split("\n")
+        .slice(0, lineStart - 1)
+        .map((s) => s + "\n")
+        .join("").length;
+      snippetIdxInSection = findStartAndEndNormalized(
+        sectionString,
+        snippet,
+        nthOccurrence
+      );
     }
     // const sectionString = code.split('\n').slice(lineStart - 1, lineEnd).join('\n')
     // const lenUpToSection = code.split('\n').slice(0, lineStart - 1).map(s=>s + '\n').join('').length
     // const snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence)
-    const leftIdx = lenUpToSection + snippetIdxInSection.start
-    const rightIdx = leftIdx + snippetIdxInSection.end - snippetIdxInSection.start
+    const leftIdx = lenUpToSection + snippetIdxInSection.start;
+    const rightIdx =
+      leftIdx + snippetIdxInSection.end - snippetIdxInSection.start;
     return {
-      updatedCodeWithDelimiters: code.slice(0, leftIdx) + delimiterStart + code.slice(leftIdx, rightIdx) + delimiterEnd + code.slice(rightIdx, code.length),
+      updatedCodeWithDelimiters:
+        code.slice(0, leftIdx) +
+        delimiterStart +
+        code.slice(leftIdx, rightIdx) +
+        delimiterEnd +
+        code.slice(rightIdx, code.length),
       leftIdx,
-      rightIdx
-    }
-  }
+      rightIdx,
+    };
+  };
   try {
     const out = computeUpdatedCodeWithSnippetRetagged({
-      code:updatedCodeWithoutDelimiters, 
-      snippet:gptRetaggingJSON[1], 
-      lineStart:gptRetaggingJSON[2], 
-      lineEnd:gptRetaggingJSON[3], 
-      nthOccurrence:gptRetaggingJSON[4], 
-      delimiterStart:delimiter, 
-      delimiterEnd:delimiter})
-  
-    console.log(out)
-    
-    return {gptRetaggingJSON, out}
-  } catch (e) {
-    return {error: e, errorType: 'snippet matching', gptOut, gptRetaggingJSON}
-  }
-}
+      code: updatedCodeWithoutDelimiters,
+      snippet: gptRetaggingJSON[1],
+      lineStart: gptRetaggingJSON[2],
+      lineEnd: gptRetaggingJSON[3],
+      nthOccurrence: gptRetaggingJSON[4],
+      delimiterStart: delimiter,
+      delimiterEnd: delimiter,
+    });
 
-export default retagUpdate
+    console.log(out);
+
+    return { gptRetaggingJSON, out };
+  } catch (e) {
+    return {
+      error: e,
+      errorType: "snippet matching",
+      gptOut,
+      gptRetaggingJSON,
+    };
+  }
+};
+
+export default retagUpdate;

@@ -38,13 +38,10 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div>
-      {error && <div style={{ color: "red" }}>{error}</div>}
-      {response && <div>{response}</div>}
-      <input
-        type="text"
-        value={props.utils.getText()}
-        onChange={(e) => props.utils.setText(e.target.value)}
-      />
+      {error && <div style={{ color: "red" }}>An error occured: {error}</div>}
+      {response && <div>Response: &nbsp; {response}</div>}
+      <input type="text" value={props.utils.getText()} />
+      &nbsp;
       <button onClick={runCode}>Run Highlighted Code</button>
     </div>
   );
