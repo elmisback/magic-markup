@@ -1,50 +1,50 @@
 import React, { useEffect, useState } from "react";
 // import logo from './logo.svg';
-import DocumentViewer from "./DocumentViewer";
+// import DocumentViewer from "./DocumentViewer";
 import Annotation from "./Annotation";
 import ReactDiffViewer from "react-diff-viewer-continued";
-import Split from "react-split";
+// import Split from "react-split";
 import "./App.css";
 import { tools } from "./tools";
-import CodeMirror, {
-  Decoration,
-  EditorState,
-  EditorView,
-  RangeSetBuilder,
-  ViewPlugin,
-  basicSetup,
-} from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
+// import CodeMirror, {
+//   Decoration,
+//   EditorState,
+//   EditorView,
+//   RangeSetBuilder,
+//   ViewPlugin,
+//   basicSetup,
+// } from "@uiw/react-codemirror";
+// import { javascript } from "@codemirror/lang-javascript";
 
 import { useContext } from "react";
 import { DocumentContext, DocumentProvider } from "./DocumentContext";
 import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
-import { hover } from "@testing-library/user-event/dist/hover";
-import { isDisabled } from "@testing-library/user-event/dist/utils";
+// import { hover } from "@testing-library/user-event/dist/hover";
+// import { isDisabled } from "@testing-library/user-event/dist/utils";
 
-function App3(props: { documentContent: string; annotations: Annotation[] }) {
-  // just render the document content with the annotations highlighted
-  // write it all out here
-  const { documentContent, annotations } = props;
-  // const contentWithAnnotations = annotations.reduce((acc, annotation) => {
+// function App3(props: { documentContent: string; annotations: Annotation[] }) {
+//   // just render the document content with the annotations highlighted
+//   // write it all out here
+//   const { documentContent, annotations } = props;
+//   // const contentWithAnnotations = annotations.reduce((acc, annotation) => {
 
-  return (
-    <div>
-      <h1>Document Content</h1>
-      <pre>{documentContent}</pre>
-      <h1>Annotations</h1>
-      {annotations.map((annotation, index) => (
-        <div key={index}>
-          <div>Start: {annotation.start}</div>
-          <div>End: {annotation.end}</div>
-          <div>Document: {annotation.document}</div>
-          <div>Tool: {annotation.tool}</div>
-          <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
+//   return (
+//     <div>
+//       <h1>Document Content</h1>
+//       <pre>{documentContent}</pre>
+//       <h1>Annotations</h1>
+//       {annotations.map((annotation, index) => (
+//         <div key={index}>
+//           <div>Start: {annotation.start}</div>
+//           <div>End: {annotation.end}</div>
+//           <div>Document: {annotation.document}</div>
+//           <div>Tool: {annotation.tool}</div>
+//           <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
 
 // function App2(props: { documentContent: string, annotations: Annotation[]}) {
 //   // get document from props
@@ -83,7 +83,9 @@ function App3(props: { documentContent: string; annotations: Annotation[] }) {
 //   return <CodeMirror value={documentContent} height="200px" extensions={[javascript({ jsx: true })]} />;
 // }
 
+// @typescript-eslint-ignore
 var mouseDown = 0;
+console.log(mouseDown)
 document.body.onmousedown = function () {
   ++mouseDown;
 };
@@ -290,9 +292,10 @@ const HTMLEditor = (props: {
                   data-index={index}
                   style={style}
                   onMouseUp={handleSelection}
-                  onMouseEnter={(e) => (
-                    handleSelection(e), handleMouseEnter(index)
-                  )}
+                  onMouseEnter={(e) => {
+                    handleSelection(e)
+                    handleMouseEnter(index)
+                  }}
                   onMouseLeave={(e) => handleMouseLeave()}
                   onClick={() => handleClick(index)}
                 >
@@ -480,6 +483,9 @@ function App() {
       ""
   );
 
+  // currently there's a bug with Windows firefox on WSL -- I think the WS server being on ipv6 causes the connection to fail?
+  // it does work if the IP is changed to match the WSL IP
+  // chrome works fine with localhost, so we should focus on chrome support for now
   return (
     <DiskStateProvider serverUrl="ws://localhost:3002" stateURI={stateURI}>
       <DocumentProvider
@@ -506,7 +512,7 @@ type MainProps = {
 
 function getStateURI(docURI: string | null): string {
   if (!docURI) return "";
-  const re: RegExp = /^(.*\/)([^\/]+)$/;
+  const re: RegExp = /^(.*\/)([^/]+)$/;
   const match: RegExpMatchArray | null = docURI.match(re);
   if (match && match.length === 3) {
     return match[1] + "." + match[2] + ".ann.json";
@@ -523,7 +529,7 @@ function Main({
   const { documentContent, setDocumentContent } = useDocument();
   const { diskState, setDiskState } = useDiskState();
   // const {diskState, setDiskState} = useContext(DiskStateContext)
-  const [continuousRetag, setContinuousRetag] = useState(false);
+  const [continuousRetag, ] = useState(false);
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(
     null
@@ -632,11 +638,7 @@ function Main({
   };
 
   return (
-    <DiskStateProvider stateURI={stateURI} serverUrl="ws://localhost:3002">
-      <DocumentProvider
-        serverUrl="ws://localhost:3002"
-        documentURI={documentURI}
-      >
+    <div className="Main">
         {annotations !== undefined && (
           <HTMLEditor
             documentContent={documentContent}
@@ -749,8 +751,7 @@ function Main({
           </div>
         </div>
         {/* show the disk state */}
-      </DocumentProvider>
-    </DiskStateProvider>
+    </div>
   );
 }
 
