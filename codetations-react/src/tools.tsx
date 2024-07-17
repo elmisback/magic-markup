@@ -1,6 +1,7 @@
 import { AnnotationEditorProps } from "./App";
 import React from "react";
 import { useState, useEffect } from "react";
+import { ObjectInspector } from "react-inspector";
 import MarkdownComment from "./applications/src/MarkdownComment";
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
@@ -50,11 +51,14 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
     <div>
       {props.value.metadata.error && (
         <div style={{ color: "red" }}>
-          An error occured: {props.value.metadata.error}
+          An error occurred: {props.value.metadata.error}
         </div>
       )}
       {props.value.metadata.response && (
-        <div>Response: &nbsp; {props.value.metadata.response}</div>
+        <div>
+          Response: &nbsp;{" "}
+          <ObjectInspector data={props.value.metadata.response} />
+        </div>
       )}
       <textarea
         value={props.value.metadata.code || ""}
@@ -79,5 +83,5 @@ export const tools = {
   comment: Comment,
   colorPicker: ColorPicker,
   runCodeSegment: RunCodeSegment,
-  markdownComment: MarkdownComment
+  markdownComment: MarkdownComment,
 };

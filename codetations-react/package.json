@@ -24,6 +24,7 @@
     "react-diff-viewer-continued": "^3.4.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",
+    "react-inspector": "^6.0.2",
     "react-jsx-parser": "github:EliteByte/react-jsx-parser#develop",
     "react-markdown": "^9.0.1",
     "react-scripts": "^5.0.1",
