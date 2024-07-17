@@ -94,6 +94,7 @@ function App() {
     });
   }
 
+  // adding a comment in the middle of the file...
   function validDate(date) {
     // Valid format: YYYY-MM-DD
     if (date.length !== 10) {

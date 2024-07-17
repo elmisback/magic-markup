@@ -1,5 +1,5 @@
 import { AnnotationEditorProps } from "./App";
-import React from "react";
+import React, { TextareaHTMLAttributes } from "react";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
 import MarkdownComment from "./applications/src/MarkdownComment";
@@ -20,6 +20,54 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
       value={props.value.metadata.comment || ""}
       onChange={(e) => props.utils.setMetadata({ comment: e.target.value })}
     />
+  );
+};
+
+const ImageUpload: React.FC<AnnotationEditorProps> = (props) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && event.target.result) {
+          props.utils.setMetadata({ image: event.target.result as string });
+        }
+      };
+      reader.readAsDataURL(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div>
+      <input type="file" accept="image/*" onChange={handleImageUpload} />
+      {props.value.metadata.image && (
+        <img src={props.value.metadata.image} alt="Uploaded" />
+      )}
+    </div>
+  );
+};
+
+const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
+  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || "");
+
+  const handleChange : React.ChangeEventHandler<HTMLTextAreaElement> = (e) => {
+    const newHtmlContent = e.target.value;
+    setHtmlContent(newHtmlContent);
+    props.utils.setMetadata({ html: newHtmlContent });
+  };
+
+  return (
+    <div>
+      <textarea
+        value={htmlContent}
+        onChange={handleChange}
+        placeholder="Write your HTML code here"
+        style={{ width: '100%', height: '150px' }}
+      />
+      <div style={{ marginTop: '10px', border: '1px solid #ccc', padding: '10px' }}>
+        <h3>Preview:</h3>
+        <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+      </div>
+    </div>
   );
 };
 
@@ -114,4 +162,6 @@ export const tools = {
   colorPicker: ColorPicker,
   runCodeSegment: RunCodeSegment,
   markdownComment: MarkdownComment,
+  imageUpload: ImageUpload,
+  displayHTML: DisplayHTML,
 };
