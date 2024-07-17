@@ -84,7 +84,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <ObjectInspector data={props.value.metadata.response} />
         </div>
       )}
-      <textarea
+      <textarea cols={80} rows={4}
         value={props.value.metadata.code || ""}
         onChange={(e) => props.utils.setMetadata({ code: e.target.value })}
       />
