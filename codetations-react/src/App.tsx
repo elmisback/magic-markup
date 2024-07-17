@@ -212,6 +212,14 @@ const HTMLEditor = (props: {
                   };
                 }
               }
+
+              // Assign ID to span if part of an annotation
+              const id = annotations.find(
+                (annotation) => index >= annotation.start && index <= annotation.end
+              )
+                ? `annotation-${index}`
+                : undefined;
+              
               return (
                 <span
                   key={index}
@@ -225,6 +233,7 @@ const HTMLEditor = (props: {
                   }
                   }
                   onClick={() => handleClick(index)}
+                  id={id}
                 >
                   {char}
                 </span>
@@ -316,8 +325,19 @@ function AnnotationEditorContainer(props: {
   setValue: (value: AnnotationUpdate) => void;
   hoveredAnnotation: Annotation | null;
   selectedAnnotation: Annotation | undefined;
+  setSelectedAnnotation: (value: Annotation | undefined) => void;
 }) {
-  const { value, setValue } = props;
+  const { value, setValue, setSelectedAnnotation } = props;
+
+  const handleClick = () => {
+    setSelectedAnnotation(value);
+
+    // Find the element by ID and scroll into view
+    const startElement = document.getElementById(`annotation-${value.start}`);
+    if (startElement) {
+      startElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const style = {
     backgroundColor:
@@ -329,7 +349,7 @@ function AnnotationEditorContainer(props: {
   };
 
   return (
-    <div className="annotation-container" style={style}>
+    <div className="annotation-container" style={style} onClick={handleClick}>
       {/* <h2>Annotation</h2>*/}
       {/* <div>Start: {value.start}</div>
       <div>End: {value.end}</div>
@@ -640,6 +660,7 @@ function Main({
                   key={index}
                   hoveredAnnotation={hoveredAnnotation}
                   selectedAnnotation={selectedAnnotation}
+                  setSelectedAnnotation={setSelectedAnnotation}
                 />
                 <div className="annotation-separator"></div>
               </div>
