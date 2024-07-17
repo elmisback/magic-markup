@@ -24,6 +24,8 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
+  const [code, setCode] = useState(props.value.metadata.code || "");
+
   function addReturn(code: string): string {
     // Match the last line in the string
     const regex = /.*$/gm;
@@ -42,16 +44,13 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
     return updatedCode;
   }
 
-  useEffect(() => {
-    props.utils.setMetadata({ code: props.utils.getText() });
-  }, []); // Empty dependency array ensures this runs only once after mount
-
-  function runCode(): void {
+  function runAndUpdateCode(): void {
     try {
       if (!props.value.metadata.code) {
         props.utils.setMetadata({
           error: "No code to run",
           response: undefined,
+          code: code,
         });
         return;
       }
@@ -62,11 +61,16 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           result = new Function(newCode)() || "Undefined";
         } catch {}
       }
-      props.utils.setMetadata({ response: result, error: undefined });
+      props.utils.setMetadata({
+        response: result,
+        error: undefined,
+        code: code,
+      });
     } catch (e) {
       props.utils.setMetadata({
         response: undefined,
         error: e instanceof Error ? e.message : String(e),
+        code: code,
       });
     }
   }
@@ -84,15 +88,17 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <ObjectInspector data={props.value.metadata.response} />
         </div>
       )}
-      <textarea cols={80} rows={4}
-        value={props.value.metadata.code || ""}
-        onChange={(e) => props.utils.setMetadata({ code: e.target.value })}
-      />
+      <textarea rows={4} cols={72}  value={code} onChange={(e) => setCode(e.target.value)} />
       <br></br>
-      <button onClick={runCode}>Run Highlighted Code</button>
+      <button onClick={runAndUpdateCode}>Run Highlighted Code</button>
       <br></br>
       <button
-        onClick={() => props.utils.setMetadata({ response: null, error: null })}
+        onClick={() =>
+          props.utils.setMetadata({
+            response: undefined,
+            error: undefined,
+          })
+        }
       >
         Clear Output
       </button>
