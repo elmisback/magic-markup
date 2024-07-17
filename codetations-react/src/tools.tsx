@@ -23,18 +23,25 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
-  const [code, setCode] = useState(props.utils.getText());
+  useEffect(() => {
+    props.utils.setMetadata({ code: props.utils.getText() });
+  }, []); // Empty dependency array ensures this runs only once after mount
 
   function runCode(): void {
-    console.log("Running code:", code);
     try {
-      const result = new Function(code)();
-      console.log(result)
-      props.utils.setMetadata({ response: result, error: null });
+      if (!props.value.metadata.code) {
+        props.utils.setMetadata({
+          error: "No code to run",
+          response: undefined,
+        });
+        return;
+      }
+      const result = new Function(props.value.metadata.code)();
+      props.utils.setMetadata({ response: result, error: undefined });
     } catch (e) {
       props.utils.setMetadata({
-        response: null,
-        error: e instanceof Error ? e.message : e,
+        response: undefined,
+        error: e instanceof Error ? e.message : String(e),
       });
     }
   }
@@ -49,7 +56,10 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
       {props.value.metadata.response && (
         <div>Response: &nbsp; {props.value.metadata.response}</div>
       )}
-      <textarea value={code} onChange={(e) => setCode(e.target.value)} />
+      <textarea
+        value={props.value.metadata.code || ""}
+        onChange={(e) => props.utils.setMetadata({ code: e.target.value })}
+      />
       <br></br>
       <button onClick={runCode}>Run Highlighted Code</button>
       <br></br>
