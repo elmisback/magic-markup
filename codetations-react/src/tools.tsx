@@ -24,6 +24,24 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
+  function addReturn(code: string): string {
+    // Match the last line in the string
+    const regex = /.*$/gm;
+    const lines = code.match(regex);
+
+    if (!lines) {
+      return "";
+    }
+
+    // Get the last line
+    const lastLine = lines[lines.length - 1];
+
+    // Replace the last line with 'return ' prepended to it
+    const updatedCode = code.replace(lastLine, "return " + lastLine);
+
+    return updatedCode;
+  }
+
   useEffect(() => {
     props.utils.setMetadata({ code: props.utils.getText() });
   }, []); // Empty dependency array ensures this runs only once after mount
@@ -37,7 +55,13 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         });
         return;
       }
-      const result = new Function(props.value.metadata.code)();
+      let result = new Function(props.value.metadata.code)();
+      if (result === undefined) {
+        const newCode: string = addReturn(props.value.metadata.code);
+        try {
+          result = new Function(newCode)() || "Undefined";
+        } catch {}
+      }
       props.utils.setMetadata({ response: result, error: undefined });
     } catch (e) {
       props.utils.setMetadata({
