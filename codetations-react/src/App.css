@@ -9,6 +9,9 @@
   border: 1px solid #ccc;
   border-radius: 5px;
   padding: 10px;
+
+  max-height: 400px;
+  overflow-y: scroll;
 }
 
 .document-view-title {
@@ -106,7 +109,19 @@ margin: 10px;
 }
 
 
+.Main {
+  display: flex;
+}
 
+.annotator {
+  flex: 1;
+  padding: 10px;
+}
+
+.tools {
+  flex: 1;
+  padding: 10px;
+}
 
 .App {
   text-align: center;

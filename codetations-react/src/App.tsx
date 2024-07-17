@@ -305,18 +305,6 @@ const HTMLEditor = (props: {
             })}
           </div>
         </div>
-        {/* <div style={{ flex: 1 }}>
-          <h1>Annotations</h1>
-          {annotations.map((annotation, index) => (
-            <div key={index} style={{ backgroundColor: selectedAnnotation === annotation ? 'lightblue' : 'transparent' }}>
-              <div>Start: {annotation.start}</div>
-              <div>End: {annotation.end}</div>
-              <div>Document: {annotation.document}</div>
-              <div>Tool: {annotation.tool}</div>
-              <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
-            </div>
-          ))}
-        </div> */}
       </div>
       <div>
         <div className="add-annotation-title">Add Annotation</div>
@@ -358,25 +346,6 @@ const HTMLEditor = (props: {
           </button>
         </div>
       )}
-
-      {/* Hovered annotation */}
-      {/* <div>
-        <h1>Hovered Annotation</h1>
-        <div>Start: {hoveredAnnotation?.start}</div>
-        <div>End: {hoveredAnnotation?.end}</div>
-        <div>Document: {hoveredAnnotation?.document}</div>
-        <div>Tool: {hoveredAnnotation?.tool}</div>
-        <div>Metadata: {JSON.stringify(hoveredAnnotation?.metadata)}</div>
-      </div> */}
-      {/* Selected annotation */}
-      {/* <div>
-        <h1>Selected Annotation</h1>
-        <div>Start: {selectedAnnotation?.start}</div>
-        <div>End: {selectedAnnotation?.end}</div>
-        <div>Document: {selectedAnnotation?.document}</div>
-        <div>Tool: {selectedAnnotation?.tool}</div>
-        <div>Metadata: {JSON.stringify(selectedAnnotation?.metadata)}</div>
-      </div> */}
     </div>
   );
 };
@@ -639,6 +608,7 @@ function Main({
 
   return (
     <div className="Main">
+      <div className="annotator">
         {annotations !== undefined && (
           <HTMLEditor
             documentContent={documentContent}
@@ -650,6 +620,8 @@ function Main({
             setSelectedAnnotation={setSelectedAnnotation}
           ></HTMLEditor>
         )}
+      </div>
+      <div className="tools">
         <div className="App">
           <div className="annotation-view-title">Annotation settings</div>
 
@@ -751,6 +723,7 @@ function Main({
           </div>
         </div>
         {/* show the disk state */}
+      </div>
     </div>
   );
 }
