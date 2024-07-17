@@ -6,82 +6,14 @@ import ReactDiffViewer from "react-diff-viewer-continued";
 // import Split from "react-split";
 import "./App.css";
 import { tools } from "./tools";
-// import CodeMirror, {
-//   Decoration,
-//   EditorState,
-//   EditorView,
-//   RangeSetBuilder,
-//   ViewPlugin,
-//   basicSetup,
-// } from "@uiw/react-codemirror";
-// import { javascript } from "@codemirror/lang-javascript";
+
 
 import { useContext } from "react";
 import { DocumentContext, DocumentProvider } from "./DocumentContext";
 import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
-// import { hover } from "@testing-library/user-event/dist/hover";
-// import { isDisabled } from "@testing-library/user-event/dist/utils";
 
-// function App3(props: { documentContent: string; annotations: Annotation[] }) {
-//   // just render the document content with the annotations highlighted
-//   // write it all out here
-//   const { documentContent, annotations } = props;
-//   // const contentWithAnnotations = annotations.reduce((acc, annotation) => {
 
-//   return (
-//     <div>
-//       <h1>Document Content</h1>
-//       <pre>{documentContent}</pre>
-//       <h1>Annotations</h1>
-//       {annotations.map((annotation, index) => (
-//         <div key={index}>
-//           <div>Start: {annotation.start}</div>
-//           <div>End: {annotation.end}</div>
-//           <div>Document: {annotation.document}</div>
-//           <div>Tool: {annotation.tool}</div>
-//           <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
-//         </div>
-//       ))}
-//     </div>
-//   );
-// }
 
-// function App2(props: { documentContent: string, annotations: Annotation[]}) {
-//   // get document from props
-//   const { documentContent, annotations } = props;
-
-//   // const [value, setValue] = React.useState("console.log('hello world!');");
-
-//   // readonly, so we don't need to update the document
-//   // const onChange = React.useCallback((val:any, viewUpdate:any) => {
-//   //   console.log('val:', val);
-//   //   setValue(val);
-//   // }, []);
-
-//   // Define decorations for highlighting annotations
-//   const createDecorations = (annotations: Annotation[]) => {
-//     const builder = new RangeSetBuilder<Decoration>();
-//     annotations.forEach((annotation) => {
-//       const { start, end } = annotation;
-//       builder.add(start, end, Decoration.mark({ class: 'highlight-annotation' }));
-//     });
-//     return builder.finish();
-//   };
-
-//   // Editor state, initialized with decorations for annotations
-//   const [editorState, setEditorState] = useState(() => EditorState.create({
-//     doc: annotations[0]?.document || '',
-//     extensions: [
-//       basicSetup(),
-//       EditorState.readOnly.of(true),
-//       // EditorView.updateListener.of(handleEditorUpdate),
-//       // EditorView.decorations.of(createDecorations(annotations)),
-//       EditorView.decorations.compute([], state => createDecorations(annotations))
-//     ]
-//   }));
-
-//   return <CodeMirror value={documentContent} height="200px" extensions={[javascript({ jsx: true })]} />;
-// }
 
 // @typescript-eslint-ignore
 var mouseDown = 0;
