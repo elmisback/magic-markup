@@ -1,6 +1,7 @@
 import { AnnotationEditorProps } from "./App";
 import React from "react";
 import { useState, useEffect } from "react";
+import MarkdownComment from "./applications/src/MarkdownComment";
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
@@ -78,4 +79,5 @@ export const tools = {
   comment: Comment,
   colorPicker: ColorPicker,
   runCodeSegment: RunCodeSegment,
+  markdownComment: MarkdownComment
 };
