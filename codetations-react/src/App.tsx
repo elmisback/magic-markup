@@ -13,18 +13,6 @@ import { DocumentContext, DocumentProvider } from "./DocumentContext";
 import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
 
 
-
-
-// @typescript-eslint-ignore
-var mouseDown = 0;
-console.log(mouseDown);
-document.body.onmousedown = function () {
-  ++mouseDown;
-};
-document.body.onmouseup = function () {
-  --mouseDown;
-};
-
 const HTMLEditor = (props: {
   documentContent: string;
   annotations: Annotation[];
