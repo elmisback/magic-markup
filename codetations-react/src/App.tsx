@@ -6,92 +6,12 @@ import ReactDiffViewer from "react-diff-viewer-continued";
 // import Split from "react-split";
 import "./App.css";
 import { tools } from "./tools";
-// import CodeMirror, {
-//   Decoration,
-//   EditorState,
-//   EditorView,
-//   RangeSetBuilder,
-//   ViewPlugin,
-//   basicSetup,
-// } from "@uiw/react-codemirror";
-// import { javascript } from "@codemirror/lang-javascript";
+
 
 import { useContext } from "react";
 import { DocumentContext, DocumentProvider } from "./DocumentContext";
 import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
-// import { hover } from "@testing-library/user-event/dist/hover";
-// import { isDisabled } from "@testing-library/user-event/dist/utils";
 
-// function App3(props: { documentContent: string; annotations: Annotation[] }) {
-//   // just render the document content with the annotations highlighted
-//   // write it all out here
-//   const { documentContent, annotations } = props;
-//   // const contentWithAnnotations = annotations.reduce((acc, annotation) => {
-
-//   return (
-//     <div>
-//       <h1>Document Content</h1>
-//       <pre>{documentContent}</pre>
-//       <h1>Annotations</h1>
-//       {annotations.map((annotation, index) => (
-//         <div key={index}>
-//           <div>Start: {annotation.start}</div>
-//           <div>End: {annotation.end}</div>
-//           <div>Document: {annotation.document}</div>
-//           <div>Tool: {annotation.tool}</div>
-//           <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
-//         </div>
-//       ))}
-//     </div>
-//   );
-// }
-
-// function App2(props: { documentContent: string, annotations: Annotation[]}) {
-//   // get document from props
-//   const { documentContent, annotations } = props;
-
-//   // const [value, setValue] = React.useState("console.log('hello world!');");
-
-//   // readonly, so we don't need to update the document
-//   // const onChange = React.useCallback((val:any, viewUpdate:any) => {
-//   //   console.log('val:', val);
-//   //   setValue(val);
-//   // }, []);
-
-//   // Define decorations for highlighting annotations
-//   const createDecorations = (annotations: Annotation[]) => {
-//     const builder = new RangeSetBuilder<Decoration>();
-//     annotations.forEach((annotation) => {
-//       const { start, end } = annotation;
-//       builder.add(start, end, Decoration.mark({ class: 'highlight-annotation' }));
-//     });
-//     return builder.finish();
-//   };
-
-//   // Editor state, initialized with decorations for annotations
-//   const [editorState, setEditorState] = useState(() => EditorState.create({
-//     doc: annotations[0]?.document || '',
-//     extensions: [
-//       basicSetup(),
-//       EditorState.readOnly.of(true),
-//       // EditorView.updateListener.of(handleEditorUpdate),
-//       // EditorView.decorations.of(createDecorations(annotations)),
-//       EditorView.decorations.compute([], state => createDecorations(annotations))
-//     ]
-//   }));
-
-//   return <CodeMirror value={documentContent} height="200px" extensions={[javascript({ jsx: true })]} />;
-// }
-
-// @typescript-eslint-ignore
-var mouseDown = 0;
-console.log(mouseDown);
-document.body.onmousedown = function () {
-  ++mouseDown;
-};
-document.body.onmouseup = function () {
-  --mouseDown;
-};
 
 const HTMLEditor = (props: {
   documentContent: string;
@@ -203,9 +123,15 @@ const HTMLEditor = (props: {
     const start = Math.min(anchorIndex, focusIndex);
     const end = Math.max(anchorIndex, focusIndex);
     const isCaret = selection.type === "Caret";
-    console.log("Selection:", start, end);
+    // console.log("Selection:", start, end);
     setAddStartEnd([start, end, isCaret]);
   };
+  useEffect(() => {
+    document.addEventListener('selectionchange', handleSelection)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelection)
+    }
+  })
 
   const clearSelection = () => {
     setAddStartEnd(null);
@@ -291,12 +217,13 @@ const HTMLEditor = (props: {
                   key={index}
                   data-index={index}
                   style={style}
-                  onMouseUp={handleSelection}
                   onMouseEnter={(e) => {
-                    handleSelection(e);
                     handleMouseEnter(index);
                   }}
-                  onMouseLeave={(e) => handleMouseLeave()}
+                  onMouseLeave={(e) => {
+                    handleMouseLeave()
+                  }
+                  }
                   onClick={() => handleClick(index)}
                 >
                   {char}
@@ -305,18 +232,6 @@ const HTMLEditor = (props: {
             })}
           </div>
         </div>
-        {/* <div style={{ flex: 1 }}>
-          <h1>Annotations</h1>
-          {annotations.map((annotation, index) => (
-            <div key={index} style={{ backgroundColor: selectedAnnotation === annotation ? 'lightblue' : 'transparent' }}>
-              <div>Start: {annotation.start}</div>
-              <div>End: {annotation.end}</div>
-              <div>Document: {annotation.document}</div>
-              <div>Tool: {annotation.tool}</div>
-              <div>Metadata: {JSON.stringify(annotation.metadata)}</div>
-            </div>
-          ))}
-        </div> */}
       </div>
       <div>
         <div className="add-annotation-title">Add Annotation</div>
@@ -356,25 +271,6 @@ const HTMLEditor = (props: {
           </button>
         </div>
       )}
-
-      {/* Hovered annotation */}
-      {/* <div>
-        <h1>Hovered Annotation</h1>
-        <div>Start: {hoveredAnnotation?.start}</div>
-        <div>End: {hoveredAnnotation?.end}</div>
-        <div>Document: {hoveredAnnotation?.document}</div>
-        <div>Tool: {hoveredAnnotation?.tool}</div>
-        <div>Metadata: {JSON.stringify(hoveredAnnotation?.metadata)}</div>
-      </div> */}
-      {/* Selected annotation */}
-      {/* <div>
-        <h1>Selected Annotation</h1>
-        <div>Start: {selectedAnnotation?.start}</div>
-        <div>End: {selectedAnnotation?.end}</div>
-        <div>Document: {selectedAnnotation?.document}</div>
-        <div>Tool: {selectedAnnotation?.tool}</div>
-        <div>Metadata: {JSON.stringify(selectedAnnotation?.metadata)}</div>
-      </div> */}
     </div>
   );
 };
@@ -637,19 +533,22 @@ function Main({
 
   return (
     <div className="Main">
-      {annotations !== undefined && (
-        <HTMLEditor
-          documentContent={documentContent}
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-          hoveredAnnotation={hoveredAnnotation}
-          selectedAnnotation={selectedAnnotation}
-          setHoveredAnnotation={setHoveredAnnotation}
-          setSelectedAnnotation={setSelectedAnnotation}
-        ></HTMLEditor>
-      )}
-      <div className="App">
-        <div className="annotation-view-title">Annotation settings</div>
+      <div className="annotator">
+        {annotations !== undefined && (
+          <HTMLEditor
+            documentContent={documentContent}
+            annotations={annotations}
+            setAnnotations={setAnnotations}
+            hoveredAnnotation={hoveredAnnotation}
+            selectedAnnotation={selectedAnnotation}
+            setHoveredAnnotation={setHoveredAnnotation}
+            setSelectedAnnotation={setSelectedAnnotation}
+          ></HTMLEditor>
+        )}
+      </div>
+      <div className="tools">
+        <div className="App">
+          <div className="annotation-view-title">Annotation settings</div>
 
         {/* Document path to open */}
         <div>
@@ -677,7 +576,7 @@ function Main({
         <div>
           API Key: &nbsp;
           <input
-            type="text"
+            type="password"
             value={APIKey}
             onChange={(e) => {
               localStorage.setItem("APIKey", e.target.value);
@@ -730,25 +629,26 @@ function Main({
       </div> */}
         <div className="section-divider"></div>
 
-        <div className="annotation-list">
-          <div className="annotation-list-title">Annotations</div>
-          {/* list of annotations */}
-          {annotations?.map((annotation, index) => (
-            <div>
-              <AnnotationEditorContainer
-                value={annotation}
-                setValue={(a) => setAnnotation(index, a)}
-                key={index}
-                hoveredAnnotation={hoveredAnnotation}
-                selectedAnnotation={selectedAnnotation}
-              />
-              <div className="annotation-separator"></div>
-            </div>
-          ))}
-          <div className="bottom-space"></div>
+          <div className="annotation-list">
+            <div className="annotation-list-title">Annotations</div>
+            {/* list of annotations */}
+            {annotations?.map((annotation, index) => (
+              <div>
+                <AnnotationEditorContainer
+                  value={annotation}
+                  setValue={(a) => setAnnotation(index, a)}
+                  key={index}
+                  hoveredAnnotation={hoveredAnnotation}
+                  selectedAnnotation={selectedAnnotation}
+                />
+                <div className="annotation-separator"></div>
+              </div>
+            ))}
+            <div className="bottom-space"></div>
+          </div>
         </div>
+        {/* show the disk state */}
       </div>
-      {/* show the disk state */}
     </div>
   );
 }
