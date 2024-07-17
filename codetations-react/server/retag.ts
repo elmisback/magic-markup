@@ -157,7 +157,7 @@ const retagUpdate = async (
           }),
         },
       ],
-      model: "gpt-3.5-turbo",
+      model: "gpt-4-turbo",
       response_format: { type: "json_object" },
     });
     console.log(gptOutCompletion);
