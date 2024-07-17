@@ -123,9 +123,15 @@ const HTMLEditor = (props: {
     const start = Math.min(anchorIndex, focusIndex);
     const end = Math.max(anchorIndex, focusIndex);
     const isCaret = selection.type === "Caret";
-    console.log("Selection:", start, end);
+    // console.log("Selection:", start, end);
     setAddStartEnd([start, end, isCaret]);
   };
+  useEffect(() => {
+    document.addEventListener('selectionchange', handleSelection)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelection)
+    }
+  })
 
   const clearSelection = () => {
     setAddStartEnd(null);
@@ -211,12 +217,13 @@ const HTMLEditor = (props: {
                   key={index}
                   data-index={index}
                   style={style}
-                  onMouseUp={handleSelection}
                   onMouseEnter={(e) => {
-                    handleSelection(e);
                     handleMouseEnter(index);
                   }}
-                  onMouseLeave={(e) => handleMouseLeave()}
+                  onMouseLeave={(e) => {
+                    handleMouseLeave()
+                  }
+                  }
                   onClick={() => handleClick(index)}
                 >
                   {char}
