@@ -85,7 +85,7 @@ import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
 
 // @typescript-eslint-ignore
 var mouseDown = 0;
-console.log(mouseDown)
+console.log(mouseDown);
 document.body.onmousedown = function () {
   ++mouseDown;
 };
@@ -293,8 +293,8 @@ const HTMLEditor = (props: {
                   style={style}
                   onMouseUp={handleSelection}
                   onMouseEnter={(e) => {
-                    handleSelection(e)
-                    handleMouseEnter(index)
+                    handleSelection(e);
+                    handleMouseEnter(index);
                   }}
                   onMouseLeave={(e) => handleMouseLeave()}
                   onClick={() => handleClick(index)}
@@ -336,8 +336,6 @@ const HTMLEditor = (props: {
               ))}
             </select>
           </div>
-          <div>Start: {addStartEnd?.[0]}</div>
-          <div>End: {addStartEnd?.[1]}</div>
           <button onClick={handleAddAnnotationClick}>Add</button>
         </div>
       </div>
@@ -529,7 +527,7 @@ function Main({
   const { documentContent, setDocumentContent } = useDocument();
   const { diskState, setDiskState } = useDiskState();
   // const {diskState, setDiskState} = useContext(DiskStateContext)
-  const [continuousRetag, ] = useState(false);
+  const [continuousRetag] = useState(false);
   const [documentOutOfDate, setDocumentOutOfDate] = useState(false);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<Annotation | null>(
     null
@@ -639,118 +637,118 @@ function Main({
 
   return (
     <div className="Main">
-        {annotations !== undefined && (
-          <HTMLEditor
-            documentContent={documentContent}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            hoveredAnnotation={hoveredAnnotation}
-            selectedAnnotation={selectedAnnotation}
-            setHoveredAnnotation={setHoveredAnnotation}
-            setSelectedAnnotation={setSelectedAnnotation}
-          ></HTMLEditor>
+      {annotations !== undefined && (
+        <HTMLEditor
+          documentContent={documentContent}
+          annotations={annotations}
+          setAnnotations={setAnnotations}
+          hoveredAnnotation={hoveredAnnotation}
+          selectedAnnotation={selectedAnnotation}
+          setHoveredAnnotation={setHoveredAnnotation}
+          setSelectedAnnotation={setSelectedAnnotation}
+        ></HTMLEditor>
+      )}
+      <div className="App">
+        <div className="annotation-view-title">Annotation settings</div>
+
+        {/* Document path to open */}
+        <div>
+          Document URI: &nbsp;
+          <input
+            type="text"
+            value={documentURI}
+            onChange={(e) => {
+              localStorage.setItem("DocumentURI", e.target.value);
+              updateURIs(e.target.value);
+            }}
+          />
+        </div>
+        <div>
+          State URI: &nbsp;
+          <input
+            type="text"
+            value={stateURI}
+            onChange={(e) => {
+              localStorage.setItem("StateURI", e.target.value);
+              setStateURI(e.target.value);
+            }}
+          />
+        </div>
+        <div>
+          API Key: &nbsp;
+          <input
+            type="text"
+            value={APIKey}
+            onChange={(e) => {
+              localStorage.setItem("APIKey", e.target.value);
+              setAPIKey(e.target.value);
+            }}
+          />
+        </div>
+        <hr></hr>
+        {/* if document is out of date, show a warning */}
+        {documentOutOfDate && (
+          <ReactDiffViewer
+            oldValue={diskState?.annotations[0]?.document || ""}
+            newValue={documentContent || ""}
+            splitView={true}
+          />
         )}
-        <div className="App">
-          <div className="annotation-view-title">Annotation settings</div>
 
-          {/* Document path to open */}
-          <div>
-            Document URI: &nbsp;
-            <input
-              type="text"
-              value={documentURI}
-              onChange={(e) => {
-                localStorage.setItem("DocumentURI", e.target.value);
-                updateURIs(e.target.value);
-              }}
-            />
-          </div>
-          <div>
-            State URI: &nbsp;
-            <input
-              type="text"
-              value={stateURI}
-              onChange={(e) => {
-                localStorage.setItem("StateURI", e.target.value);
-                setStateURI(e.target.value);
-              }}
-            />
-          </div>
-          <div>
-            API Key: &nbsp;
-            <input
-              type="text"
-              value={APIKey}
-              onChange={(e) => {
-                localStorage.setItem("APIKey", e.target.value);
-                setAPIKey(e.target.value);
-              }}
-            />
-          </div>
-          <hr></hr>
-          {/* if document is out of date, show a warning */}
-          {documentOutOfDate && (
-            <ReactDiffViewer
-              oldValue={diskState?.annotations[0]?.document || ""}
-              newValue={documentContent || ""}
-              splitView={true}
-            />
+        <div className="retag-document">
+          Retag document:{" "}
+          <button
+            onClick={handleRetag}
+            disabled={
+              !documentOutOfDate ||
+              continuousRetag ||
+              documentURI === "" ||
+              stateURI === "" ||
+              APIKey === ""
+            }
+            style={{
+              backgroundColor:
+                documentOutOfDate &&
+                !(
+                  continuousRetag ||
+                  documentURI === "" ||
+                  stateURI === "" ||
+                  APIKey === ""
+                )
+                  ? "chartreuse"
+                  : "initial",
+            }}
+          >
+            Retag
+          </button>
+          {APIKey === "" && (
+            <div style={{ color: "red" }}>(API key is required)</div>
           )}
-
-          <div className="retag-document">
-            Retag document:{" "}
-            <button
-              onClick={handleRetag}
-              disabled={
-                !documentOutOfDate ||
-                continuousRetag ||
-                documentURI === "" ||
-                stateURI === "" ||
-                APIKey === ""
-              }
-              style={{
-                backgroundColor:
-                  documentOutOfDate &&
-                  !(
-                    continuousRetag ||
-                    documentURI === "" ||
-                    stateURI === "" ||
-                    APIKey === ""
-                  )
-                    ? "chartreuse"
-                    : "initial",
-              }}
-            >
-              Retag
-            </button>
-            {APIKey === "" && (
-              <div style={{ color: "red" }}>(API key is required)</div>
-            )}
-          </div>
-          {/* <div>Continuous Retag: &nbsp;
+        </div>
+        {/* <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
       </div> */}
-          <div className="section-divider"></div>
+        <div className="section-divider"></div>
 
-          <div className="annotation-list">
-            <div className="annotation-list-title">Annotations</div>
-            {/* list of annotations */}
-            {annotations?.map((annotation, index) => (
-              <div>
-                <AnnotationEditorContainer
-                  value={annotation}
-                  setValue={(a) => setAnnotation(index, a)}
-                  key={index}
-                  hoveredAnnotation={hoveredAnnotation}
-                  selectedAnnotation={selectedAnnotation}
-                />
-                <div className="annotation-separator"></div>
-              </div>
-            ))}
-            <div className="bottom-space"></div>
-          </div>
+        <div className="annotation-list">
+          <div className="annotation-list-title">Annotations</div>
+          {/* list of annotations */}
+          {annotations?.map((annotation, index) => (
+            <div>
+              <AnnotationEditorContainer
+                value={annotation}
+                setValue={(a) => setAnnotation(index, a)}
+                key={index}
+                hoveredAnnotation={hoveredAnnotation}
+                selectedAnnotation={selectedAnnotation}
+              />
+              <div className="annotation-separator"></div>
+            </div>
+          ))}
+          <div className="bottom-space"></div>
         </div>
-        {/* show the disk state */}
+      </div>
+      {/* show the disk state */}
     </div>
   );
 }
