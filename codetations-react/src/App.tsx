@@ -143,7 +143,7 @@ const HTMLEditor = (props: {
       return;
     }
     let [start, end] = addStartEnd;
-    end = end + 1; // HACK fix off-by-one error
+    // end = end + 1; // HACK fix off-by-one error
     const newAnnotation: Annotation = {
       start,
       end,
