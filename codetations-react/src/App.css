@@ -37,9 +37,9 @@
 .annotation-list {
   margin-top: 0px;
   /* Add an internal scrollbar, always show */
-  overflow-y: auto;
-  scrollbar-width: thin;
-  max-height: 200px;
+  /* overflow-y: auto;
+  scrollbar-width: thin; */
+  /* max-height: 200px; */
 }
 
 .annotation-list-title {
