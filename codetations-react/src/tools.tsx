@@ -1,6 +1,7 @@
 import { AnnotationEditorProps } from "./App";
 import React from "react";
 import { useState, useEffect } from "react";
+import MarkdownComment from "./applications/src/MarkdownComment";
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
@@ -25,13 +26,15 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   const [code, setCode] = useState(props.utils.getText());
 
   function runCode(): void {
+    console.log("Running code:", code);
     try {
       const result = new Function(code)();
+      console.log(result)
       props.utils.setMetadata({ response: result, error: null });
     } catch (e) {
       props.utils.setMetadata({
         response: null,
-        error: e instanceof Error ? e.message : String(e),
+        error: e instanceof Error ? e.message : e,
       });
     }
   }
@@ -66,4 +69,5 @@ export const tools = {
   comment: Comment,
   colorPicker: ColorPicker,
   runCodeSegment: RunCodeSegment,
+  markdownComment: MarkdownComment
 };
