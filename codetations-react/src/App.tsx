@@ -649,7 +649,7 @@ function Main({
         <div>
           API Key: &nbsp;
           <input
-            type="text"
+            type="password"
             value={APIKey}
             onChange={(e) => {
               localStorage.setItem("APIKey", e.target.value);
