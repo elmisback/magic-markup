@@ -47,9 +47,11 @@ const ImageUpload: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
-  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || "");
+  const [htmlContent, setHtmlContent] = useState(
+    props.value.metadata.html || ""
+  );
 
-  const handleChange : React.ChangeEventHandler<HTMLTextAreaElement> = (e) => {
+  const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (e) => {
     const newHtmlContent = e.target.value;
     setHtmlContent(newHtmlContent);
     props.utils.setMetadata({ html: newHtmlContent });
@@ -61,9 +63,11 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
         value={htmlContent}
         onChange={handleChange}
         placeholder="Write your HTML code here"
-        style={{ width: '100%', height: '150px' }}
+        style={{ width: "100%", height: "150px" }}
       />
-      <div style={{ marginTop: '10px', border: '1px solid #ccc', padding: '10px' }}>
+      <div
+        style={{ marginTop: "10px", border: "1px solid #ccc", padding: "10px" }}
+      >
         <h3>Preview:</h3>
         <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
       </div>
@@ -76,25 +80,21 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 
   function addReturn(code: string): string {
     // Match the last line in the string
-    const regex = /.*$/gm;
-    const lines = code.match(regex);
+    const lines: Array<String> = code.trim().split("\n");
 
-    if (!lines) {
+    if (lines.length === 0) {
       return "";
     }
 
-    // Get the last line
     const lastLine = lines[lines.length - 1];
+    lines[lines.length - 1] = `return ${lastLine.trim()}`;
 
-    // Replace the last line with 'return ' prepended to it
-    const updatedCode = code.replace(lastLine, "return " + lastLine);
-
-    return updatedCode;
+    return lines.join("\n");
   }
 
   function runAndUpdateCode(): void {
     try {
-      if (!props.value.metadata.code) {
+      if (code === "") {
         props.utils.setMetadata({
           error: "No code to run",
           response: undefined,
@@ -102,15 +102,15 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         });
         return;
       }
-      let result = new Function(props.value.metadata.code)();
+      let result = new Function(code)();
       if (result === undefined) {
-        const newCode: string = addReturn(props.value.metadata.code);
+        const newCode: string = addReturn(code);
         try {
-          result = new Function(newCode)() || "Undefined";
+          result = new Function(newCode)();
         } catch {}
       }
       props.utils.setMetadata({
-        response: result,
+        response: result || "Undefined",
         error: undefined,
         code: code,
       });
@@ -136,7 +136,12 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <ObjectInspector data={props.value.metadata.response} />
         </div>
       )}
-      <textarea rows={4} cols={72}  value={code} onChange={(e) => setCode(e.target.value)} />
+      <textarea
+        rows={4}
+        cols={72}
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
       <br></br>
       <button onClick={runAndUpdateCode}>Run Highlighted Code</button>
       <br></br>
