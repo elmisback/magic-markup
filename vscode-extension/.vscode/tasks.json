@@ -5,36 +5,57 @@
 	"tasks": [
 		{
 			"type": "npm",
+			"label": "watch",
 			"script": "watch",
-			"problemMatcher": "$ts-webpack-watch",
+			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
 			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
+				"reveal": "never"
 			},
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			}
+		},
+		// run vite build in watch mode
+		{
+			"type": "npm",
+			"label": "watch:webview",
+			"script": "watch:webview",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			}
+		},
+		{
+			// run vite dev server
+			"type": "npm",
+			"label": "serve",
+			"script": "start:webview",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			}
+		},
+		// run both watch tasks
+		{
+			"type": "shell",
+			"label": "watch",
+			"dependsOn": ["watch:webview", "watch", "serve"],
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			}
 		},
-		{
-			"type": "npm",
-			"script": "watch-tests",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
-			},
-			"group": "build"
-		},
-		{
-			"label": "tasks: watch-tests",
-			"dependsOn": [
-				"npm: watch",
-				"npm: watch-tests"
-			],
-			"problemMatcher": []
-		}
 	]
 }
