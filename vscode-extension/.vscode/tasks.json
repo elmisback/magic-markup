@@ -1,61 +1,95 @@
 // See https://go.microsoft.com/fwlink/?LinkId=733558
 // for the documentation about the tasks.json format
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "npm",
-			"label": "watch",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			}
-		},
-		// run vite build in watch mode
-		{
-			"type": "npm",
-			"label": "watch:webview",
-			"script": "watch:webview",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			}
-		},
-		{
-			// run vite dev server
-			"type": "npm",
-			"label": "serve",
-			"script": "start:webview",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			}
-		},
-		// run both watch tasks
-		{
-			"type": "shell",
-			"label": "watch",
-			"dependsOn": ["watch:webview", "watch", "serve"],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		},
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "label": "watch",
+      "script": "watch",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    // run vite build in watch mode
+    {
+      "type": "npm",
+      "label": "watch:webview",
+      "script": "watch:webview",
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "line": 1,
+              "column": 1,
+              "message": 1
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": { "regexp": "." },
+            "endsPattern": { "regexp": "^.*$" } // <-- right here
+          }
+        }
+      ],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      // run vite dev server
+      "type": "npm",
+      "label": "serve",
+      "script": "start:webview",
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "line": 1,
+              "column": 1,
+              "message": 1
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": { "regexp": "." },
+            "endsPattern": { "regexp": "^.*$" } // <-- right here
+          }
+        }
+      ],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    // run both watch tasks
+    {
+      "type": "shell",
+      "label": "watch",
+      "dependsOn": ["watch:webview", "watch", "serve"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
 }
