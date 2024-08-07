@@ -88,8 +88,80 @@ function AnnotationEditorContainer(props: {
   );
 }
 
+type RetagFunction = (oldDocument: string, currentDocument: string, annotation: Annotation) => Annotation | undefined;
+
+type OutOfDateFunction = (oldDocument: string, currentDocument: string) => boolean;
+
+/* Basically, we want to write a component like this:
+<AnnotationSidebarView annotations={annotations} setAnnotations={setAnnotations}  // annotation setter and getter
+  currentLineNumber={} // line number, so we can scroll to the most relevant annotation
+  
+  selectedAnnotation={} setSelectedAnnotation={} // annotation that is currently selected, if any
+  hoveredAnnotation={} setHoveredAnnotation={} // annotation that is currently hovered, if any
+  />
+  
+  <AnnotationSyncer annotations={} setAnnotations={}
+
+  // These parts are separate and handle keeping the annotations up to date
+  documentOutOfDate={OutOfDateFunction} currentDocument={} retag={RetagFunction} // functions to watch the document and retag it when it is out of date
+  />
+
+  when the currentDocument changes, call retag on each annotation and setAnnotations to the new annotations
+
+  when the currentLineNumber changes, scroll to the annotation with the closest start value
+
+  when the selectedAnnotation changes, scroll to that annotation
+
+This shows a view of the annotations.
+*/
+
+function AnnotationSidebarView(props: {
+  annotations: Annotation[];
+  setAnnotations: (annotations: Annotation[]) => void;
+  currentLineNumber: number;
+  selectedAnnotation: Annotation | undefined;
+  setSelectedAnnotation: (annotation: Annotation | undefined) => void;
+  hoveredAnnotation: Annotation | null;
+  setHoveredAnnotation: (annotation: Annotation | null) => void;
+}) {
+  const { annotations, setAnnotations } = props;
+  return <>
+    <h1>Annotations</h1>
+      <ul>
+        {annotations.map((annotation, index) => (
+          <li key={index}>
+            <p>Document: {annotation.document}</p>
+            <p>Start: {annotation.start}</p>
+            <p>End: {annotation.end}</p>
+            <p>Tool: {annotation.tool}</p>
+            <p>Metadata: {JSON.stringify(annotation.metadata)}</p>
+            <p>Original Document: {annotation.original.document}</p>
+            <p>Original Start: {annotation.original.start}</p>
+            <p>Original End: {annotation.original.end}</p>
+          </li>
+        ))}
+      </ul>
+      {annotations.map((annotation, index) => (
+        <AnnotationEditorContainer
+          key={index}
+          value={annotation}
+          setValue={(value) => {
+            annotations[index] = { ...annotations[index], ...value };
+            setAnnotations(annotations);
+          }}
+          hoveredAnnotation={null}
+          selectedAnnotation={undefined}
+          setSelectedAnnotation={() => {}}
+        />
+      ))}
+    </>
+}
+
 function App() {
+  // get the values we need from the disk
   const [filePath, setFilePath] = useState("");
+
+  // const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   window.addEventListener("message", (event) => {
     const message = event.data;
@@ -149,38 +221,7 @@ function App() {
 
   return (
     <main>
-      <h1>Annotations</h1>
-      <ul>
-        {annotations.annotations.map((annotation, index) => (
-          <li key={index}>
-            <p>Document: {annotation.document}</p>
-            <p>Start: {annotation.start}</p>
-            <p>End: {annotation.end}</p>
-            <p>Tool: {annotation.tool}</p>
-            <p>Metadata: {JSON.stringify(annotation.metadata)}</p>
-            <p>Original Document: {annotation.original.document}</p>
-            <p>Original Start: {annotation.original.start}</p>
-            <p>Original End: {annotation.original.end}</p>
-          </li>
-        ))}
-      </ul>
-      {annotations.annotations.map((annotation, index) => (
-        <AnnotationEditorContainer
-          key={index}
-          value={annotation}
-          setValue={(value) => {
-            annotations.annotations[index] = { ...annotations.annotations[index], ...value };
-          }}
-          hoveredAnnotation={null}
-          selectedAnnotation={undefined}
-          setSelectedAnnotation={() => {}}
-        />
-      ))}
-      <h2>Filepath</h2>
-      <text>{filePath}</text>
-      <button onClick={() => vscode.postMessage({ command: "getFilepath" })}>
-        Update Filepath
-      </button>
+      <AnnotationSidebarView annotations={annotations.annotations} setAnnotations={(annotations) => {}} currentLineNumber={0} selectedAnnotation={undefined} setSelectedAnnotation={() => {}} hoveredAnnotation={null} setHoveredAnnotation={() => {}} />
     </main>
   );
 }
