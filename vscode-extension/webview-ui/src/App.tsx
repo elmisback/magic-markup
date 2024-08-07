@@ -2,6 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
+import React, { useState } from "react";
 
 interface AnnotationUpdate {
   document?: string;
@@ -88,6 +89,16 @@ function AnnotationEditorContainer(props: {
 }
 
 function App() {
+  const [filePath, setFilePath] = useState("");
+
+  window.addEventListener("message", (event) => {
+    const message = event.data;
+    switch (message.command) {
+      case "setFilepath":
+        setFilePath(message.filepath);
+    }
+  });
+
   const annotations = {
     annotations: [
       {
@@ -165,6 +176,11 @@ function App() {
           setSelectedAnnotation={() => {}}
         />
       ))}
+      <h2>Filepath</h2>
+      <text>{filePath}</text>
+      <button onClick={() => vscode.postMessage({ command: "getFilepath" })}>
+        Update Filepath
+      </button>
     </main>
   );
 }

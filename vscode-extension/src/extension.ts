@@ -12,6 +12,7 @@ import chokidar from "chokidar";
 import retagUpdate from "./server/retag";
 
 export function activate(context: ExtensionContext) {
+  // Helper to run REST endpoints
   const runEndpointDictWithErrorHandlingOnPort = (
     port: number,
     endpointDict: { [key: string]: (req: any, res: any) => void },
@@ -43,6 +44,7 @@ export function activate(context: ExtensionContext) {
     });
   };
 
+  // Retag server
   const retagServer = runEndpointDictWithErrorHandlingOnPort(
     8071,
     {
