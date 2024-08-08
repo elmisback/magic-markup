@@ -47,8 +47,8 @@ function AnnotationEditorContainer(props: {
       props.selectedAnnotation === value
         ? "lightgreen"
         : props.hoveredAnnotation === value
-        ? "lightgray"
-        : "transparent",
+          ? "lightgray"
+          : "transparent",
   };
 
   return (
@@ -129,37 +129,37 @@ function AnnotationSidebarView(props: {
   const { annotations, setAnnotations } = props;
   return <>
     <h1>Annotations</h1>
-      <ul>
-        {annotations.map((annotation, index) => (
-          <li key={index}>
-            <p>Document: {annotation.document}</p>
-            <p>Start: {annotation.start}</p>
-            <p>End: {annotation.end}</p>
-            <p>Tool: {annotation.tool}</p>
-            <p>Metadata: {JSON.stringify(annotation.metadata)}</p>
-            <p>Original Document: {annotation.original.document}</p>
-            <p>Original Start: {annotation.original.start}</p>
-            <p>Original End: {annotation.original.end}</p>
-          </li>
-        ))}
-      </ul>
+    <ul>
       {annotations.map((annotation, index) => (
-        <AnnotationEditorContainer
-          key={index}
-          value={annotation}
-          setValue={(value) => {
-            annotations[index] = { ...annotations[index], ...value };
-            setAnnotations(annotations);
-          }}
-          hoveredAnnotation={null}
-          selectedAnnotation={undefined}
-          setSelectedAnnotation={() => {}}
-        />
+        <li key={index}>
+          <p>Document: {annotation.document}</p>
+          <p>Start: {annotation.start}</p>
+          <p>End: {annotation.end}</p>
+          <p>Tool: {annotation.tool}</p>
+          <p>Metadata: {JSON.stringify(annotation.metadata)}</p>
+          <p>Original Document: {annotation.original.document}</p>
+          <p>Original Start: {annotation.original.start}</p>
+          <p>Original End: {annotation.original.end}</p>
+        </li>
       ))}
-    </>
+    </ul>
+    {annotations.map((annotation, index) => (
+      <AnnotationEditorContainer
+        key={index}
+        value={annotation}
+        setValue={(value) => {
+          annotations[index] = { ...annotations[index], ...value };
+          setAnnotations(annotations);
+        }}
+        hoveredAnnotation={null}
+        selectedAnnotation={undefined}
+        setSelectedAnnotation={() => { }}
+      />
+    ))}
+  </>
 }
 
-const annotationsDefault: {annotations: Annotation[]} = {
+const annotationsDefault: { annotations: Annotation[] } = {
   annotations: [
     {
       document:
@@ -210,14 +210,14 @@ const annotationsDefault: {annotations: Annotation[]} = {
 /* Generic function to use a document from a WebSocket server,
    with a read and write callback to convert between the document and an object type if needed
 */
-function useDocumentFromWSServer(serverUrl: string | undefined, documentURI: string | undefined,
+function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined,
   readCallback: (document: string) => any = document => document,
   writeCallback: (object: any) => string = document => document
 ) {
   // TODO May want to read up on how to do websockets with React properly, 
-  // e.g.https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
+  // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
   const [document, setDocument] = useState(undefined as (string | undefined));
-  
+
   if (!serverUrl || !documentURI) {
     return [undefined, undefined];
   }
@@ -252,46 +252,45 @@ function useDocumentFromWSServer(serverUrl: string | undefined, documentURI: str
   return [document, updateDocumentState];
 }
 
-function useObjectFromWSServer(serverUrl: string | undefined, documentURI: string | undefined) {
-  useDocumentFromWSServer(serverUrl, documentURI, document => JSON.parse(document), object => JSON.stringify(object, undefined, 2));
+function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined) {
+  // Handles JSON parsing/stringify and errors
+  useDocumentFromWSFileServer(serverUrl, documentURI,
+    document => {
+      try {
+        return JSON.parse(document);
+      } catch (error) {
+        console.error('Error parsing JSON: ', error);
+      }
+    },
+    object => JSON.stringify(object)
+  );
 }
 
 function App() {
   // Data source configuration
   const [annotationURI, setAnnotationURI] = useState(undefined);
   const [documentURI, setDocumentURI] = useState(undefined);
-  
+
   // Data
   const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSServer("ws://localhost:8073", documentURI)
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer("ws://localhost:8073", documentURI)
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined);
   const [selectedAnnotation, setSelectedAnnotation] = useState(undefined);
   const [hoveredAnnotation, setHoveredAnnotation] = useState(undefined);
 
-  // Connect to the annotation state server and listen for changes
-
-  /* Want a generic function for useEffect that 
-  1) sends a listen request on open
-  2) runs a callback on a JSON parse of messages with error handling for the parse
-  3) cleans up on unmount
-  */
-
-  // get the values we need from the disk
-  const [filePath, setFilePath] = useState("");
-
   window.addEventListener("message", (event) => {
     const message = event.data;
     switch (message.command) {
       case "setFilepath":
-        setFilePath(message.filepath);
+      //setFilePath(message.filepath);
     }
   });
 
   return (
     <main>
-      <AnnotationSidebarView annotations={annotations.annotations} setAnnotations={(annotations) => {}} currentLineNumber={0} selectedAnnotation={undefined} setSelectedAnnotation={() => {}} hoveredAnnotation={null} setHoveredAnnotation={() => {}} />
+      <AnnotationSidebarView annotations={annotations.annotations} setAnnotations={(annotations) => { }} currentLineNumber={0} selectedAnnotation={undefined} setSelectedAnnotation={() => { }} hoveredAnnotation={null} setHoveredAnnotation={() => { }} />
     </main>
   );
 }
