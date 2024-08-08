@@ -150,10 +150,12 @@ export class HelloWorldPanel {
           // Add more switch case statements here as more webview message commands
           // are created within the webview context (i.e. inside media/main.js)
           case "getFilepath":
-            this._panel.webview.postMessage({
-              command: "setFilepath",
-              filepath: vscode.window.activeTextEditor?.document.fileName,
-            });
+            this._panel.webview.postMessage(
+              JSON.stringify({
+                command: "setFilepath",
+                data: { filepath: vscode.window.activeTextEditor?.document.fileName },
+              })
+            );
             return;
         }
       },
@@ -171,5 +173,4 @@ export class HelloWorldPanel {
     // Assume message is an object
     this._panel.webview.postMessage(JSON.stringify(message));
   }
-
 }

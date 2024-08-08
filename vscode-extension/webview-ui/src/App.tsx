@@ -47,8 +47,8 @@ function AnnotationEditorContainer(props: {
       props.selectedAnnotation === value
         ? "lightgreen"
         : props.hoveredAnnotation === value
-          ? "lightgray"
-          : "transparent",
+        ? "lightgray"
+        : "transparent",
   };
 
   return (
@@ -88,7 +88,11 @@ function AnnotationEditorContainer(props: {
   );
 }
 
-type RetagFunction = (oldDocument: string, currentDocument: string, annotation: Annotation) => Annotation | undefined;
+type RetagFunction = (
+  oldDocument: string,
+  currentDocument: string,
+  annotation: Annotation
+) => Annotation | undefined;
 
 type OutOfDateFunction = (oldDocument: string, currentDocument: string) => boolean;
 
@@ -127,9 +131,10 @@ function AnnotationSidebarView(props: {
   setHoveredAnnotation: (annotation: Annotation | null) => void;
 }) {
   const { annotations, setAnnotations } = props;
-  return <>
-    <h1>Annotations</h1>
-    {/* <ul>
+  return (
+    <>
+      <h1>Annotations</h1>
+      {/* <ul>
       {annotations.map((annotation, index) => (
         <li key={index}>
           <p>Document: {annotation.document}</p>
@@ -143,20 +148,21 @@ function AnnotationSidebarView(props: {
         </li>
       ))}
     </ul> */}
-    {annotations.map((annotation, index) => (
-      <AnnotationEditorContainer
-        key={index}
-        value={annotation}
-        setValue={(value) => {
-          annotations[index] = { ...annotations[index], ...value };
-          setAnnotations(annotations);
-        }}
-        hoveredAnnotation={null}
-        selectedAnnotation={undefined}
-        setSelectedAnnotation={() => { }}
-      />
-    ))}
-  </>
+      {annotations.map((annotation, index) => (
+        <AnnotationEditorContainer
+          key={index}
+          value={annotation}
+          setValue={(value) => {
+            annotations[index] = { ...annotations[index], ...value };
+            setAnnotations(annotations);
+          }}
+          hoveredAnnotation={null}
+          selectedAnnotation={undefined}
+          setSelectedAnnotation={() => {}}
+        />
+      ))}
+    </>
+  );
 }
 
 const annotationsDefault: { annotations: Annotation[] } = {
@@ -210,16 +216,18 @@ const annotationsDefault: { annotations: Annotation[] } = {
 /* Generic function to use a document from a WebSocket server,
    with a read and write callback to convert between the document and an object type if needed
 */
-function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined,
-  readCallback: (document: string) => any = document => document,
-  writeCallback: (object: any) => string = document => document
+function useDocumentFromWSFileServer(
+  serverUrl: string | undefined,
+  documentURI: string | undefined,
+  readCallback: (document: string) => any = (document) => document,
+  writeCallback: (object: any) => string = (document) => document
 ): [string | undefined, (object: any) => void] {
-  // TODO May want to read up on how to do websockets with React properly, 
+  // TODO May want to read up on how to do websockets with React properly,
   // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
-  const [document, setDocument] = useState(undefined as (string | undefined));
+  const [document, setDocument] = useState(undefined as string | undefined);
 
   if (!serverUrl || !documentURI) {
-    return [undefined, () => { }];
+    return [undefined, () => {}];
   }
 
   const ws = new WebSocket(serverUrl);
@@ -229,40 +237,46 @@ function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI:
       const document = event.data;
       readCallback(document);
     } catch (error) {
-      console.error('Error parsing JSON: ', error);
-    };
-  }
+      console.error("Error parsing JSON: ", error);
+    }
+  };
 
   ws.onopen = () => {
     // Send message to server to start listening to document updates
-    ws.send(JSON.stringify({
-      type: 'listen',
-      documentURI
-    }));
+    ws.send(
+      JSON.stringify({
+        type: "listen",
+        documentURI,
+      })
+    );
   };
 
   const updateDocumentState = (object: any) => {
-    ws.send(JSON.stringify({
-      type: 'write',
-      documentURI,
-      state: writeCallback(object)
-    }));
-  }
+    ws.send(
+      JSON.stringify({
+        type: "write",
+        documentURI,
+        state: writeCallback(object),
+      })
+    );
+  };
 
   return [document, updateDocumentState];
 }
 
 function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined) {
   // Handles JSON parsing/stringify and errors
-  useDocumentFromWSFileServer(serverUrl, documentURI,
-    document => {
+  useDocumentFromWSFileServer(
+    serverUrl,
+    documentURI,
+    (document) => {
       try {
         return JSON.parse(document);
       } catch (error) {
-        console.error('Error parsing JSON: ', error);
+        console.error("Error parsing JSON: ", error);
       }
     },
-    object => JSON.stringify(object)
+    (object) => JSON.stringify(object)
   );
 }
 
@@ -270,7 +284,8 @@ function listenForEditorMessages(
   setDocumentURI: (documentURI: string) => void,
   setAnnotationURI: (annotationURI: string) => void,
   setServerUrl: (serverUrl: string) => void,
-  setCurrentLineNumber: (currentLineNumber: number) => void
+  setCurrentLineNumber: (currentLineNumber: number) => void,
+  setFilepath: (filepath: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -294,6 +309,8 @@ function listenForEditorMessages(
       case "setCurrentLineNumber":
         setCurrentLineNumber(data.currentLineNumber);
         break;
+      case "setFilepath":
+        setFilepath(data.filepath);
       default:
         break;
     }
@@ -306,17 +323,10 @@ const retag = async (currentDocument: string, annotation: Annotation, APIKey: st
   const oldDocumentContent = annotation.document;
   const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
   const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
-  const annotationText = oldDocumentContent.slice(
-    annotation.start,
-    annotation.end
-  );
+  const annotationText = oldDocumentContent.slice(annotation.start, annotation.end);
   const delimiter = "★";
   const codeWithSnippetDelimited =
-    codeUpToSnippet +
-    delimiter +
-    annotationText +
-    delimiter +
-    codeAfterSnippet;
+    codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
   const updatedCodeWithoutDelimiters = currentDocument;
   const output = await fetch("http://localhost:3004/retag", {
     method: "POST",
@@ -327,7 +337,7 @@ const retag = async (currentDocument: string, annotation: Annotation, APIKey: st
       codeWithSnippetDelimited,
       updatedCodeWithoutDelimiters,
       delimiter,
-      APIKey
+      APIKey,
     }),
   }).then((res) => res.json());
 
@@ -339,7 +349,7 @@ const retag = async (currentDocument: string, annotation: Annotation, APIKey: st
     start: output.out.leftIdx,
     end: output.out.rightIdx,
   };
-}
+};
 
 function RetagHeadlineWarning(props: {
   currentDocument: string | undefined;
@@ -350,21 +360,23 @@ function RetagHeadlineWarning(props: {
 
   return (
     <>
-      {currentDocument &&
+      {currentDocument && (
         <>
           Document is out of date!
           <button
             onClick={async () => {
               // Update the annotations after awaiting retagging promises
-              const newAnnotations = await Promise.all(annotations.map(annotation => {
-                return retag(currentDocument, annotation, "APIKey");
-              }
-              ));
+              const newAnnotations = await Promise.all(
+                annotations.map((annotation) => {
+                  return retag(currentDocument, annotation, "APIKey");
+                })
+              );
               setAnnotations(newAnnotations);
-            }}
-          >Retag</button>
+            }}>
+            Retag
+          </button>
         </>
-      }
+      )}
     </>
   );
 }
@@ -375,9 +387,12 @@ function App() {
   const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
   const [serverUrl, setServerUrl] = useState(undefined as string | undefined);
 
+  // Testing filepath
+  const [filepath, setFilepath] = useState("filepath not set");
+
   // Data
   const [annotations, setAnnotations] = useState(annotationsDefault.annotations); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI)
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI);
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
@@ -385,16 +400,41 @@ function App() {
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
 
   // Listen for configuration updates from editor
-  listenForEditorMessages(setDocumentURI, setAnnotationURI, setServerUrl, setCurrentLineNumber);
+  listenForEditorMessages(
+    setDocumentURI,
+    setAnnotationURI,
+    setServerUrl,
+    setCurrentLineNumber,
+    setFilepath
+  );
 
-  const documentOutOfDate = annotations.some(annotation => {
+  const documentOutOfDate = annotations.some((annotation) => {
     return annotation.document !== currentDocument;
   });
 
   return (
     <main>
-      {documentOutOfDate && <RetagHeadlineWarning currentDocument={currentDocument} annotations={annotations} setAnnotations={setAnnotations} />}
-      <AnnotationSidebarView annotations={annotations} setAnnotations={(annotations) => { }} currentLineNumber={currentLineNumber} selectedAnnotationId={selectedAnnotationId} setSelectedAnnotation={() => { }} hoveredAnnotation={null} setHoveredAnnotation={() => { }} />
+      {documentOutOfDate && (
+        <RetagHeadlineWarning
+          currentDocument={currentDocument}
+          annotations={annotations}
+          setAnnotations={setAnnotations}
+        />
+      )}
+      <AnnotationSidebarView
+        annotations={annotations}
+        setAnnotations={(annotations) => {}}
+        currentLineNumber={currentLineNumber}
+        selectedAnnotationId={selectedAnnotationId}
+        setSelectedAnnotation={() => {}}
+        hoveredAnnotation={null}
+        setHoveredAnnotation={() => {}}
+      />
+      <h2>Filepath</h2>
+      <text>{filepath || "Undefined filepath"}</text>
+      <button onClick={() => vscode.postMessage({ command: "getFilepath" })}>
+        Update Filepath
+      </button>
     </main>
   );
 }
