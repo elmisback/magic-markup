@@ -167,7 +167,7 @@ export function activate(context: ExtensionContext) {
 
   // Add another command to test messaging the webview
   const sendMessageCommand = commands.registerCommand("hello-world.sendTestMessage", () => {
-    HelloWorldPanel.currentPanel?.sendMessageObject({ command: "test", data: { text: "Hello from the extension!" } });
+    HelloWorldPanel.currentPanel?.sendMessageObject({ command: "test", data: vscode.window.activeTextEditor?.document.fileName });
   });
 
   context.subscriptions.push(showHelloWorldCommand, sendMessageCommand);
