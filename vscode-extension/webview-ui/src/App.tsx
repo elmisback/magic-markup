@@ -2,7 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface AnnotationUpdate {
   document?: string;
@@ -92,7 +92,9 @@ type RetagFunction = (oldDocument: string, currentDocument: string, annotation: 
 
 type OutOfDateFunction = (oldDocument: string, currentDocument: string) => boolean;
 
+type SetAnnotationsHandler = (setAnnotations: (annotations: Annotation[]) => void) => void;
 /* Basically, we want to write a component like this:
+
 <AnnotationSidebarView annotations={annotations} setAnnotations={setAnnotations}  // annotation setter and getter
   currentLineNumber={} // line number, so we can scroll to the most relevant annotation
   
@@ -157,11 +159,127 @@ function AnnotationSidebarView(props: {
     </>
 }
 
+const annotationsDefault: {annotations: Annotation[]} = {
+  annotations: [
+    {
+      document:
+        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+      start: 34,
+      end: 41,
+      tool: "colorPicker",
+      metadata: {},
+      original: {
+        document: "test original document #0000FF",
+        start: 23,
+        end: 31,
+      },
+    },
+    {
+      start: 60,
+      end: 67,
+      document:
+        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+      tool: "colorPicker",
+      metadata: {},
+      original: {
+        document:
+          "This hex code has a color picker: #80ffff\nSo does this one: #80ffff\nAnd this one: #80ffff",
+        start: 60,
+        end: 67,
+      },
+    },
+    {
+      start: 77,
+      end: 80,
+      document:
+        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+      tool: "comment",
+      metadata: {
+        comment: "abcde",
+      },
+      original: {
+        document:
+          "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
+        start: 77,
+        end: 80,
+      },
+    },
+  ],
+};
+
+/* Generic function to use a document from a WebSocket server,
+   with a read and write callback to convert between the document and an object type if needed
+*/
+function useDocumentFromWSServer(serverUrl: string | undefined, documentURI: string | undefined,
+  readCallback: (document: string) => any = document => document,
+  writeCallback: (object: any) => string = document => document
+) {
+  // TODO May want to read up on how to do websockets with React properly, 
+  // e.g.https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
+  const [document, setDocument] = useState(undefined as (string | undefined));
+  
+  if (!serverUrl || !documentURI) {
+    return [undefined, undefined];
+  }
+
+  const ws = new WebSocket(serverUrl);
+
+  ws.onmessage = (event) => {
+    try {
+      const document = event.data;
+      readCallback(document);
+    } catch (error) {
+      console.error('Error parsing JSON: ', error);
+    };
+  }
+
+  ws.onopen = () => {
+    // Send message to server to start listening to document updates
+    ws.send(JSON.stringify({
+      type: 'listen',
+      documentURI
+    }));
+  };
+
+  const updateDocumentState = (object: any) => {
+    ws.send(JSON.stringify({
+      type: 'write',
+      documentURI,
+      state: writeCallback(object)
+    }));
+  }
+
+  return [document, updateDocumentState];
+}
+
+function useObjectFromWSServer(serverUrl: string | undefined, documentURI: string | undefined) {
+  useDocumentFromWSServer(serverUrl, documentURI, document => JSON.parse(document), object => JSON.stringify(object, undefined, 2));
+}
+
 function App() {
+  // Data source configuration
+  const [annotationURI, setAnnotationURI] = useState(undefined);
+  const [documentURI, setDocumentURI] = useState(undefined);
+  
+  // Data
+  const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSServer("ws://localhost:8073", documentURI)
+
+  // Transient editor + UI state
+  const [currentLineNumber, setCurrentLineNumber] = useState(undefined);
+  const [selectedAnnotation, setSelectedAnnotation] = useState(undefined);
+  const [hoveredAnnotation, setHoveredAnnotation] = useState(undefined);
+
+  // Connect to the annotation state server and listen for changes
+
+  /* Want a generic function for useEffect that 
+  1) sends a listen request on open
+  2) runs a callback on a JSON parse of messages with error handling for the parse
+  3) cleans up on unmount
+  */
+
   // get the values we need from the disk
   const [filePath, setFilePath] = useState("");
-
-  // const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   window.addEventListener("message", (event) => {
     const message = event.data;
@@ -170,54 +288,6 @@ function App() {
         setFilePath(message.filepath);
     }
   });
-
-  const annotations = {
-    annotations: [
-      {
-        document:
-          "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-        start: 34,
-        end: 41,
-        tool: "colorPicker",
-        metadata: {},
-        original: {
-          document: "test original document #0000FF",
-          start: 23,
-          end: 31,
-        },
-      },
-      {
-        start: 60,
-        end: 67,
-        document:
-          "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-        tool: "colorPicker",
-        metadata: {},
-        original: {
-          document:
-            "This hex code has a color picker: #80ffff\nSo does this one: #80ffff\nAnd this one: #80ffff",
-          start: 60,
-          end: 67,
-        },
-      },
-      {
-        start: 77,
-        end: 80,
-        document:
-          "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-        tool: "comment",
-        metadata: {
-          comment: "abcde",
-        },
-        original: {
-          document:
-            "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-          start: 77,
-          end: 80,
-        },
-      },
-    ],
-  };
 
   return (
     <main>
