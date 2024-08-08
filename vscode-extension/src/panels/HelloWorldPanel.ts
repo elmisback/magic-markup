@@ -47,7 +47,7 @@ export class HelloWorldPanel {
   public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
     if (HelloWorldPanel.currentPanel) {
       // If the webview panel already exists reveal it
-      HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.One);
+      HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -56,7 +56,7 @@ export class HelloWorldPanel {
         // Panel title
         "Hello World",
         // The editor column the panel should be displayed in
-        ViewColumn.One,
+        { viewColumn: ViewColumn.Two, preserveFocus: true },
         // Extra panel configurations
         {
           // Enable JavaScript in the webview
@@ -74,14 +74,14 @@ export class HelloWorldPanel {
 
       // Send the retag server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
-        command: "setRetagServer",
-        data: {fileServerUrl: `http://localhost:${fileServerPort}`},
+        command: "setFileServerURL",
+        data: {fileServerURL: `ws://localhost:${fileServerPort}`},
       });
 
       // Send the file server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
-        command: "setFileServer",
-        fileServerPort,
+        command: "setDocumentURI",
+        data: {documentURI: vscode.window.activeTextEditor?.document.fileName}
       });
     }
   }
@@ -130,7 +130,7 @@ export class HelloWorldPanel {
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}' http://localhost:*;">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}' http://localhost:*; connect-src 'self' ws://localhost:8072/; ">
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
           <title>Hello World</title>
         </head>

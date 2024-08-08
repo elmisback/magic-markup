@@ -239,43 +239,7 @@ function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: s
   );
 }
 
-function listenForEditorMessages(
-  setDocumentURI: (documentURI: string) => void,
-  setAnnotationURI: (annotationURI: string) => void,
-  setServerUrl: (serverUrl: string) => void,
-  setCurrentLineNumber: (currentLineNumber: number) => void,
-  setRetagServerURL: (retagServerURL: string) => void
-) {
-  window.addEventListener("message", (event) => {
-    console.debug("Codetations: webview received message:", event);
-    const message = JSON.parse(event.data);
-    console.debug("Codetations: webview message command:", message.command);
-    console.debug("Codetations: webview message data:", message.data);
-    const data = message.data;
-    switch (message.command) {
-      // case "test":
-      //   console.log("Test message received");
-      //   break;
-      case "setDocumentURI":
-        setDocumentURI(data.documentURI);
-        break;
-      case "setAnnotationURI":
-        setAnnotationURI(data.annotationURI);
-        break;
-      case "setFileServerUrl":
-        setServerUrl(data.fileServerUrl);
-        break;
-      case "setCurrentLineNumber":
-        setCurrentLineNumber(data.currentLineNumber);
-        break;
-      case "setRetagServerURL":
-        setRetagServerURL(data.retagServerURL);
-        break;
-      default:
-        break;
-    }
-  });
-}
+
 
 const preprocessAnnotation = (annotation: Annotation) => {
   const oldDocumentContent = annotation.document;
@@ -357,9 +321,47 @@ function RetagHeadlineWarning(props: {
   );
 }
 
+function listenForEditorMessages(
+  setDocumentURI: (documentURI: string) => void,
+  setAnnotationURI: (annotationURI: string) => void,
+  setFileServerURL: (serverUrl: string) => void,
+  setCurrentLineNumber: (currentLineNumber: number) => void,
+  setRetagServerURL: (retagServerURL: string) => void
+) {
+  window.addEventListener("message", (event) => {
+    console.debug("Codetations: webview received message:", event);
+    const message = JSON.parse(event.data);
+    console.debug("Codetations: webview message command:", message.command);
+    console.debug("Codetations: webview message data:", message.data);
+    const data = message.data;
+    switch (message.command) {
+      // case "test":
+      //   console.log("Test message received");
+      //   break;
+      case "setDocumentURI":
+        setDocumentURI(data.documentURI);
+        break;
+      case "setAnnotationURI":
+        setAnnotationURI(data.annotationURI);
+        break;
+      case "setFileServerURL":
+        setFileServerURL(data.fileServerURL);
+        break;
+      case "setCurrentLineNumber":
+        setCurrentLineNumber(data.currentLineNumber);
+        break;
+      case "setRetagServerURL":
+        setRetagServerURL(data.retagServerURL);
+        break;
+      default:
+        break;
+    }
+  });
+}
+
 function App() {
   // Data source configuration
-  const [fileServerURL, setServerUrl] = useState(undefined as string | undefined);
+  const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
   const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
   const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
 
@@ -381,7 +383,7 @@ function App() {
   );
 
   // Listen for configuration updates from editor
-  listenForEditorMessages(setDocumentURI, setAnnotationURI, setServerUrl, setCurrentLineNumber, setRetagServerURL);
+  listenForEditorMessages(setDocumentURI, setAnnotationURI, setFileServerUrl, setCurrentLineNumber, setRetagServerURL);
 
   const documentOutOfDate = annotations.some(annotation => {
     return annotation.document !== currentDocument;
