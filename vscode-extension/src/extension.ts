@@ -11,72 +11,54 @@ import chokidar from "chokidar";
 
 import retagUpdate from "./server/retag";
 
-export function activate(context: ExtensionContext) {
-  // Helper to run REST endpoints
-  const runEndpointDictWithErrorHandlingOnPort = (
-    port: number,
-    endpointDict: { [key: string]: (req: any, res: any) => void },
-    serverName: string
-  ) => {
-    const app = express();
-    app.use(cors());
-    app.use(bodyParser.urlencoded({ extended: true }));
-    app.use(bodyParser.json());
-    Object.entries(endpointDict).forEach(([endpoint, handler]) => {
-      app.post(endpoint, async (req: any, res: any) => {
-        console.log(endpoint, req.body);
-        try {
-          handler(req, res);
-        } catch (e) {
-          vscode.window
-            .showErrorMessage(`Error running ${endpoint}: ${e}`, "Copy to clipboard")
-            .then((action) => {
-              if (action === "Copy to clipboard") {
-                vscode.env.clipboard.writeText(e as string);
-              }
-            });
-          console.error(e);
-        }
-      });
+// Helper to run REST endpoints
+const runEndpointDictWithErrorHandlingOnPort = (
+  port: number,
+  endpointDict: { [key: string]: (req: any, res: any) => void },
+  serverName: string
+) => {
+  const app = express();
+  app.use(cors());
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(bodyParser.json());
+  Object.entries(endpointDict).forEach(([endpoint, handler]) => {
+    app.post(endpoint, async (req: any, res: any) => {
+      console.log(endpoint, req.body);
+      try {
+        handler(req, res);
+      } catch (e) {
+        vscode.window
+          .showErrorMessage(`Error running ${endpoint}: ${e}`, "Copy to clipboard")
+          .then((action) => {
+            if (action === "Copy to clipboard") {
+              vscode.env.clipboard.writeText(e as string);
+            }
+          });
+        console.error(e);
+      }
     });
-    return app.listen(port, () => {
-      console.log(`${serverName} is running on port ${port}`);
-    });
-  };
+  });
+  return app.listen(port, () => {
+    console.log(`${serverName} is running on port ${port}`);
+  });
+};
 
-  // Retag server
-  const retagServer = runEndpointDictWithErrorHandlingOnPort(
-    8071,
-    {
-      "/retag": async (req: any, res: any) => {
-        console.log("Retagging document");
-        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey } =
-          req.body;
-
-        const out = await retagUpdate(
-          codeWithSnippetDelimited,
-          updatedCodeWithoutDelimiters,
-          delimiter,
-          APIKey
-        );
-
-        res.json(out);
-      },
-    },
-    "Retag"
-  );
-
-  // Document server
-  const documentServer = new WebSocket.Server({ port: 8072 });
+// Set up websocket server on a port to provide a document's text to all listeners
+function runWSFileServer(port: number) {
+  // Create a WebSocket server
+  const wss = new WebSocket.Server({ port });
 
   function validate(documentURI: string) {
+    return true;
     // we only access files that exist, and are in the directory where this server is running.
-    return documentURI.startsWith(process.cwd()) && fs.existsSync(documentURI);
+    // return documentURI.startsWith(process.cwd()) && fs.existsSync(documentURI);
   }
 
-  type MySocket = WebSocket & { documentURI?: string } & { watcher?: chokidar.FSWatcher };
+  type MySocket = WebSocket & { documentURI?: string } & {
+    watcher?: chokidar.FSWatcher;
+  };
 
-  documentServer.on("connection", (ws: MySocket) => {
+  wss.on("connection", (ws: MySocket) => {
     console.log("new connection");
     ws.on("message", (message) => {
       console.log(`Received message => ${message}`);
@@ -130,8 +112,11 @@ export function activate(context: ExtensionContext) {
         });
 
         // send state to all listeners
-        documentServer.clients.forEach((ws1: MySocket) => {
-          if (ws1.documentURI === ws.documentURI && ws1.readyState === WebSocket.OPEN) {
+        wss.clients.forEach((ws1: MySocket) => {
+          if (
+            ws1.documentURI === ws.documentURI &&
+            ws1.readyState === WebSocket.OPEN
+          ) {
             ws1.send(state);
           }
         });
@@ -143,58 +128,48 @@ export function activate(context: ExtensionContext) {
       ws.watcher?.close();
     });
   });
+  return wss;
+}
 
-  // State server
-  const stateServer = new WebSocket.Server({ port: 8073 });
+export function activate(context: ExtensionContext) {
 
-  let stateURI = "";
+  // Retag server
+  const retagServerPort = 8071;
+  const retagServer = runEndpointDictWithErrorHandlingOnPort(
+    8071,
+    {
+      "/retag": async (req: any, res: any) => {
+        console.log("Retagging document");
+        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey } =
+          req.body;
 
-  stateServer.on("connection", (ws: WebSocket.WebSocket) => {
-    console.log("new connection");
-    ws.on("message", (message) => {
-      console.log(`Received message => ${message}`);
-      const messageObj = JSON.parse(message.toString());
+        const out = await retagUpdate(
+          codeWithSnippetDelimited,
+          updatedCodeWithoutDelimiters,
+          delimiter,
+          APIKey
+        );
 
-      if (messageObj.type === "listen") {
-        const state = fs.readFileSync(stateURI, "utf8");
-        ws.send(state);
-      } else if (messageObj.type === "save") {
-        // read file uri from req.body
-        stateURI = messageObj.stateURI;
-        const state = messageObj.state;
+        res.json(out);
+      },
+    },
+    "Retag"
+  );
 
-        // open the file and save the new state
-        fs.writeFile(stateURI, JSON.stringify(state), (err: any) => {
-          if (err) {
-            console.error(err);
-            return;
-          }
-          console.log("File saved.");
-        });
-
-        // send state to all listeners
-        stateServer.clients.forEach((ws) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(state);
-          }
-        });
-      }
-    });
-  });
+  // Document + state server
+  const fileServerPort = 8072;
+  const fileServer = runWSFileServer(8072);
 
   // Create the show hello world command
   const showHelloWorldCommand = commands.registerCommand("hello-world.showHelloWorld", () => {
-    HelloWorldPanel.render(context.extensionUri);
+    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
   });
-
-  // Add command to the extension context
-  context.subscriptions.push(showHelloWorldCommand);
 
   // Add another command to test messaging the webview
   const sendMessageCommand = commands.registerCommand("hello-world.sendTestMessage", () => {
     HelloWorldPanel.currentPanel?.sendMessageObject({ command: "test", data: { text: "Hello from the extension!" } });
   });
 
-  context.subscriptions.push(sendMessageCommand);
+  context.subscriptions.push(showHelloWorldCommand, sendMessageCommand);
 
 }

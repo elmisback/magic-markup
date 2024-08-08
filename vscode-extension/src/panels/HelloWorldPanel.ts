@@ -44,7 +44,7 @@ export class HelloWorldPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri) {
+  public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
     if (HelloWorldPanel.currentPanel) {
       // If the webview panel already exists reveal it
       HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.One);
@@ -70,6 +70,18 @@ export class HelloWorldPanel {
       );
 
       HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri);
+
+      // Send the retag server url to the webview
+      HelloWorldPanel.currentPanel.sendMessageObject({
+        command: "setRetagServer",
+        data: {fileServerUrl: `http://localhost:${fileServerPort}`},
+      });
+
+      // Send the file server url to the webview
+      HelloWorldPanel.currentPanel.sendMessageObject({
+        command: "setFileServer",
+        fileServerPort,
+      });
     }
   }
 
