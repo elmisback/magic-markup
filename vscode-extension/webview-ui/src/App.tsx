@@ -120,8 +120,8 @@ This shows a view of the annotations.
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
-  currentLineNumber: number;
-  selectedAnnotation: Annotation | undefined;
+  currentLineNumber: number | undefined;
+  selectedAnnotationId: number | undefined;
   setSelectedAnnotation: (annotation: Annotation | undefined) => void;
   hoveredAnnotation: Annotation | null;
   setHoveredAnnotation: (annotation: Annotation | null) => void;
@@ -213,13 +213,13 @@ const annotationsDefault: { annotations: Annotation[] } = {
 function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined,
   readCallback: (document: string) => any = document => document,
   writeCallback: (object: any) => string = document => document
-) {
+): [string | undefined, (object: any) => void] {
   // TODO May want to read up on how to do websockets with React properly, 
   // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
   const [document, setDocument] = useState(undefined as (string | undefined));
 
   if (!serverUrl || !documentURI) {
-    return [undefined, undefined];
+    return [undefined, () => { }];
   }
 
   const ws = new WebSocket(serverUrl);
@@ -273,7 +273,7 @@ function listenForEditorMessages(
   setCurrentLineNumber: (currentLineNumber: number) => void
 ) {
   window.addEventListener("message", (event) => {
-    console.debug("Codetations: webview received message:", event); 
+    console.debug("Codetations: webview received message:", event);
     const message = JSON.parse(event.data);
     console.debug("Codetations: webview message command:", message.command);
     console.debug("Codetations: webview message data:", message.data);
@@ -300,6 +300,75 @@ function listenForEditorMessages(
   });
 }
 
+// Retag function (async!)
+const retag = async (currentDocument: string, annotation: Annotation, APIKey: string) => {
+  console.debug("Retagging annotation:", annotation);
+  const oldDocumentContent = annotation.document;
+  const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
+  const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
+  const annotationText = oldDocumentContent.slice(
+    annotation.start,
+    annotation.end
+  );
+  const delimiter = "★";
+  const codeWithSnippetDelimited =
+    codeUpToSnippet +
+    delimiter +
+    annotationText +
+    delimiter +
+    codeAfterSnippet;
+  const updatedCodeWithoutDelimiters = currentDocument;
+  const output = await fetch("http://localhost:3004/retag", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      codeWithSnippetDelimited,
+      updatedCodeWithoutDelimiters,
+      delimiter,
+      APIKey
+    }),
+  }).then((res) => res.json());
+
+  // update the annotation
+  console.log("Output:", output);
+  return {
+    ...annotation,
+    document: updatedCodeWithoutDelimiters,
+    start: output.out.leftIdx,
+    end: output.out.rightIdx,
+  };
+}
+
+function RetagHeadlineWarning(props: {
+  currentDocument: string | undefined;
+  annotations: Annotation[];
+  setAnnotations: (annotations: Annotation[]) => void;
+}) {
+  const { currentDocument, annotations, setAnnotations } = props;
+
+  return (
+    <>
+      {currentDocument &&
+        <>
+          Document is out of date!
+          <button
+            onClick={async () => {
+              // Update the annotations after awaiting retagging promises
+              const newAnnotations = await Promise.all(annotations.map(annotation => {
+                return retag(currentDocument, annotation, "APIKey");
+              }
+              ));
+              setAnnotations(newAnnotations);
+            }}
+          >Retag</button>
+        </>
+      }
+    </>
+  );
+}
+
 function App() {
   // Data source configuration
   const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
@@ -307,7 +376,7 @@ function App() {
   const [serverUrl, setServerUrl] = useState(undefined as string | undefined);
 
   // Data
-  const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
+  const [annotations, setAnnotations] = useState(annotationsDefault.annotations); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
   const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI)
 
   // Transient editor + UI state
@@ -318,14 +387,14 @@ function App() {
   // Listen for configuration updates from editor
   listenForEditorMessages(setDocumentURI, setAnnotationURI, setServerUrl, setCurrentLineNumber);
 
-
+  const documentOutOfDate = annotations.some(annotation => {
+    return annotation.document !== currentDocument;
+  });
 
   return (
     <main>
-      <AnnotationSidebarView annotations={annotations.annotations} setAnnotations={(annotations) => { }} currentLineNumber={0} selectedAnnotation={undefined} setSelectedAnnotation={() => { }} hoveredAnnotation={null} setHoveredAnnotation={() => { }} />
-      <button>
-        Retag
-      </button>
+      {documentOutOfDate && <RetagHeadlineWarning currentDocument={currentDocument} annotations={annotations} setAnnotations={setAnnotations} />}
+      <AnnotationSidebarView annotations={annotations} setAnnotations={(annotations) => { }} currentLineNumber={currentLineNumber} selectedAnnotationId={selectedAnnotationId} setSelectedAnnotation={() => { }} hoveredAnnotation={null} setHoveredAnnotation={() => { }} />
     </main>
   );
 }
