@@ -376,26 +376,31 @@ function App() {
 
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
-  
-  // HACK For now, use browser storage to initialize API key
   const [APIKey, setAPIKey] = useState(
+    // HACK For now, use browser storage to initialize API key
     () => window.localStorage.getItem('APIKey') || undefined
   );
 
   // Listen for configuration updates from editor
   listenForEditorMessages(setDocumentURI, setAnnotationURI, setFileServerUrl, setCurrentLineNumber, setRetagServerURL);
 
+  // Set up retagging function
+  const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
+
   const documentOutOfDate = annotations.some(annotation => {
     return annotation.document !== currentDocument;
   });
 
-  const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
-
-  console.log('currentDocument', currentDocument)
   return (
     <main>
       {documentOutOfDate && <RetagHeadlineWarning currentDocument={currentDocument} annotations={annotations} setAnnotations={setAnnotations} retag={retag} />}
       <AnnotationSidebarView annotations={annotations} setAnnotations={(annotations) => { }} currentLineNumber={currentLineNumber} selectedAnnotationId={selectedAnnotationId} setSelectedAnnotationId={() => { }} hoveredAnnotationId={hoveredAnnotationId} setHoveredAnnotationId={() => { }} />
+      
+      {/* Show document content in a div for testing */}
+      <div>
+        <h1>Document</h1>
+        <pre>{currentDocument}</pre>
+      </div>
     </main>
   );
 }
