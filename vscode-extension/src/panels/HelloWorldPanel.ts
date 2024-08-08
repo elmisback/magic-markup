@@ -161,4 +161,15 @@ export class HelloWorldPanel {
       this._disposables
     );
   }
+
+  /**
+   * Sends a message to the webview context.
+   *
+   * @param message The message to be sent to the webview context
+   */
+  public sendMessageObject(message: any) {
+    // Assume message is an object
+    this._panel.webview.postMessage(JSON.stringify(message));
+  }
+
 }

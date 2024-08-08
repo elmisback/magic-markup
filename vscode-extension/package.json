@@ -12,6 +12,10 @@
       {
         "command": "hello-world.showHelloWorld",
         "title": "Hello World (React + Vite): Show"
+      },
+      {
+        "command": "hello-world.sendTestMessage",
+        "title": "Hello World (React + Vite): Test"
       }
     ]
   },

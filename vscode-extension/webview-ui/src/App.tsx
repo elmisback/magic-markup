@@ -270,10 +270,11 @@ function App() {
   // Data source configuration
   const [annotationURI, setAnnotationURI] = useState(undefined);
   const [documentURI, setDocumentURI] = useState(undefined);
+  const [serverUrl, setServerUrl] = useState(undefined);
 
   // Data
   const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer("ws://localhost:8073", documentURI)
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI)
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined);
@@ -281,10 +282,29 @@ function App() {
   const [hoveredAnnotation, setHoveredAnnotation] = useState(undefined);
 
   window.addEventListener("message", (event) => {
-    const message = event.data;
+    console.debug("Codetations: webview received message:", event); 
+    const message = JSON.parse(event.data);
+    console.debug("Codetations: webview message command:", message.command);
+    console.debug("Codetations: webview message data:", message.data);
+    const data = message.data;
     switch (message.command) {
-      case "setFilepath":
-      //setFilePath(message.filepath);
+      // case "test":
+      //   console.log("Test message received");
+      //   break;
+      case "setDocumentURI":
+        setDocumentURI(data.documentURI);
+        break;
+      case "setAnnotationURI":
+        setAnnotationURI(data.annotationURI);
+        break;
+      case "setServerUrl":
+        setServerUrl(data.serverUrl);
+        break;
+      case "setCurrentLineNumber":
+        setCurrentLineNumber(data.currentLineNumber);
+        break;
+      default:
+        break;
     }
   });
 

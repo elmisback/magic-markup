@@ -189,4 +189,12 @@ export function activate(context: ExtensionContext) {
 
   // Add command to the extension context
   context.subscriptions.push(showHelloWorldCommand);
+
+  // Add another command to test messaging the webview
+  const sendMessageCommand = commands.registerCommand("hello-world.sendTestMessage", () => {
+    HelloWorldPanel.currentPanel?.sendMessageObject({ command: "test", data: { text: "Hello from the extension!" } });
+  });
+
+  context.subscriptions.push(sendMessageCommand);
+
 }
