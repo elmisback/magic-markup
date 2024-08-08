@@ -88,34 +88,7 @@ function AnnotationEditorContainer(props: {
   );
 }
 
-type RetagFunction = (currentDocument: string, annotation: Annotation, APIKey: string) => Promise<Annotation | undefined>;
-
-type OutOfDateFunction = (oldDocument: string, currentDocument: string) => boolean;
-
-type SetAnnotationsHandler = (setAnnotations: (annotations: Annotation[]) => void) => void;
-/* Basically, we want to write a component like this:
-
-<AnnotationSidebarView annotations={annotations} setAnnotations={setAnnotations}  // annotation setter and getter
-  currentLineNumber={} // line number, so we can scroll to the most relevant annotation
-  
-  selectedAnnotation={} setSelectedAnnotation={} // annotation that is currently selected, if any
-  hoveredAnnotation={} setHoveredAnnotation={} // annotation that is currently hovered, if any
-  />
-  
-  <AnnotationSyncer annotations={} setAnnotations={}
-
-  // These parts are separate and handle keeping the annotations up to date
-  documentOutOfDate={OutOfDateFunction} currentDocument={} retag={RetagFunction} // functions to watch the document and retag it when it is out of date
-  />
-
-  when the currentDocument changes, call retag on each annotation and setAnnotations to the new annotations
-
-  when the currentLineNumber changes, scroll to the annotation with the closest start value
-
-  when the selectedAnnotation changes, scroll to that annotation
-
-This shows a view of the annotations.
-*/
+type RetagFunction = (currentDocument: string, annotation: Annotation) => Promise<Annotation | undefined>;
 
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
@@ -370,8 +343,9 @@ function RetagHeadlineWarning(props: {
               onClick={async () => {
 
                 // Update the annotations after awaiting retagging promises
-                const newAnnotations = await Promise.all(annotations.map(async annotation => {
-                  return await retag(currentDocument, annotation, "APIKey") || annotation;
+              const newAnnotations = await Promise.all(annotations.map(async annotation => {
+                  // TODO error handling
+                  return await retag(currentDocument, annotation) || annotation;
                 }
                 ));
                 setAnnotations(newAnnotations);
