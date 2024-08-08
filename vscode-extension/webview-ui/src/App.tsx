@@ -200,7 +200,7 @@ function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI:
   ws.onmessage = (event) => {
     try {
       const document = event.data;
-      readCallback(document);
+      setDocument(readCallback(document));
     } catch (error) {
       console.error('Error parsing JSON: ', error);
     };
@@ -391,6 +391,7 @@ function App() {
 
   const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
+  console.log('currentDocument', currentDocument)
   return (
     <main>
       {documentOutOfDate && <RetagHeadlineWarning currentDocument={currentDocument} annotations={annotations} setAnnotations={setAnnotations} retag={retag} />}
