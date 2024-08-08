@@ -129,7 +129,7 @@ function AnnotationSidebarView(props: {
   const { annotations, setAnnotations } = props;
   return <>
     <h1>Annotations</h1>
-    <ul>
+    {/* <ul>
       {annotations.map((annotation, index) => (
         <li key={index}>
           <p>Document: {annotation.document}</p>
@@ -142,7 +142,7 @@ function AnnotationSidebarView(props: {
           <p>Original End: {annotation.original.end}</p>
         </li>
       ))}
-    </ul>
+    </ul> */}
     {annotations.map((annotation, index) => (
       <AnnotationEditorContainer
         key={index}
@@ -266,21 +266,12 @@ function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: s
   );
 }
 
-function App() {
-  // Data source configuration
-  const [annotationURI, setAnnotationURI] = useState(undefined);
-  const [documentURI, setDocumentURI] = useState(undefined);
-  const [serverUrl, setServerUrl] = useState(undefined);
-
-  // Data
-  const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI)
-
-  // Transient editor + UI state
-  const [currentLineNumber, setCurrentLineNumber] = useState(undefined);
-  const [selectedAnnotation, setSelectedAnnotation] = useState(undefined);
-  const [hoveredAnnotation, setHoveredAnnotation] = useState(undefined);
-
+function listenForEditorMessages(
+  setDocumentURI: (documentURI: string) => void,
+  setAnnotationURI: (annotationURI: string) => void,
+  setServerUrl: (serverUrl: string) => void,
+  setCurrentLineNumber: (currentLineNumber: number) => void
+) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event); 
     const message = JSON.parse(event.data);
@@ -307,10 +298,34 @@ function App() {
         break;
     }
   });
+}
+
+function App() {
+  // Data source configuration
+  const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
+  const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
+  const [serverUrl, setServerUrl] = useState(undefined as string | undefined);
+
+  // Data
+  const [annotations, setAnnotations] = useState(annotationsDefault); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(serverUrl, documentURI)
+
+  // Transient editor + UI state
+  const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
+
+  // Listen for configuration updates from editor
+  listenForEditorMessages(setDocumentURI, setAnnotationURI, setServerUrl, setCurrentLineNumber);
+
+
 
   return (
     <main>
       <AnnotationSidebarView annotations={annotations.annotations} setAnnotations={(annotations) => { }} currentLineNumber={0} selectedAnnotation={undefined} setSelectedAnnotation={() => { }} hoveredAnnotation={null} setHoveredAnnotation={() => { }} />
+      <button>
+        Retag
+      </button>
     </main>
   );
 }
