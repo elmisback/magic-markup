@@ -113,10 +113,7 @@ function runWSFileServer(port: number) {
 
         // send state to all listeners
         wss.clients.forEach((ws1: MySocket) => {
-          if (
-            ws1.documentURI === ws.documentURI &&
-            ws1.readyState === WebSocket.OPEN
-          ) {
+          if (ws1.documentURI === ws.documentURI && ws1.readyState === WebSocket.OPEN) {
             ws1.send(state);
           }
         });
@@ -132,7 +129,6 @@ function runWSFileServer(port: number) {
 }
 
 export function activate(context: ExtensionContext) {
-
   // Retag server
   const retagServerPort = 8071;
   const retagServer = runEndpointDictWithErrorHandlingOnPort(
@@ -167,9 +163,11 @@ export function activate(context: ExtensionContext) {
 
   // Add another command to test messaging the webview
   const sendMessageCommand = commands.registerCommand("hello-world.sendTestMessage", () => {
-    HelloWorldPanel.currentPanel?.sendMessageObject({ command: "test", data: vscode.window.activeTextEditor?.document.fileName });
+    HelloWorldPanel.currentPanel?.sendMessageObject({
+      command: "test",
+      data: vscode.window.activeTextEditor?.document.fileName,
+    });
   });
 
   context.subscriptions.push(showHelloWorldCommand, sendMessageCommand);
-
 }

@@ -36,6 +36,9 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for messages passed from the webview context
     this._setWebviewMessageListener(this._panel.webview);
+
+    // Set an event listener to listen for changes in the active text editor
+    this._setFileChangeListener(this._panel.webview);
   }
 
   /**
@@ -75,13 +78,13 @@ export class HelloWorldPanel {
       // Send the retag server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
         command: "setFileServerURL",
-        data: {fileServerURL: `ws://localhost:${fileServerPort}`},
+        data: { fileServerURL: `ws://localhost:${fileServerPort}` },
       });
 
       // Send the file server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
         command: "setDocumentURI",
-        data: {documentURI: vscode.window.activeTextEditor?.document.fileName}
+        data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
       });
     }
   }
@@ -142,6 +145,17 @@ export class HelloWorldPanel {
     `;
   }
 
+  private _setFileChangeListener(webview: Webview) {
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      this._panel.webview.postMessage(
+        JSON.stringify({
+          command: "setDocumentURI",
+          data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
+        })
+      );
+    });
+  }
+
   /**
    * Sets up an event listener to listen for messages passed from the webview context and
    * executes code based on the message that is recieved.
@@ -162,12 +176,6 @@ export class HelloWorldPanel {
             return;
           // Add more switch case statements here as more webview message commands
           // are created within the webview context (i.e. inside media/main.js)
-          case "getFilepath":
-            this._panel.webview.postMessage({
-              command: "setFilepath",
-              filepath: vscode.window.activeTextEditor?.document.fileName,
-            });
-            return;
         }
       },
       undefined,
@@ -184,5 +192,4 @@ export class HelloWorldPanel {
     // Assume message is an object
     this._panel.webview.postMessage(JSON.stringify(message));
   }
-
 }
