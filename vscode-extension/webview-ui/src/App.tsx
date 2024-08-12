@@ -3,6 +3,7 @@ import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
 import React, { useState, useEffect } from "react";
+import * as path from "path";
 
 interface AnnotationUpdate {
   document?: string;
@@ -22,6 +23,14 @@ type ToolTypes = {
 const toolTypes: ToolTypes = {
   ...tools,
 };
+
+function getStateURI(documentURI: string): string {
+  if (documentURI === "") {
+    console.log("Empty document URI passed in to getStateURI");
+  }
+  const fileName: string = documentURI.replace(/[\\/]/g, "_"); // replace slashes with underscores
+  return path.join("annotations/", fileName + ".json");
+}
 
 function AnnotationEditorContainer(props: {
   value: Annotation;
@@ -47,8 +56,8 @@ function AnnotationEditorContainer(props: {
       props.selectedAnnotation === value
         ? "lightgreen"
         : props.hoveredAnnotation === value
-          ? "lightgray"
-          : "transparent",
+        ? "lightgray"
+        : "transparent",
   };
 
   return (
@@ -88,7 +97,10 @@ function AnnotationEditorContainer(props: {
   );
 }
 
-type RetagFunction = (currentDocument: string, annotation: Annotation) => Promise<Annotation | undefined>;
+type RetagFunction = (
+  currentDocument: string,
+  annotation: Annotation
+) => Promise<Annotation | undefined>;
 
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
@@ -100,9 +112,10 @@ function AnnotationSidebarView(props: {
   setHoveredAnnotationId: (id: number | undefined) => void;
 }) {
   const { annotations, setAnnotations } = props;
-  return <>
-    <h1>Annotations</h1>
-    {/* <ul>
+  return (
+    <>
+      <h1>Annotations</h1>
+      {/* <ul>
       {annotations.map((annotation, index) => (
         <li key={index}>
           <p>Document: {annotation.document}</p>
@@ -116,20 +129,21 @@ function AnnotationSidebarView(props: {
         </li>
       ))}
     </ul> */}
-    {annotations.map((annotation, index) => (
-      <AnnotationEditorContainer
-        key={index}
-        value={annotation}
-        setValue={(value) => {
-          annotations[index] = { ...annotations[index], ...value };
-          setAnnotations(annotations);
-        }}
-        hoveredAnnotation={null}
-        selectedAnnotation={undefined}
-        setSelectedAnnotation={() => { }}
-      />
-    ))}
-  </>
+      {annotations.map((annotation, index) => (
+        <AnnotationEditorContainer
+          key={index}
+          value={annotation}
+          setValue={(value) => {
+            annotations[index] = { ...annotations[index], ...value };
+            setAnnotations(annotations);
+          }}
+          hoveredAnnotation={null}
+          selectedAnnotation={undefined}
+          setSelectedAnnotation={() => {}}
+        />
+      ))}
+    </>
+  );
 }
 
 const annotationsDefault: { annotations: Annotation[] } = {
@@ -183,16 +197,18 @@ const annotationsDefault: { annotations: Annotation[] } = {
 /* Generic function to use a document from a WebSocket server,
    with a read and write callback to convert between the document and an object type if needed
 */
-function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined,
-  readCallback: (document: string) => any = document => document,
-  writeCallback: (object: any) => string = document => document
+function useDocumentFromWSFileServer(
+  serverUrl: string | undefined,
+  documentURI: string | undefined,
+  readCallback: (document: string) => any = (document) => document,
+  writeCallback: (object: any) => string = (document) => document
 ): [string | undefined, (object: any) => void] {
-  // TODO May want to read up on how to do websockets with React properly, 
+  // TODO May want to read up on how to do websockets with React properly,
   // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
-  const [document, setDocument] = useState(undefined as (string | undefined));
+  const [document, setDocument] = useState(undefined as string | undefined);
 
   if (!serverUrl || !documentURI) {
-    return [undefined, () => { }];
+    return [undefined, () => {}];
   }
 
   const ws = new WebSocket(serverUrl);
@@ -202,92 +218,91 @@ function useDocumentFromWSFileServer(serverUrl: string | undefined, documentURI:
       const document = event.data;
       setDocument(readCallback(document));
     } catch (error) {
-      console.error('Error parsing JSON: ', error);
-    };
-  }
+      console.error("Error parsing JSON: ", error);
+    }
+  };
 
   ws.onopen = () => {
     // Send message to server to start listening to document updates
-    ws.send(JSON.stringify({
-      type: 'listen',
-      documentURI
-    }));
+    ws.send(
+      JSON.stringify({
+        type: "listen",
+        documentURI,
+      })
+    );
   };
 
   const updateDocumentState = (object: any) => {
-    ws.send(JSON.stringify({
-      type: 'write',
-      documentURI,
-      state: writeCallback(object)
-    }));
-  }
+    ws.send(
+      JSON.stringify({
+        type: "write",
+        documentURI,
+        state: writeCallback(object),
+      })
+    );
+  };
 
   return [document, updateDocumentState];
 }
 
 function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined) {
   // Handles JSON parsing/stringify and errors
-  useDocumentFromWSFileServer(serverUrl, documentURI,
-    document => {
+  useDocumentFromWSFileServer(
+    serverUrl,
+    documentURI,
+    (document) => {
       try {
         return JSON.parse(document);
       } catch (error) {
-        console.error('Error parsing JSON: ', error);
+        console.error("Error parsing JSON: ", error);
       }
     },
-    object => JSON.stringify(object)
+    (object) => JSON.stringify(object)
   );
 }
-
-
 
 const preprocessAnnotation = (annotation: Annotation) => {
   const oldDocumentContent = annotation.document;
   const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
   const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
-  const annotationText = oldDocumentContent.slice(
-    annotation.start,
-    annotation.end
-  );
+  const annotationText = oldDocumentContent.slice(annotation.start, annotation.end);
   const delimiter = "★";
   const codeWithSnippetDelimited =
-    codeUpToSnippet +
-    delimiter +
-    annotationText +
-    delimiter +
-    codeAfterSnippet;
+    codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
   return {
     codeWithSnippetDelimited,
-    delimiter
+    delimiter,
   };
-}
+};
 
-const useRetagFromAPI = (retagServerUrl: string, APIKey: string) => async (currentDocument: string, annotation: Annotation) => {
-  console.debug("Retagging annotation:", annotation);
-  const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
+const useRetagFromAPI =
+  (retagServerUrl: string, APIKey: string) =>
+  async (currentDocument: string, annotation: Annotation) => {
+    console.debug("Retagging annotation:", annotation);
+    const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
 
-  const output = await fetch(retagServerUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      codeWithSnippetDelimited,
-      updatedCodeWithoutDelimiters: currentDocument,
-      delimiter,
-      APIKey
-    }),
-  }).then((res) => res.json());
+    const output = await fetch(retagServerUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        codeWithSnippetDelimited,
+        updatedCodeWithoutDelimiters: currentDocument,
+        delimiter,
+        APIKey,
+      }),
+    }).then((res) => res.json());
 
-  // update the annotation
-  console.log("Output:", output);
-  return {
-    ...annotation,
-    document: currentDocument,
-    start: output.out.leftIdx,
-    end: output.out.rightIdx,
+    // update the annotation
+    console.log("Output:", output);
+    return {
+      ...annotation,
+      document: currentDocument,
+      start: output.out.leftIdx,
+      end: output.out.rightIdx,
+    };
   };
-}
 
 function RetagHeadlineWarning(props: {
   currentDocument: string | undefined;
@@ -299,24 +314,26 @@ function RetagHeadlineWarning(props: {
 
   return (
     <>
-      {currentDocument &&
+      {currentDocument && (
         <>
           Document is out of date!
-          {retag &&
+          {retag && (
             <button
               onClick={async () => {
-
                 // Update the annotations after awaiting retagging promises
-              const newAnnotations = await Promise.all(annotations.map(async annotation => {
-                  // TODO error handling
-                  return await retag(currentDocument, annotation) || annotation;
-                }
-                ));
+                const newAnnotations = await Promise.all(
+                  annotations.map(async (annotation) => {
+                    // TODO error handling
+                    return (await retag(currentDocument, annotation)) || annotation;
+                  })
+                );
                 setAnnotations(newAnnotations);
-              }}
-            >Retag</button>}
+              }}>
+              Retag
+            </button>
+          )}
         </>
-      }
+      )}
     </>
   );
 }
@@ -359,6 +376,13 @@ function listenForEditorMessages(
   });
 }
 
+function handleAddAnnotation(annotations: Annotation[], stateURI: string) {
+  if (!stateURI) {
+    console.error("No document URI");
+    return;
+  }
+}
+
 function App() {
   // Data source configuration
   const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
@@ -367,7 +391,10 @@ function App() {
 
   // Data
   const [annotations, setAnnotations] = useState(annotationsDefault.annotations); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(fileServerURL, documentURI)
+  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(
+    fileServerURL,
+    documentURI
+  );
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
@@ -378,28 +405,54 @@ function App() {
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [APIKey, setAPIKey] = useState(
     // HACK For now, use browser storage to initialize API key
-    () => window.localStorage.getItem('APIKey') || undefined
+    () => window.localStorage.getItem("APIKey") || undefined
   );
 
   // Listen for configuration updates from editor
-  listenForEditorMessages(setDocumentURI, setAnnotationURI, setFileServerUrl, setCurrentLineNumber, setRetagServerURL);
+  listenForEditorMessages(
+    setDocumentURI,
+    setAnnotationURI,
+    setFileServerUrl,
+    setCurrentLineNumber,
+    setRetagServerURL
+  );
 
   // Set up retagging function
   const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
-  const documentOutOfDate = annotations.some(annotation => {
+  const documentOutOfDate = annotations.some((annotation) => {
     return annotation.document !== currentDocument;
   });
 
   return (
     <main>
-      {documentOutOfDate && <RetagHeadlineWarning currentDocument={currentDocument} annotations={annotations} setAnnotations={setAnnotations} retag={retag} />}
-      <AnnotationSidebarView annotations={annotations} setAnnotations={(annotations) => { }} currentLineNumber={currentLineNumber} selectedAnnotationId={selectedAnnotationId} setSelectedAnnotationId={() => { }} hoveredAnnotationId={hoveredAnnotationId} setHoveredAnnotationId={() => { }} />
-      
+      {documentOutOfDate && (
+        <RetagHeadlineWarning
+          currentDocument={currentDocument}
+          annotations={annotations}
+          setAnnotations={setAnnotations}
+          retag={retag}
+        />
+      )}
+      <AnnotationSidebarView
+        annotations={annotations}
+        setAnnotations={(annotations) => {}}
+        currentLineNumber={currentLineNumber}
+        selectedAnnotationId={selectedAnnotationId}
+        setSelectedAnnotationId={() => {}}
+        hoveredAnnotationId={hoveredAnnotationId}
+        setHoveredAnnotationId={() => {}}
+      />
+
       {/* Show document content in a div for testing */}
       <div>
         <h1>Document</h1>
         <pre>{currentDocument}</pre>
+      </div>
+      <div>
+        <button disabled={!documentURI} onClick={() => updateDocumentState(annotations)}>
+          Add Annotation
+        </button>
       </div>
     </main>
   );

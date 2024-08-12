@@ -147,12 +147,14 @@ export class HelloWorldPanel {
 
   private _setFileChangeListener(webview: Webview) {
     vscode.window.onDidChangeActiveTextEditor(() => {
-      this._panel.webview.postMessage(
-        JSON.stringify({
-          command: "setDocumentURI",
-          data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
-        })
-      );
+      if (vscode.window.activeTextEditor) {
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "setDocumentURI",
+            data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
+          })
+        );
+      }
     });
   }
 
