@@ -89,8 +89,14 @@ function runWSFileServer(port: number) {
         });
         ws.watcher = watcher;
 
-        const state = fs.readFileSync(documentURI, "utf8");
-        ws.send(state);
+        try {
+          const state = fs.readFileSync(documentURI, "utf8");
+          ws.send(state);
+        } catch (e) {  // HACK for now, just send an empty string if the file doesn't exist
+          console.error('file read error:', e);
+          const state = "";
+          ws.send(state);
+        }
       } else if (messageObj.type === "write") {
         // read file uri from req.body
         const documentURI = path.resolve(messageObj.documentURI);
@@ -111,12 +117,12 @@ function runWSFileServer(port: number) {
           console.log("File saved.");
         });
 
-        // send state to all listeners
-        wss.clients.forEach((ws1: MySocket) => {
-          if (ws1.documentURI === ws.documentURI && ws1.readyState === WebSocket.OPEN) {
-            ws1.send(state);
-          }
-        });
+        // // send state to all listeners
+        // wss.clients.forEach((ws1: MySocket) => {
+        //   if (ws1.documentURI === ws.documentURI && ws1.readyState === WebSocket.OPEN) {
+        //     ws1.send(state);
+        //   }
+        // });
       }
     });
     ws.on("close", () => {

@@ -2,7 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as path from "path";
 
 interface AnnotationUpdate {
@@ -194,39 +194,56 @@ function _useDocumentFromWSFileServer<T>(
   documentURI: string | undefined,
   readCallback: (document: string) => T | undefined,
   serializeCallback: (object: T) => string,
-): [T | undefined, (object: T) => void] {
+): [T | undefined, ((object: T) => void) | undefined] {
   // TODO May want to read up on how to do websockets with React properly,
   // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
   const [document, setDocument] = useState(undefined as T | undefined);
+  const wsRef = useRef<WebSocket | undefined>(undefined);
+
+  useEffect(() => {
+    console.log("Opening WebSocket connection for document:", documentURI);
+    if (!serverUrl || !documentURI) {
+      return;
+    }
+    const ws = new WebSocket(serverUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const document = event.data;
+        setDocument(readCallback(document));
+      } catch (error) {
+        console.error("Error parsing JSON: ", error);
+      }
+    };
+
+    ws.onopen = () => {
+      // Send message to server to start listening to document updates
+      ws.send(
+        JSON.stringify({
+          type: "listen",
+          documentURI,
+        })
+      );
+    };
+
+    return () => {
+      console.log("Closing WebSocket connection");
+      wsRef.current && ws.close();
+    };
+  }, [serverUrl, documentURI]);
 
   if (!serverUrl || !documentURI) {
-    return [undefined, () => {}];
+    return [undefined, undefined];
   }
 
-  const ws = new WebSocket(serverUrl);
-
-  ws.onmessage = (event) => {
-    try {
-      const document = event.data;
-      setDocument(readCallback(document));
-    } catch (error) {
-      console.error("Error parsing JSON: ", error);
-    }
-  };
-
-  ws.onopen = () => {
-    // Send message to server to start listening to document updates
-    ws.send(
-      JSON.stringify({
-        type: "listen",
-        documentURI,
-      })
-    );
-  };
-
   const updateDocumentState = (object: T) => {
+    if (!wsRef.current) {
+      console.error("No WebSocket connection");
+      return;
+    }
     console.log("Sending update to server:", object);
-    ws.send(
+    wsRef.current.send(
       JSON.stringify({
         type: "write",
         documentURI,
@@ -405,9 +422,10 @@ function App() {
 
   const annotations = annotationState?.annotations || []
   const setAnnotations = (annotations: Annotation[]) => {
-    console.log(annotations)
-    console.log(setAnnotationState.toString())
-    console.log(fileServerURL, annotationURI)
+    if (!setAnnotationState) {
+      console.error("No setAnnotationState function yet");
+      return;
+    }
     setAnnotationState({ annotations });
   }
 
