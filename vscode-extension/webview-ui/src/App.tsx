@@ -24,14 +24,6 @@ const toolTypes: ToolTypes = {
   ...tools,
 };
 
-function getStateURI(documentURI: string): string {
-  if (documentURI === "") {
-    console.log("Empty document URI passed in to getStateURI");
-  }
-  const fileName: string = documentURI.replace(/[\\/]/g, "_"); // replace slashes with underscores
-  return path.join("annotations/", fileName + ".json");
-}
-
 function AnnotationEditorContainer(props: {
   value: Annotation;
   setValue: (value: AnnotationUpdate) => void;
@@ -197,15 +189,15 @@ const annotationsDefault: { annotations: Annotation[] } = {
 /* Generic function to use a document from a WebSocket server,
    with a read and write callback to convert between the document and an object type if needed
 */
-function useDocumentFromWSFileServer(
+function _useDocumentFromWSFileServer<T>(
   serverUrl: string | undefined,
   documentURI: string | undefined,
-  readCallback: (document: string) => any = (document) => document,
-  writeCallback: (object: any) => string = (document) => document
-): [string | undefined, (object: any) => void] {
+  readCallback: (document: string) => T | undefined,
+  serializeCallback: (object: T) => string,
+): [T | undefined, (object: T) => void] {
   // TODO May want to read up on how to do websockets with React properly,
   // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
-  const [document, setDocument] = useState(undefined as string | undefined);
+  const [document, setDocument] = useState(undefined as T | undefined);
 
   if (!serverUrl || !documentURI) {
     return [undefined, () => {}];
@@ -232,12 +224,13 @@ function useDocumentFromWSFileServer(
     );
   };
 
-  const updateDocumentState = (object: any) => {
+  const updateDocumentState = (object: T) => {
+    console.log("Sending update to server:", object);
     ws.send(
       JSON.stringify({
         type: "write",
         documentURI,
-        state: writeCallback(object),
+        state: serializeCallback(object),
       })
     );
   };
@@ -245,19 +238,32 @@ function useDocumentFromWSFileServer(
   return [document, updateDocumentState];
 }
 
-function useObjectFromWSFileServer(serverUrl: string | undefined, documentURI: string | undefined) {
+function useDocumentFromWSFileServer(
+  serverUrl: string | undefined,
+  documentURI: string | undefined
+) {
+  return _useDocumentFromWSFileServer(serverUrl, documentURI, 
+    (document) => document,
+    (document) => document
+  );
+}
+
+function useObjectFromWSFileServer<T>(serverUrl: string | undefined, documentURI: string | undefined) {
   // Handles JSON parsing/stringify and errors
-  useDocumentFromWSFileServer(
+  return _useDocumentFromWSFileServer<T>(
     serverUrl,
     documentURI,
     (document) => {
       try {
-        return JSON.parse(document);
+        return JSON.parse(document) as T | undefined;
       } catch (error) {
         console.error("Error parsing JSON: ", error);
       }
     },
-    (object) => JSON.stringify(object)
+    (object: T) => {
+      console.log("Serializing object:", object);
+      return JSON.stringify(object)
+    }
   );
 }
 
@@ -352,14 +358,11 @@ function listenForEditorMessages(
     console.debug("Codetations: webview message data:", message.data);
     const data = message.data;
     switch (message.command) {
-      // case "test":
-      //   console.log("Test message received");
-      //   break;
       case "setDocumentURI":
         setDocumentURI(data.documentURI);
         break;
-      case "setAnnotationURI":
-        setAnnotationURI(data.annotationURI);
+      case "setAnnotationsURI":
+        setAnnotationURI(data.annotationsURI);
         break;
       case "setFileServerURL":
         setFileServerURL(data.fileServerURL);
@@ -383,6 +386,10 @@ function handleAddAnnotation(annotations: Annotation[], stateURI: string) {
   }
 }
 
+type State = {
+  annotations: Annotation[];
+};
+
 function App() {
   // Data source configuration
   const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
@@ -390,11 +397,19 @@ function App() {
   const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
 
   // Data
-  const [annotations, setAnnotations] = useState(annotationsDefault.annotations); // useObjectFromWSServer("ws://localhost:8073", annotationURI);
+  const [annotationState, setAnnotationState] = useObjectFromWSFileServer<State>(fileServerURL, annotationURI); // useState(annotationsDefault.annotations); // 
   const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(
     fileServerURL,
     documentURI
   );
+
+  const annotations = annotationState?.annotations || []
+  const setAnnotations = (annotations: Annotation[]) => {
+    console.log(annotations)
+    console.log(setAnnotationState.toString())
+    console.log(fileServerURL, annotationURI)
+    setAnnotationState({ annotations });
+  }
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
@@ -420,7 +435,7 @@ function App() {
   // Set up retagging function
   const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
-  const documentOutOfDate = annotations.some((annotation) => {
+  const documentOutOfDate = annotations && annotations.some((annotation: Annotation) => {
     return annotation.document !== currentDocument;
   });
 
@@ -450,7 +465,7 @@ function App() {
         <pre>{currentDocument}</pre>
       </div>
       <div>
-        <button disabled={!documentURI} onClick={() => updateDocumentState(annotations)}>
+        <button disabled={!documentURI} onClick={() => setAnnotations(annotations)}>
           Add Annotation
         </button>
       </div>

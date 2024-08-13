@@ -2,6 +2,8 @@ import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vsco
 import { getUri } from "../utilities/getUri";
 import { getNonce } from "../utilities/getNonce";
 import * as vscode from "vscode";
+import * as path from "path";
+import * as fs from "fs";
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -39,6 +41,30 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for changes in the active text editor
     this._setFileChangeListener(this._panel.webview);
+  }
+
+  /**
+   * Returns the URI of the annotations JSON file for the current document.
+   * @param documentURI The URI of the active text editor.
+   */
+  private static getAnnotationsURI(documentURI: string): string {
+    let currentDir = path.dirname(documentURI);
+    const annotationsFilename = (dir: string, documentURI: string) => {
+      const annotationsDir = path.join(dir, "codetations");
+      if (!fs.existsSync(annotationsDir)) {
+        fs.mkdirSync(annotationsDir);
+      }
+      return path.join(annotationsDir, path.basename(documentURI) + ".annotations.json");
+    };
+    while (currentDir !== path.parse(currentDir).root) {
+      if (fs.existsSync(path.join(currentDir, ".git"))) {
+        return annotationsFilename(currentDir, documentURI);
+        //return path.join(currentDir, 'codetations', path.basename(documentURI) + ".annotations.json");
+      }
+      currentDir = path.dirname(currentDir);
+    }
+    return annotationsFilename(path.dirname(documentURI), documentURI);
+    //return path.join(path.dirname(documentURI), 'codetations', path.basename(documentURI) + ".annotations.json");
   }
 
   /**
@@ -81,11 +107,22 @@ export class HelloWorldPanel {
         data: { fileServerURL: `ws://localhost:${fileServerPort}` },
       });
 
-      // Send the file server url to the webview
-      HelloWorldPanel.currentPanel.sendMessageObject({
-        command: "setDocumentURI",
-        data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
-      });
+      if (vscode.window.activeTextEditor) {
+        // Send the file server url to the webview
+        HelloWorldPanel.currentPanel.sendMessageObject({
+          command: "setDocumentURI",
+          data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
+        });
+
+        HelloWorldPanel.currentPanel.sendMessageObject({
+          command: "setAnnotationsURI",
+          data: {
+            annotationsURI: path.join(
+              HelloWorldPanel.getAnnotationsURI(vscode.window.activeTextEditor?.document.fileName)
+            ),
+          },
+        });
+      }
     }
   }
 
@@ -152,6 +189,18 @@ export class HelloWorldPanel {
           JSON.stringify({
             command: "setDocumentURI",
             data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
+          })
+        );
+        // Find parent directory of documentURI that contains a git repository
+        // If there isn't a git repository, use the same directory as the documentURI
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "setAnnotationsURI",
+            data: {
+              annotationsURI: HelloWorldPanel.getAnnotationsURI(
+                vscode.window.activeTextEditor?.document.fileName
+              ),
+            },
           })
         );
       }
