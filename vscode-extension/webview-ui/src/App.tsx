@@ -195,9 +195,10 @@ function _useDocumentFromWSFileServer<T>(
   readCallback: (document: string) => T | undefined,
   serializeCallback: (object: T) => string,
 ): [T | undefined, ((object: T) => void) | undefined] {
-  // TODO May want to read up on how to do websockets with React properly,
-  // e.g. https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
   const [document, setDocument] = useState(undefined as T | undefined);
+  // Uses refs to do websockets with React properly (open single socket connection)
+  // TODO may need to handle closing etc. properly
+  // see https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
   const wsRef = useRef<WebSocket | undefined>(undefined);
 
   useEffect(() => {
