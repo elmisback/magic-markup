@@ -177,4 +177,15 @@ export function activate(context: ExtensionContext) {
   });
 
   context.subscriptions.push(showHelloWorldCommand, sendMessageCommand);
+
+  // Add annotations command
+  context.subscriptions.push(
+    vscode.commands.registerCommand("helloworld.addAnnotations", () => {
+      if (HelloWorldPanel.currentPanel) {
+        HelloWorldPanel.currentPanel.addAnnotations();
+      } else {
+        vscode.window.showInformationMessage("HelloWorldPanel is not open.");
+      }
+    })
+  );
 }
