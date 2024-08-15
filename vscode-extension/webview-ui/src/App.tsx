@@ -193,7 +193,7 @@ function _useDocumentFromWSFileServer<T>(
   serverUrl: string | undefined,
   documentURI: string | undefined,
   readCallback: (document: string) => T | undefined,
-  serializeCallback: (object: T) => string,
+  serializeCallback: (object: T) => string
 ): [T | undefined, ((object: T) => void) | undefined] {
   const [document, setDocument] = useState(undefined as T | undefined);
   // Uses refs to do websockets with React properly (open single socket connection)
@@ -260,13 +260,18 @@ function useDocumentFromWSFileServer(
   serverUrl: string | undefined,
   documentURI: string | undefined
 ) {
-  return _useDocumentFromWSFileServer(serverUrl, documentURI, 
+  return _useDocumentFromWSFileServer(
+    serverUrl,
+    documentURI,
     (document) => document,
     (document) => document
   );
 }
 
-function useObjectFromWSFileServer<T>(serverUrl: string | undefined, documentURI: string | undefined) {
+function useObjectFromWSFileServer<T>(
+  serverUrl: string | undefined,
+  documentURI: string | undefined
+) {
   // Handles JSON parsing/stringify and errors
   return _useDocumentFromWSFileServer<T>(
     serverUrl,
@@ -280,7 +285,7 @@ function useObjectFromWSFileServer<T>(serverUrl: string | undefined, documentURI
     },
     (object: T) => {
       console.log("Serializing object:", object);
-      return JSON.stringify(object)
+      return JSON.stringify(object);
     }
   );
 }
@@ -367,7 +372,8 @@ function listenForEditorMessages(
   setAnnotationURI: (annotationURI: string) => void,
   setFileServerURL: (serverUrl: string) => void,
   setCurrentLineNumber: (currentLineNumber: number) => void,
-  setRetagServerURL: (retagServerURL: string) => void
+  setRetagServerURL: (retagServerURL: string) => void,
+  handleAddAnnotationClickResp: (start: number, end: number, document: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -378,30 +384,27 @@ function listenForEditorMessages(
     switch (message.command) {
       case "setDocumentURI":
         setDocumentURI(data.documentURI);
-        break;
+        return;
       case "setAnnotationsURI":
         setAnnotationURI(data.annotationsURI);
-        break;
+        return;
       case "setFileServerURL":
         setFileServerURL(data.fileServerURL);
-        break;
+        return;
       case "setCurrentLineNumber":
         setCurrentLineNumber(data.currentLineNumber);
-        break;
+        return;
       case "setRetagServerURL":
         setRetagServerURL(data.retagServerURL);
-        break;
+        return;
+      case "setNewAnnotationData":
+        console.log("RECEIVED");
+        handleAddAnnotationClickResp(data.start, data.end, data.documentContent);
+        return;
       default:
-        break;
+        return;
     }
   });
-}
-
-function handleAddAnnotation(annotations: Annotation[], stateURI: string) {
-  if (!stateURI) {
-    console.error("No document URI");
-    return;
-  }
 }
 
 type State = {
@@ -413,28 +416,81 @@ function App() {
   const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
   const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
   const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
+  const [startCharNum, setStartCharNum] = useState(undefined as number | undefined);
+  const [endCharNum, setEndCharNum] = useState(undefined as number | undefined);
+  const [documentContent, setDocumentContent] = useState(undefined as string | undefined);
 
   // Data
-  const [annotationState, setAnnotationState] = useObjectFromWSFileServer<State>(fileServerURL, annotationURI); // useState(annotationsDefault.annotations); // 
+  const [annotationState, setAnnotationState] = useObjectFromWSFileServer<State>(
+    fileServerURL,
+    annotationURI
+  ); // useState(annotationsDefault.annotations); //
   const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(
     fileServerURL,
     documentURI
   );
 
-  const annotations = annotationState?.annotations || []
+  const handleAddAnnotationClick = () => {
+    // TODO: implement
+  };
+
+  const handleNewAnnotationData = (start: number, end: number, documentContent: string) => {
+    setStartCharNum(start);
+    setEndCharNum(end);
+    setDocumentContent(documentContent);
+    vscode.setState({ newTool: startCharNum, endCharNum, documentContent });
+  };
+
+  const handleAddAnnotationClickResp = (start: number, end: number, documentContent: string) => {
+    // Error handling
+    if (!start || !end) {
+      setError("Error adding annotations: no highlighted text");
+      return;
+    } else if (!documentContent) {
+      setError("Error adding annotations: no document content");
+      return;
+    } else if (!newTool) {
+      setError("Error adding annotations: no tool selected");
+      return;
+    }
+    // Create new annotation based on message
+    const newAnnotation: Annotation = {
+      start,
+      end,
+      document: documentContent,
+      tool: newTool,
+      metadata: {},
+      original: {
+        document: documentContent,
+        start,
+        end,
+      },
+    };
+    setAnnotations([...annotations, newAnnotation]);
+    setError(undefined);
+  };
+
+  const annotations = annotationState?.annotations || [];
   const setAnnotations = (annotations: Annotation[]) => {
     if (!setAnnotationState) {
       console.error("No setAnnotationState function yet");
       return;
     }
     setAnnotationState({ annotations });
-  }
+  };
 
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
+  const [error, setError] = useState(undefined as string | undefined);
 
+  const prevState = vscode.getState();
+  const defaultTool: string | undefined =
+    Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
+  const [newTool, setNewTool] = useState(
+    prevState ? prevState.newTool : (defaultTool as string | undefined)
+  );
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [APIKey, setAPIKey] = useState(
@@ -448,15 +504,18 @@ function App() {
     setAnnotationURI,
     setFileServerUrl,
     setCurrentLineNumber,
-    setRetagServerURL
+    setRetagServerURL,
+    handleAddAnnotationClickResp
   );
 
   // Set up retagging function
   const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
-  const documentOutOfDate = annotations && annotations.some((annotation: Annotation) => {
-    return annotation.document !== currentDocument;
-  });
+  const documentOutOfDate =
+    annotations &&
+    annotations.some((annotation: Annotation) => {
+      return annotation.document !== currentDocument;
+    });
 
   return (
     <main>
@@ -484,9 +543,30 @@ function App() {
         <pre>{currentDocument}</pre>
       </div>
       <div>
-        <button disabled={!documentURI} onClick={() => setAnnotations(annotations)}>
+        <button disabled={!documentURI} onClick={() => handleAddAnnotationClick()}>
           Add Annotation
         </button>
+      </div>
+      <div>
+        Tool: &nbsp;
+        {/* select with dropdown */}
+        {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
+        <select
+          value={newTool}
+          onChange={(e) => {
+            setNewTool(e.target.value);
+            vscode.setState({ newTool: e.target.value });
+          }}>
+          {Object.keys(toolTypes).map((toolKey) => (
+            <option key={toolKey} value={toolKey}>
+              {toolKey}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <text>{error}</text>
+        <button onClick={() => setError(undefined)}>Clear Error</button>
       </div>
     </main>
   );

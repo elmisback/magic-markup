@@ -41,6 +41,9 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for changes in the active text editor
     this._setFileChangeListener(this._panel.webview);
+
+    // Set an event listener to listen for changes in highlighted text
+    this._setSelectionChangeListener(this._panel.webview);
   }
 
   /**
@@ -200,6 +203,27 @@ export class HelloWorldPanel {
               annotationsURI: HelloWorldPanel.getAnnotationsURI(
                 vscode.window.activeTextEditor?.document.fileName
               ),
+            },
+          })
+        );
+      }
+    });
+  }
+
+  private _setSelectionChangeListener(webview: Webview) {
+    vscode.window.onDidChangeTextEditorSelection(() => {
+      const editor: any = vscode.window.activeTextEditor;
+      const start: number = editor?.document.offsetAt(editor.selection.start);
+      const end: number = editor?.document.offsetAt(editor.selection.end);
+      if (start !== end) {
+        console.log("Sent highlight change");
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "setNewAnnotationData",
+            data: {
+              start: editor?.document.offsetAt(editor.selection.start),
+              end: editor?.document.offsetAt(editor.selection.end),
+              documentContent: editor?.document.getText(),
             },
           })
         );

@@ -92,8 +92,9 @@ function runWSFileServer(port: number) {
         try {
           const state = fs.readFileSync(documentURI, "utf8");
           ws.send(state);
-        } catch (e) {  // HACK for now, just send an empty string if the file doesn't exist
-          console.error('file read error:', e);
+        } catch (e) {
+          // HACK for now, just send an empty string if the file doesn't exist
+          console.error("file read error:", e);
           const state = "";
           ws.send(state);
         }

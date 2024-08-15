@@ -7,11 +7,9 @@ import ReactDiffViewer from "react-diff-viewer-continued";
 import "./App.css";
 import { tools } from "./tools";
 
-
 import { useContext } from "react";
 import { DocumentContext, DocumentProvider } from "./DocumentContext";
 import { DiskStateContext, DiskStateProvider } from "./DiskStateContext";
-
 
 const HTMLEditor = (props: {
   documentContent: string;
@@ -127,17 +125,18 @@ const HTMLEditor = (props: {
     setAddStartEnd([start, end, isCaret]);
   };
   useEffect(() => {
-    document.addEventListener('selectionchange', handleSelection)
+    document.addEventListener("selectionchange", handleSelection);
     return () => {
-      document.removeEventListener('selectionchange', handleSelection)
-    }
-  })
+      document.removeEventListener("selectionchange", handleSelection);
+    };
+  });
 
   const clearSelection = () => {
     setAddStartEnd(null);
   };
 
-  const handleAddAnnotationClick = () => {
+  const 
+  handleAddAnnotationClick = () => {
     if (!addStartEnd) {
       console.error("Error: no selection");
       return;
@@ -215,11 +214,12 @@ const HTMLEditor = (props: {
 
               // Assign ID to span if part of an annotation
               const id = annotations.find(
-                (annotation) => index >= annotation.start && index <= annotation.end
+                (annotation) =>
+                  index >= annotation.start && index <= annotation.end
               )
                 ? `annotation-${index}`
                 : undefined;
-              
+
               return (
                 <span
                   key={index}
@@ -229,9 +229,8 @@ const HTMLEditor = (props: {
                     handleMouseEnter(index);
                   }}
                   onMouseLeave={(e) => {
-                    handleMouseLeave()
-                  }
-                  }
+                    handleMouseLeave();
+                  }}
                   onClick={() => handleClick(index)}
                   id={id}
                 >
@@ -570,84 +569,84 @@ function Main({
         <div className="App">
           <div className="annotation-view-title">Annotation settings</div>
 
-        {/* Document path to open */}
-        <div>
-          Document URI: &nbsp;
-          <input
-            type="text"
-            value={documentURI}
-            onChange={(e) => {
-              localStorage.setItem("DocumentURI", e.target.value);
-              updateURIs(e.target.value);
-            }}
-          />
-        </div>
-        <div>
-          State URI: &nbsp;
-          <input
-            type="text"
-            value={stateURI}
-            onChange={(e) => {
-              localStorage.setItem("StateURI", e.target.value);
-              setStateURI(e.target.value);
-            }}
-          />
-        </div>
-        <div>
-          API Key: &nbsp;
-          <input
-            type="password"
-            value={APIKey}
-            onChange={(e) => {
-              localStorage.setItem("APIKey", e.target.value);
-              setAPIKey(e.target.value);
-            }}
-          />
-        </div>
-        <hr></hr>
-        {/* if document is out of date, show a warning */}
-        {documentOutOfDate && (
-          <ReactDiffViewer
-            oldValue={diskState?.annotations[0]?.document || ""}
-            newValue={documentContent || ""}
-            splitView={true}
-          />
-        )}
-
-        <div className="retag-document">
-          Retag document:{" "}
-          <button
-            onClick={handleRetag}
-            disabled={
-              !documentOutOfDate ||
-              continuousRetag ||
-              documentURI === "" ||
-              stateURI === "" ||
-              APIKey === ""
-            }
-            style={{
-              backgroundColor:
-                documentOutOfDate &&
-                !(
-                  continuousRetag ||
-                  documentURI === "" ||
-                  stateURI === "" ||
-                  APIKey === ""
-                )
-                  ? "chartreuse"
-                  : "initial",
-            }}
-          >
-            Retag
-          </button>
-          {APIKey === "" && (
-            <div style={{ color: "red" }}>(API key is required)</div>
+          {/* Document path to open */}
+          <div>
+            Document URI: &nbsp;
+            <input
+              type="text"
+              value={documentURI}
+              onChange={(e) => {
+                localStorage.setItem("DocumentURI", e.target.value);
+                updateURIs(e.target.value);
+              }}
+            />
+          </div>
+          <div>
+            State URI: &nbsp;
+            <input
+              type="text"
+              value={stateURI}
+              onChange={(e) => {
+                localStorage.setItem("StateURI", e.target.value);
+                setStateURI(e.target.value);
+              }}
+            />
+          </div>
+          <div>
+            API Key: &nbsp;
+            <input
+              type="password"
+              value={APIKey}
+              onChange={(e) => {
+                localStorage.setItem("APIKey", e.target.value);
+                setAPIKey(e.target.value);
+              }}
+            />
+          </div>
+          <hr></hr>
+          {/* if document is out of date, show a warning */}
+          {documentOutOfDate && (
+            <ReactDiffViewer
+              oldValue={diskState?.annotations[0]?.document || ""}
+              newValue={documentContent || ""}
+              splitView={true}
+            />
           )}
-        </div>
-        {/* <div>Continuous Retag: &nbsp;
+
+          <div className="retag-document">
+            Retag document:{" "}
+            <button
+              onClick={handleRetag}
+              disabled={
+                !documentOutOfDate ||
+                continuousRetag ||
+                documentURI === "" ||
+                stateURI === "" ||
+                APIKey === ""
+              }
+              style={{
+                backgroundColor:
+                  documentOutOfDate &&
+                  !(
+                    continuousRetag ||
+                    documentURI === "" ||
+                    stateURI === "" ||
+                    APIKey === ""
+                  )
+                    ? "chartreuse"
+                    : "initial",
+              }}
+            >
+              Retag
+            </button>
+            {APIKey === "" && (
+              <div style={{ color: "red" }}>(API key is required)</div>
+            )}
+          </div>
+          {/* <div>Continuous Retag: &nbsp;
         <input type="checkbox" checked={continuousRetag} onChange={e => setContinuousRetag(e.target.checked)} />
       </div> */}
-        <div className="section-divider"></div>
+          <div className="section-divider"></div>
 
           <div className="annotation-list">
             <div className="annotation-list-title">Annotations</div>

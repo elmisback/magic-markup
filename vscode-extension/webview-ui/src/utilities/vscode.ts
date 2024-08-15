@@ -44,7 +44,7 @@ class VSCodeAPIWrapper {
    *
    * @return The current state or `undefined` if no state has been set.
    */
-  public getState(): unknown | undefined {
+  public getState(): any {
     if (this.vsCodeApi) {
       return this.vsCodeApi.getState();
     } else {
