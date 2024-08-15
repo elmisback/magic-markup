@@ -373,7 +373,7 @@ function listenForEditorMessages(
   setFileServerURL: (serverUrl: string) => void,
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
-  handleAddAnnotationClickResp: (start: number, end: number, document: string) => void
+  handleNewAnnotationData: (start: number, end: number, document: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -396,10 +396,6 @@ function listenForEditorMessages(
         return;
       case "setRetagServerURL":
         setRetagServerURL(data.retagServerURL);
-        return;
-      case "setNewAnnotationData":
-        console.log("RECEIVED");
-        handleAddAnnotationClickResp(data.start, data.end, data.documentContent);
         return;
       default:
         return;
@@ -431,19 +427,8 @@ function App() {
   );
 
   const handleAddAnnotationClick = () => {
-    // TODO: implement
-  };
-
-  const handleNewAnnotationData = (start: number, end: number, documentContent: string) => {
-    setStartCharNum(start);
-    setEndCharNum(end);
-    setDocumentContent(documentContent);
-    vscode.setState({ newTool: startCharNum, endCharNum, documentContent });
-  };
-
-  const handleAddAnnotationClickResp = (start: number, end: number, documentContent: string) => {
-    // Error handling
-    if (!start || !end) {
+    // Ensure all required variables for annotation are defined
+    if (!startCharNum || !endCharNum) {
       setError("Error adding annotations: no highlighted text");
       return;
     } else if (!documentContent) {
@@ -453,21 +438,29 @@ function App() {
       setError("Error adding annotations: no tool selected");
       return;
     }
+
     // Create new annotation based on message
     const newAnnotation: Annotation = {
-      start,
-      end,
+      start: startCharNum,
+      end: endCharNum,
       document: documentContent,
       tool: newTool,
       metadata: {},
       original: {
         document: documentContent,
-        start,
-        end,
+        start: startCharNum,
+        end: endCharNum,
       },
     };
     setAnnotations([...annotations, newAnnotation]);
     setError(undefined);
+  };
+
+  const handleNewAnnotationData = (start: number, end: number, documentContent: string) => {
+    setStartCharNum(start);
+    setEndCharNum(end);
+    setDocumentContent(documentContent);
+    vscode.setState({ newTool: startCharNum, endCharNum, documentContent });
   };
 
   const annotations = annotationState?.annotations || [];
@@ -505,7 +498,7 @@ function App() {
     setFileServerUrl,
     setCurrentLineNumber,
     setRetagServerURL,
-    handleAddAnnotationClickResp
+    handleNewAnnotationData
   );
 
   // Set up retagging function

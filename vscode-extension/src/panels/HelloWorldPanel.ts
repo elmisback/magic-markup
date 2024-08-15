@@ -216,7 +216,6 @@ export class HelloWorldPanel {
       const start: number = editor?.document.offsetAt(editor.selection.start);
       const end: number = editor?.document.offsetAt(editor.selection.end);
       if (start !== end) {
-        console.log("Sent highlight change");
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "setNewAnnotationData",
