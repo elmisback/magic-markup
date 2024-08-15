@@ -449,7 +449,8 @@ function App() {
   );
   const [start, setStart] = useState(prevState?.start || undefined);
   const [end, setEnd] = useState(prevState?.end || undefined);
-  // TODO: this will cause the content to persist unecessarily, probably better to just lose the state if the user clicks off the 'select annotation' page
+  // TODO: make sure this state doesn't persist after user selects tool
+  // It shouldn't because I reset the state after the user selects a tool
   const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
