@@ -325,7 +325,11 @@ function listenForEditorMessages(
   setFileServerURL: (serverUrl: string) => void,
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
-  handleAddAnnotation: (start: number, end: number, document: string) => void
+  handleAddAnnotation: (start: number, end: number, document: string) => void,
+  setChooseAnnotationType: (chooseAnnotationType: boolean) => void,
+  setStart: (start: number) => void,
+  setEnd: (end: number) => void,
+  setDocumentContent: (documentContent: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -351,6 +355,18 @@ function listenForEditorMessages(
         return;
       case "addAnnotation":
         handleAddAnnotation(data.start, data.end, data.documentContent);
+        return;
+      case "chooseAnnotationType":
+        setChooseAnnotationType(true);
+        setStart(data.start);
+        setEnd(data.end);
+        setDocumentContent(data.documentContent);
+        vscode.setState({
+          chooseAnnotationType: true,
+          start: data.start,
+          end: data.end,
+          documentContent: data.documentContent,
+        });
         return;
       default:
         return;
@@ -423,17 +439,21 @@ function App() {
   };
 
   // Transient editor + UI state
+  const prevState = vscode.getState();
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
   const [error, setError] = useState(undefined as string | undefined);
-
-  const prevState = vscode.getState();
+  const [chooseAnnotationType, setChooseAnnotationType] = useState(
+    prevState?.chooseAnnotationType || false
+  );
+  const [start, setStart] = useState(prevState?.start || undefined);
+  const [end, setEnd] = useState(prevState?.end || undefined);
+  // TODO: this will cause the content to persist unecessarily, probably better to just lose the state if the user clicks off the 'select annotation' page
+  const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
-  const [newTool, setNewTool] = useState(
-    prevState ? prevState.newTool : (defaultTool as string | undefined)
-  );
+  const [newTool, setNewTool] = useState(prevState?.newTool || (defaultTool as string | undefined));
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [APIKey, setAPIKey] = useState(
@@ -448,7 +468,11 @@ function App() {
     setFileServerUrl,
     setCurrentLineNumber,
     setRetagServerURL,
-    handleAddAnnotation
+    handleAddAnnotation,
+    setChooseAnnotationType,
+    setStart,
+    setEnd,
+    setDocumentContent
   );
 
   // Set up retagging function
@@ -460,35 +484,60 @@ function App() {
       return annotation.document !== currentDocument;
     });
 
-  return (
-    <main>
-      {documentOutOfDate && (
-        <RetagHeadlineWarning
-          currentDocument={currentDocument}
+  if (!chooseAnnotationType) {
+    return (
+      <main>
+        {documentOutOfDate && (
+          <RetagHeadlineWarning
+            currentDocument={currentDocument}
+            annotations={annotations}
+            setAnnotations={setAnnotations}
+            retag={retag}
+          />
+        )}
+        <AnnotationSidebarView
           annotations={annotations}
-          setAnnotations={setAnnotations}
-          retag={retag}
+          setAnnotations={(annotations) => {}}
+          currentLineNumber={currentLineNumber}
+          selectedAnnotationId={selectedAnnotationId}
+          setSelectedAnnotationId={() => {}}
+          hoveredAnnotationId={hoveredAnnotationId}
+          setHoveredAnnotationId={() => {}}
         />
-      )}
-      <AnnotationSidebarView
-        annotations={annotations}
-        setAnnotations={(annotations) => {}}
-        currentLineNumber={currentLineNumber}
-        selectedAnnotationId={selectedAnnotationId}
-        setSelectedAnnotationId={() => {}}
-        hoveredAnnotationId={hoveredAnnotationId}
-        setHoveredAnnotationId={() => {}}
-      />
 
-      {/* Show document content in a div for testing */}
-      <div>
-        <h1>Document</h1>
-        <pre>{currentDocument}</pre>
-      </div>
-      <div>
-        Tool: &nbsp;
-        {/* select with dropdown */}
-        {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
+        {/* Show document content in a div for testing */}
+        <div>
+          <h1>Document</h1>
+          <pre>{currentDocument}</pre>
+        </div>
+        <div>
+          Tool: &nbsp;
+          {/* select with dropdown */}
+          {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
+          <select
+            value={newTool}
+            onChange={(e) => {
+              setNewTool(e.target.value);
+              vscode.setState({ newTool: e.target.value, chooseAnnotationType: false });
+            }}>
+            {Object.keys(toolTypes).map((toolKey) => (
+              <option key={toolKey} value={toolKey}>
+                {toolKey}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <text>{error}</text>
+          <br></br>
+          <button onClick={() => setError(undefined)}>Clear Error</button>
+        </div>
+      </main>
+    );
+  } else {
+    return (
+      <main>
+        <div>Choose Annotation Type</div>
         <select
           value={newTool}
           onChange={(e) => {
@@ -501,14 +550,20 @@ function App() {
             </option>
           ))}
         </select>
-      </div>
-      <div>
-        <text>{error}</text>
-        <br></br>
-        <button onClick={() => setError(undefined)}>Clear Error</button>
-      </div>
-    </main>
-  );
+        <button
+          onClick={() => {
+            handleAddAnnotation(start, end, documentContent);
+            setChooseAnnotationType(false);
+            setStart(undefined);
+            setEnd(undefined);
+            setDocumentContent(undefined);
+            vscode.setState({ chooseAnnotationType: false });
+          }}>
+          Submit
+        </button>
+      </main>
+    );
+  }
 }
 
 export default App;

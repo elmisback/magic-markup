@@ -26,7 +26,6 @@
       "editor/context": [
         {
           "command": "hello-world.addAnnotations",
-          "when": "panelVisible",
           "group": "navigation"
         }
       ]

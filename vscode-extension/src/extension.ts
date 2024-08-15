@@ -176,12 +176,25 @@ export function activate(context: ExtensionContext) {
     });
   });
 
+  const chooseAnotationType = () => {
+    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+    const editor = vscode.window.activeTextEditor;
+    HelloWorldPanel.currentPanel?.sendMessageObject({
+      command: "chooseAnnotationType",
+      data: {
+        start: editor?.document.offsetAt(editor.selection.start),
+        end: editor?.document.offsetAt(editor.selection.end),
+        documentContent: editor?.document.getText(),
+      },
+    });
+  };
+
   // Create a command for adding annotations
   const addAnnotationsCommand = commands.registerCommand("hello-world.addAnnotations", () => {
     if (HelloWorldPanel.currentPanel) {
       HelloWorldPanel.currentPanel.addAnnotations();
     } else {
-      vscode.window.showInformationMessage("HelloWorldPanel is not open.");
+      chooseAnotationType();
     }
   });
 
