@@ -138,54 +138,6 @@ function AnnotationSidebarView(props: {
   );
 }
 
-const annotationsDefault: { annotations: Annotation[] } = {
-  annotations: [
-    {
-      document:
-        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-      start: 34,
-      end: 41,
-      tool: "colorPicker",
-      metadata: {},
-      original: {
-        document: "test original document #0000FF",
-        start: 23,
-        end: 31,
-      },
-    },
-    {
-      start: 60,
-      end: 67,
-      document:
-        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-      tool: "colorPicker",
-      metadata: {},
-      original: {
-        document:
-          "This hex code has a color picker: #80ffff\nSo does this one: #80ffff\nAnd this one: #80ffff",
-        start: 60,
-        end: 67,
-      },
-    },
-    {
-      start: 77,
-      end: 80,
-      document:
-        "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-      tool: "comment",
-      metadata: {
-        comment: "abcde",
-      },
-      original: {
-        document:
-          "This hex code has a color picker: #80ffff\nSo does this one: #a8d7bd\n(added a new line)",
-        start: 77,
-        end: 80,
-      },
-    },
-  ],
-};
-
 /* Generic function to use a document from a WebSocket server,
    with a read and write callback to convert between the document and an object type if needed
 */
@@ -373,7 +325,7 @@ function listenForEditorMessages(
   setFileServerURL: (serverUrl: string) => void,
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
-  handleNewAnnotationData: (start: number, end: number, document: string) => void
+  handleAddAnnotation: (start: number, end: number, document: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -397,6 +349,9 @@ function listenForEditorMessages(
       case "setRetagServerURL":
         setRetagServerURL(data.retagServerURL);
         return;
+      case "addAnnotation":
+        handleAddAnnotation(data.start, data.end, data.documentContent);
+        return;
       default:
         return;
     }
@@ -412,9 +367,6 @@ function App() {
   const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
   const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
   const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
-  const [startCharNum, setStartCharNum] = useState(undefined as number | undefined);
-  const [endCharNum, setEndCharNum] = useState(undefined as number | undefined);
-  const [documentContent, setDocumentContent] = useState(undefined as string | undefined);
 
   // Data
   const [annotationState, setAnnotationState] = useObjectFromWSFileServer<State>(
@@ -426,10 +378,15 @@ function App() {
     documentURI
   );
 
-  const handleAddAnnotationClick = () => {
+  const handleAddAnnotation = (start: number, end: number, documentContent: string) => {
     // Ensure all required variables for annotation are defined
-    if (!startCharNum || !endCharNum) {
+    console.log("START: " + start);
+    console.log("END: " + end);
+    if (!start || !end) {
       setError("Error adding annotations: no highlighted text");
+      return;
+    } else if (start === end) {
+      setError("Error adding annotations: selection must not be empty");
       return;
     } else if (!documentContent) {
       setError("Error adding annotations: no document content");
@@ -441,26 +398,19 @@ function App() {
 
     // Create new annotation based on message
     const newAnnotation: Annotation = {
-      start: startCharNum,
-      end: endCharNum,
+      start,
+      end,
       document: documentContent,
       tool: newTool,
       metadata: {},
       original: {
         document: documentContent,
-        start: startCharNum,
-        end: endCharNum,
+        start,
+        end,
       },
     };
     setAnnotations([...annotations, newAnnotation]);
     setError(undefined);
-  };
-
-  const handleNewAnnotationData = (start: number, end: number, documentContent: string) => {
-    setStartCharNum(start);
-    setEndCharNum(end);
-    setDocumentContent(documentContent);
-    vscode.setState({ newTool: startCharNum, endCharNum, documentContent });
   };
 
   const annotations = annotationState?.annotations || [];
@@ -498,7 +448,7 @@ function App() {
     setFileServerUrl,
     setCurrentLineNumber,
     setRetagServerURL,
-    handleNewAnnotationData
+    handleAddAnnotation
   );
 
   // Set up retagging function
@@ -536,11 +486,6 @@ function App() {
         <pre>{currentDocument}</pre>
       </div>
       <div>
-        <button disabled={!documentURI} onClick={() => handleAddAnnotationClick()}>
-          Add Annotation
-        </button>
-      </div>
-      <div>
         Tool: &nbsp;
         {/* select with dropdown */}
         {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
@@ -559,6 +504,7 @@ function App() {
       </div>
       <div>
         <text>{error}</text>
+        <br></br>
         <button onClick={() => setError(undefined)}>Clear Error</button>
       </div>
     </main>

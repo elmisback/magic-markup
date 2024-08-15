@@ -21,16 +21,16 @@
         "command": "hello-world.sendTestMessage",
         "title": "Hello World (React + Vite): Test"
       }
-    ]
-  },
-  "menus": {
-    "editor/context": [
-      {
-        "command": "hello-world.addAnnotations",
-        "when": "panelVisible",
-        "group": "navigation"
-      }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "hello-world.addAnnotations",
+          "when": "panelVisible",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "install:all": "npm install && cd webview-ui && npm install",
