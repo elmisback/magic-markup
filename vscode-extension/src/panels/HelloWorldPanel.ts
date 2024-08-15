@@ -79,7 +79,6 @@ export class HelloWorldPanel {
 
   public addAnnotations(): void {
     const editor: any = vscode.window.activeTextEditor;
-    console.log("ADD ANNOTATION REQ");
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "addAnnotation",
