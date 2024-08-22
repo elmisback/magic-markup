@@ -20,6 +20,10 @@
       {
         "command": "hello-world.sendTestMessage",
         "title": "Hello World (React + Vite): Test"
+      },
+      {
+        "command": "hello-world.setAPIKey",
+        "title": "Hello World (React + Vite): Set API Key"
       }
     ],
     "menus": {
@@ -29,6 +33,16 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Hello World (React + Vite)",
+      "properties": {
+        "hello-world.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key for OpenAI GPT-3"
+        }
+      }
     }
   },
   "scripts": {

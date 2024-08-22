@@ -143,9 +143,9 @@ export function activate(context: ExtensionContext) {
     {
       "/retag": async (req: any, res: any) => {
         console.log("Retagging document");
-        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter, APIKey } =
+        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } =
           req.body;
-
+        const APIKey = vscode.workspace.getConfiguration().get("hello-world.apiKey") as string;
         const out = await retagUpdate(
           codeWithSnippetDelimited,
           updatedCodeWithoutDelimiters,
@@ -166,6 +166,17 @@ export function activate(context: ExtensionContext) {
   // Create the show hello world command
   const showHelloWorldCommand = commands.registerCommand("hello-world.showHelloWorld", () => {
     HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+  });
+
+  // Create a command that allows a user to set an API key for the extension
+  const setAPIKeyCommand = commands.registerCommand("hello-world.setAPIKey", async () => {
+    const apiKey = await vscode.window.showInputBox({
+      prompt: "Enter your OpenAI API key",
+      placeHolder: "API Key",
+    });
+    if (apiKey) {
+      vscode.workspace.getConfiguration().update("hello-world.apiKey", apiKey);
+    }
   });
 
   // Add another command to test messaging the webview

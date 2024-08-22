@@ -4,3 +4,4 @@
 !**/lib/retag-server.js
 **/lib/*.js.map
 codetations-react/src/applications/src/config.js
+**/.vscode/settings.json
