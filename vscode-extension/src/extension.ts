@@ -205,7 +205,7 @@ export function activate(context: ExtensionContext) {
     if (HelloWorldPanel.currentPanel) {
       HelloWorldPanel.currentPanel.addAnnotations();
     } else {
-      chooseAnotationType();
+      chooseAnnotationType();
     }
   });
 
