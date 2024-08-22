@@ -162,12 +162,8 @@ function _useDocumentFromWSFileServer<T>(
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
-      try {
-        const document = event.data;
-        setDocument(readCallback(document));
-      } catch (error) {
-        console.error("Error parsing JSON: ", error);
-      }
+      const document = event.data;
+      setDocument(readCallback(document));
     };
 
     ws.onopen = () => {
