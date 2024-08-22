@@ -379,14 +379,11 @@ function App() {
   );
 
   const showErrorMessage = (error: string) => {
-    vscode.postMessage(
-      JSON.stringify({
-        command: "showErrorMessage",
-        data: {
-          error,
-        },
-      })
-    );
+    console.log("Show error called, error: " + error);
+    vscode.postMessage({
+      command: "showErrorMessage",
+      error,
+    });
   };
 
   const handleChooseAnnType = (start: number, end: number) => {
@@ -453,6 +450,15 @@ function App() {
     setTempDocumentContent(currentDocument);
   };
 
+  // Check if document content in annotations lines up with current document
+  const getIsFresh = (): boolean => {
+    if (annotations.length === 0) {
+      return true;
+    } else {
+      return annotations[0].document === currentDocument;
+    }
+  };
+
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
@@ -460,12 +466,11 @@ function App() {
   const [chooseAnnotationType, setChooseAnnotationType] = useState(false);
   const [start, setStart] = useState(undefined as number | undefined);
   const [end, setEnd] = useState(undefined as number | undefined);
-  // TODO: make sure this state doesn't persist after user selects tool
-  // It shouldn't because I reset the state after the user selects a tool
   const [tempDocumentContent, setTempDocumentContent] = useState(undefined as string | undefined);
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState(defaultTool as string | undefined);
+  const [isFresh, setIsFresh] = useState(getIsFresh());
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [confirmAnnotation, setConfirmAnnotation] = useState(false);

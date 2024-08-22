@@ -237,17 +237,18 @@ export class HelloWorldPanel {
     webview.onDidReceiveMessage(
       (message: any) => {
         const command = message.command;
-        const text = message.text;
 
         switch (command) {
           case "hello":
             // Code that should run in response to the hello message command
-            window.showInformationMessage(text);
+            window.showInformationMessage(message.text);
             return;
           // Add more switch case statements here as more webview message commands
           // are created within the webview context (i.e. inside media/main.js)
           case "showErrorMessage":
-            window.showErrorMessage(message.data.error);
+            console.log("Error message received");
+            window.showErrorMessage(message.error);
+            return;
         }
       },
       undefined,
