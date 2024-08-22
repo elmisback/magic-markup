@@ -329,7 +329,8 @@ function listenForEditorMessages(
   setChooseAnnotationType: (chooseAnnotationType: boolean) => void,
   setStart: (start: number) => void,
   setEnd: (end: number) => void,
-  setDocumentContent: (documentContent: string) => void
+  setDocumentContent: (documentContent: string) => void,
+  prevState?: any
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -362,6 +363,7 @@ function listenForEditorMessages(
         setEnd(data.end);
         setDocumentContent(data.documentContent);
         vscode.setState({
+          ...prevState,
           chooseAnnotationType: true,
           start: data.start,
           end: data.end,
@@ -394,7 +396,22 @@ function App() {
     documentURI
   );
 
-  const handleAddAnnotation = (start: number, end: number, documentContent: string) => {
+  const handleAddAnnotationConf = () => {
+    vscode.postMessage(
+      JSON.stringify({
+        command: "getDocumentContent",
+        data: {
+          start,
+          end,
+          documentContent,
+        },
+      })
+    );
+    setConfirmAnnotation(false);
+    vscode.setState({ ...prevState, confirmAnnotation: false });
+  };
+
+  const handleAddAnnotationResp = (start: number, end: number, documentContent: string) => {
     // Ensure all required variables for annotation are defined
     console.log("START: " + start);
     console.log("END: " + end);
@@ -438,6 +455,11 @@ function App() {
     setAnnotationState({ annotations });
   };
 
+  const handleAddAnnotation = (start: number, end: number, documentContent: string) => {
+    vscode.setState({ ...prevState, start, end, documentContent, confirmAnnotation: true });
+    setConfirmAnnotation(true);
+  };
+
   // Transient editor + UI state
   const prevState = vscode.getState();
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
@@ -447,8 +469,8 @@ function App() {
   const [chooseAnnotationType, setChooseAnnotationType] = useState(
     prevState?.chooseAnnotationType || false
   );
-  const [start, setStart] = useState(prevState?.start || undefined);
-  const [end, setEnd] = useState(prevState?.end || undefined);
+  const [start, setStart] = useState(prevState?.start || (undefined as number | undefined));
+  const [end, setEnd] = useState(prevState?.end || (undefined as number | undefined));
   // TODO: make sure this state doesn't persist after user selects tool
   // It shouldn't because I reset the state after the user selects a tool
   const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
@@ -461,6 +483,7 @@ function App() {
     // HACK For now, use browser storage to initialize API key
     () => window.localStorage.getItem("APIKey") || undefined
   );
+  const [confirmAnnotation, setConfirmAnnotation] = useState(prevState?.confirmAnnotation || false);
 
   // Listen for configuration updates from editor
   listenForEditorMessages(
@@ -473,7 +496,8 @@ function App() {
     setChooseAnnotationType,
     setStart,
     setEnd,
-    setDocumentContent
+    setDocumentContent,
+    prevState
   );
 
   // Set up retagging function
@@ -519,7 +543,10 @@ function App() {
             value={newTool}
             onChange={(e) => {
               setNewTool(e.target.value);
-              vscode.setState({ newTool: e.target.value, chooseAnnotationType: false });
+              vscode.setState({
+                ...prevState,
+                newTool: e.target.value,
+              });
             }}>
             {Object.keys(toolTypes).map((toolKey) => (
               <option key={toolKey} value={toolKey}>
@@ -528,6 +555,13 @@ function App() {
             ))}
           </select>
         </div>
+        {confirmAnnotation && (
+          <div>
+            Add annotation?
+            <br></br>
+            <button onClick={handleAddAnnotationConf}>Confirm</button>
+          </div>
+        )}
         <div>
           <text>{error}</text>
           <br></br>
@@ -543,7 +577,7 @@ function App() {
           value={newTool}
           onChange={(e) => {
             setNewTool(e.target.value);
-            vscode.setState({ newTool: e.target.value });
+            vscode.setState({ ...prevState, newTool: e.target.value });
           }}>
           {Object.keys(toolTypes).map((toolKey) => (
             <option key={toolKey} value={toolKey}>
