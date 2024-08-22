@@ -187,7 +187,7 @@ export function activate(context: ExtensionContext) {
     });
   });
 
-  const chooseAnotationType = () => {
+  const chooseAnnotationType = () => {
     HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
     const editor = vscode.window.activeTextEditor;
     HelloWorldPanel.currentPanel?.sendMessageObject({
