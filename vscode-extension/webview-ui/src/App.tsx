@@ -322,7 +322,8 @@ function listenForEditorMessages(
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
-  handleChooseAnnType: (start: number, end: number) => void
+  handleChooseAnnType: (start: number, end: number) => void,
+  handleFileEdit: () => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -351,6 +352,9 @@ function listenForEditorMessages(
         return;
       case "chooseAnnotationType":
         handleChooseAnnType(data.start, data.end);
+        return;
+      case "handleFileEdit":
+        handleFileEdit();
         return;
       default:
         return;
@@ -382,7 +386,9 @@ function App() {
     console.log("Show error called, error: " + error);
     vscode.postMessage({
       command: "showErrorMessage",
-      error,
+      data: {
+        error,
+      },
     });
   };
 
@@ -450,13 +456,34 @@ function App() {
     setTempDocumentContent(currentDocument);
   };
 
+  const hideAnnotations = () => {
+    vscode.postMessage({
+      command: "hideAnnotations",
+    });
+  };
+
+  const showAnnotations = () => {
+    vscode.postMessage({
+      command: "showAnnotations",
+      data: { annotations },
+    });
+  };
   // Check if document content in annotations lines up with current document
-  const getIsFresh = (): boolean => {
+  const updateAnnotationDecorations = (): boolean => {
     if (annotations.length === 0) {
+      hideAnnotations();
+      return true;
+    } else if (annotations[0].document === currentDocument) {
+      showAnnotations();
       return true;
     } else {
-      return annotations[0].document === currentDocument;
+      hideAnnotations();
+      return false;
     }
+  };
+
+  const handleFileEdit = () => {
+    setIsFresh(updateAnnotationDecorations());
   };
 
   // Transient editor + UI state
@@ -470,7 +497,7 @@ function App() {
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState(defaultTool as string | undefined);
-  const [isFresh, setIsFresh] = useState(getIsFresh());
+  const [isFresh, setIsFresh] = useState(updateAnnotationDecorations());
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [confirmAnnotation, setConfirmAnnotation] = useState(false);
@@ -483,7 +510,8 @@ function App() {
     setCurrentLineNumber,
     setRetagServerURL,
     handleAddAnnotation,
-    handleChooseAnnType
+    handleChooseAnnType,
+    handleFileEdit
   );
 
   const documentOutOfDate =

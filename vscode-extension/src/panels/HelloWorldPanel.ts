@@ -40,7 +40,7 @@ export class HelloWorldPanel {
     this._setWebviewMessageListener(this._panel.webview);
 
     // Set an event listener to listen for changes in the active text editor
-    this._setFileChangeListener(this._panel.webview);
+    this._setActiveTextEditorChangeListener(this._panel.webview);
   }
 
   /**
@@ -201,7 +201,21 @@ export class HelloWorldPanel {
     `;
   }
 
-  private _setFileChangeListener(webview: Webview) {
+  private _setFileEditListener(webview: Webview) {
+    vscode.workspace.onDidChangeTextDocument(() => {
+      this._panel.webview.postMessage(
+        JSON.stringify({
+          command: "handleFileEdit",
+        })
+      );
+    });
+  }
+
+  /**
+   * Listen for changes to the active text editor and post a message to the webview.
+   * @param webview VSCode webview
+   */
+  private _setActiveTextEditorChangeListener(webview: Webview) {
     vscode.window.onDidChangeActiveTextEditor(() => {
       if (vscode.window.activeTextEditor) {
         this._panel.webview.postMessage(
@@ -234,6 +248,38 @@ export class HelloWorldPanel {
    * @param context A reference to the extension context
    */
   private _setWebviewMessageListener(webview: Webview) {
+    // Create a decoration type
+    const annotationDecorationType = vscode.window.createTextEditorDecorationType({
+      backgroundColor: "rgba(255,255,0,0.3)", // Yellow highlight with some transparency
+    });
+    // Function to show annotations
+    const updateDecorations = (annotations: { start: number; end: number }[]) => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        window.showErrorMessage("Error showing annotations: no active text editor");
+        return;
+      }
+
+      const decorations: vscode.DecorationOptions[] = annotations.map((annotation) => {
+        const startPos = editor.document.positionAt(annotation.start);
+        const endPos = editor.document.positionAt(annotation.end);
+        return { range: new vscode.Range(startPos, endPos) };
+      });
+
+      editor.setDecorations(annotationDecorationType, decorations);
+    };
+
+    // Function to clear annotations from editor
+    const clearDecorations = () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showErrorMessage("Error hiding annotations: no active text editor");
+        return;
+      }
+
+      editor.setDecorations(annotationDecorationType, []);
+    };
+
     webview.onDidReceiveMessage(
       (message: any) => {
         const command = message.command;
@@ -246,8 +292,13 @@ export class HelloWorldPanel {
           // Add more switch case statements here as more webview message commands
           // are created within the webview context (i.e. inside media/main.js)
           case "showErrorMessage":
-            console.log("Error message received");
-            window.showErrorMessage(message.error);
+            window.showErrorMessage(message.data.error);
+            return;
+          case "showAnnotations":
+            updateDecorations(message.data.annotations);
+            return;
+          case "hideAnnotations":
+            clearDecorations();
             return;
         }
       },
