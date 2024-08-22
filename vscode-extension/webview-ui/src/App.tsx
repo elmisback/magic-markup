@@ -191,7 +191,7 @@ function _useDocumentFromWSFileServer<T>(
       console.error("No WebSocket connection");
       return;
     }
-    console.log("Sending update to server:", object);
+    console.debug("Sending update to server:", object, documentURI, serializeCallback(object));
     wsRef.current.send(
       JSON.stringify({
         type: "write",

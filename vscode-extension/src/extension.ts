@@ -83,7 +83,7 @@ function runWSFileServer(port: number) {
         });
 
         watcher.on("change", (path, stats) => {
-          console.log("file changed");
+          console.debug("file changed:", path);
           const state = fs.readFileSync(documentURI, "utf8");
           ws.send(state);
         });
@@ -115,7 +115,7 @@ function runWSFileServer(port: number) {
             console.error(err);
             return;
           }
-          console.log("File saved.");
+          console.debug("File saved:", documentURI);
         });
 
         // // send state to all listeners
