@@ -319,7 +319,6 @@ export class HelloWorldPanel {
 
     // Function to clear annotations from editor
     const clearDecorations = () => {
-      console.log("Clearing decorations");
       const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
         vscode.window.showErrorMessage(

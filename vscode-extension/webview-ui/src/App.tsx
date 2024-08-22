@@ -338,7 +338,7 @@ function listenForEditorMessages(
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
   handleRemoveAnnotation: (start: number, end: number) => void,
-  handleChooseAnnType: (start: number, end: number) => void,
+  handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
   updateAnnotationDecorations: () => void
 ) {
   window.addEventListener("message", (event) => {
@@ -358,7 +358,6 @@ function listenForEditorMessages(
         setFileServerURL(data.fileServerURL);
         return;
       case "handleCursorPositionChange":
-        console.log("Cursor position change to " + data.position);
         setCharNum(data.position);
         return;
       case "setRetagServerURL":
@@ -368,11 +367,10 @@ function listenForEditorMessages(
         handleAddAnnotation(data.start, data.end);
         return;
       case "removeAnnotation":
-        console.log("Remove called in app.tsx");
         handleRemoveAnnotation(data.start, data.end);
         return;
       case "chooseAnnotationType":
-        handleChooseAnnType(data.start, data.end);
+        handleChooseAnnType(data.start, data.end, data.documentContent);
         return;
       case "handleFileEdit":
         updateAnnotationDecorations();
@@ -413,11 +411,11 @@ function App() {
     });
   };
 
-  const handleChooseAnnType = (start: number, end: number) => {
+  const handleChooseAnnType = (start: number, end: number, documentContent: string) => {
     setChooseAnnotationType(true);
     setStart(start);
     setEnd(end);
-    setTempDocumentContent(currentDocument);
+    setTempDocumentContent(documentContent);
   };
 
   const handleAddAnnotationConf = () => {
@@ -495,7 +493,7 @@ function App() {
       showErrorMessage("Error removing annotations: no highlighted text");
     }
     const newAnnotations = annotations.filter(
-      (annotation) => start > annotation.end || end < annotation.start
+      (annotation) => start < annotation.start || end > annotation.end
     );
     setAnnotations(newAnnotations);
     updateAnnotationDecorations();
