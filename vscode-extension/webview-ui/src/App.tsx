@@ -321,13 +321,8 @@ function listenForEditorMessages(
   setFileServerURL: (serverUrl: string) => void,
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
-  handleAddAnnotation: (start: number, end: number, document: string) => void,
-  setChooseAnnotationType: (chooseAnnotationType: boolean) => void,
-  setStart: (start: number) => void,
-  setEnd: (end: number) => void,
-  setDocumentContent: (documentContent: string) => void,
-  prevState: any,
-  handleAddAnnotationResp: (start: number, end: number, newDocumentContent: string) => void
+  handleAddAnnotation: (start: number, end: number) => void,
+  handleChooseAnnType: (start: number, end: number) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -352,23 +347,10 @@ function listenForEditorMessages(
         setRetagServerURL(data.retagServerURL);
         return;
       case "addAnnotation":
-        handleAddAnnotation(data.start, data.end, data.documentContent);
+        handleAddAnnotation(data.start, data.end);
         return;
       case "chooseAnnotationType":
-        setChooseAnnotationType(true);
-        setStart(data.start);
-        setEnd(data.end);
-        setDocumentContent(data.documentContent);
-        vscode.setState({
-          ...prevState,
-          chooseAnnotationType: true,
-          start: data.start,
-          end: data.end,
-          documentContent: data.documentContent,
-        });
-        return;
-      case "returnDocumentContent":
-        handleAddAnnotationResp(data.start, data.end, data.newDocumentContent);
+        handleChooseAnnType(data.start, data.end);
         return;
       default:
         return;
@@ -407,23 +389,17 @@ function App() {
     );
   };
 
-  const handleAddAnnotationConf = () => {
-    vscode.postMessage(
-      JSON.stringify({
-        command: "getDocumentContent",
-        data: {
-          start,
-          end,
-          documentContent,
-        },
-      })
-    );
-    setConfirmAnnotation(false);
-    vscode.setState({ ...prevState, confirmAnnotation: false });
+  const handleChooseAnnType = (start: number, end: number) => {
+    setChooseAnnotationType(true);
+    setStart(start);
+    setEnd(end);
+    setTempDocumentContent(currentDocument);
   };
 
-  const handleAddAnnotationResp = (start: number, end: number, newDocumentContent: string) => {
-    if (newDocumentContent !== documentContent) {
+  const handleAddAnnotationConf = () => {
+    setConfirmAnnotation(false);
+    setChooseAnnotationType(false);
+    if (currentDocument !== tempDocumentContent) {
       // Ensure file hasn't been changed since annotation was added
       showErrorMessage("Document content has changed since annotation was added");
       return;
@@ -436,7 +412,7 @@ function App() {
     } else if (start === end) {
       showErrorMessage("Error adding annotations: selection must not be empty");
       return;
-    } else if (!documentContent) {
+    } else if (!tempDocumentContent) {
       showErrorMessage("Error adding annotations: no document content");
       return;
     } else if (!newTool) {
@@ -448,16 +424,17 @@ function App() {
     const newAnnotation: Annotation = {
       start,
       end,
-      document: documentContent,
+      document: tempDocumentContent,
       tool: newTool,
       metadata: {},
       original: {
-        document: documentContent,
+        document: tempDocumentContent,
         start,
         end,
       },
     };
     setAnnotations([...annotations, newAnnotation]);
+    setTempDocumentContent(undefined);
   };
 
   const annotations = annotationState?.annotations || [];
@@ -469,30 +446,29 @@ function App() {
     setAnnotationState({ annotations });
   };
 
-  const handleAddAnnotation = (start: number, end: number, documentContent: string) => {
-    vscode.setState({ ...prevState, start, end, documentContent, confirmAnnotation: true });
+  const handleAddAnnotation = (start: number, end: number) => {
     setConfirmAnnotation(true);
+    setStart(start);
+    setEnd(end);
+    setTempDocumentContent(currentDocument);
   };
 
   // Transient editor + UI state
-  const prevState = vscode.getState();
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
-  const [chooseAnnotationType, setChooseAnnotationType] = useState(
-    prevState?.chooseAnnotationType || false
-  );
-  const [start, setStart] = useState(prevState?.start || (undefined as number | undefined));
-  const [end, setEnd] = useState(prevState?.end || (undefined as number | undefined));
+  const [chooseAnnotationType, setChooseAnnotationType] = useState(false);
+  const [start, setStart] = useState(undefined as number | undefined);
+  const [end, setEnd] = useState(undefined as number | undefined);
   // TODO: make sure this state doesn't persist after user selects tool
   // It shouldn't because I reset the state after the user selects a tool
-  const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
+  const [tempDocumentContent, setTempDocumentContent] = useState(undefined as string | undefined);
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
-  const [newTool, setNewTool] = useState(prevState?.newTool || (defaultTool as string | undefined));
+  const [newTool, setNewTool] = useState(defaultTool as string | undefined);
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
-  const [confirmAnnotation, setConfirmAnnotation] = useState(prevState?.confirmAnnotation || false);
+  const [confirmAnnotation, setConfirmAnnotation] = useState(false);
 
   // Listen for configuration updates from editor
   listenForEditorMessages(
@@ -502,12 +478,7 @@ function App() {
     setCurrentLineNumber,
     setRetagServerURL,
     handleAddAnnotation,
-    setChooseAnnotationType,
-    setStart,
-    setEnd,
-    setDocumentContent,
-    prevState,
-    handleAddAnnotationResp
+    handleChooseAnnType
   );
 
   const documentOutOfDate =
@@ -553,10 +524,6 @@ function App() {
             value={newTool}
             onChange={(e) => {
               setNewTool(e.target.value);
-              vscode.setState({
-                ...prevState,
-                newTool: e.target.value,
-              });
             }}>
             {Object.keys(toolTypes).map((toolKey) => (
               <option key={toolKey} value={toolKey}>
@@ -582,7 +549,6 @@ function App() {
           value={newTool}
           onChange={(e) => {
             setNewTool(e.target.value);
-            vscode.setState({ ...prevState, newTool: e.target.value });
           }}>
           {Object.keys(toolTypes).map((toolKey) => (
             <option key={toolKey} value={toolKey}>
@@ -590,17 +556,7 @@ function App() {
             </option>
           ))}
         </select>
-        <button
-          onClick={() => {
-            handleAddAnnotation(start, end, documentContent);
-            setChooseAnnotationType(false);
-            setStart(undefined);
-            setEnd(undefined);
-            setDocumentContent(undefined);
-            vscode.setState({ chooseAnnotationType: false });
-          }}>
-          Submit
-        </button>
+        <button onClick={handleAddAnnotationConf}>Submit</button>
       </main>
     );
   }
