@@ -83,7 +83,12 @@ function runWSFileServer(port: number) {
         });
 
         watcher.on("change", (path, stats) => {
-          console.log("file changed");
+          console.debug("file changed:", path);
+          const state = fs.readFileSync(documentURI, "utf8");
+          ws.send(state);
+        });
+        watcher.on("add", (path, stats) => {
+          console.debug("file added:", path);
           const state = fs.readFileSync(documentURI, "utf8");
           ws.send(state);
         });
@@ -115,7 +120,7 @@ function runWSFileServer(port: number) {
             console.error(err);
             return;
           }
-          console.log("File saved.");
+          console.debug("File saved:", documentURI);
         });
 
         // // send state to all listeners
@@ -187,7 +192,7 @@ export function activate(context: ExtensionContext) {
     });
   });
 
-  const chooseAnotationType = () => {
+  const chooseAnnotationType = () => {
     HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
     const editor = vscode.window.activeTextEditor;
     HelloWorldPanel.currentPanel?.sendMessageObject({
@@ -205,7 +210,7 @@ export function activate(context: ExtensionContext) {
     if (HelloWorldPanel.currentPanel) {
       HelloWorldPanel.currentPanel.addAnnotations();
     } else {
-      chooseAnotationType();
+      chooseAnnotationType();
     }
   });
 

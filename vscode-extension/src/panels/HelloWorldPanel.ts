@@ -121,6 +121,12 @@ export class HelloWorldPanel {
         data: { fileServerURL: `ws://localhost:${fileServerPort}` },
       });
 
+      // Send the retag server url to the webview
+      HelloWorldPanel.currentPanel.sendMessageObject({
+        command: "setRetagServerURL",
+        data: { retagServerURL: `ws://localhost:${retagServerPort}` },
+      });
+
       if (vscode.window.activeTextEditor) {
         // Send the file server url to the webview
         HelloWorldPanel.currentPanel.sendMessageObject({

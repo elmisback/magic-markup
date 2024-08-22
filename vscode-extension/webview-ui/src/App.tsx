@@ -162,12 +162,8 @@ function _useDocumentFromWSFileServer<T>(
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
-      try {
-        const document = event.data;
-        setDocument(readCallback(document));
-      } catch (error) {
-        console.error("Error parsing JSON: ", error);
-      }
+      const document = event.data;
+      setDocument(readCallback(document));
     };
 
     ws.onopen = () => {
@@ -195,7 +191,7 @@ function _useDocumentFromWSFileServer<T>(
       console.error("No WebSocket connection");
       return;
     }
-    console.log("Sending update to server:", object);
+    console.debug("Sending update to server:", object, documentURI, serializeCallback(object));
     wsRef.current.send(
       JSON.stringify({
         type: "write",
@@ -229,6 +225,7 @@ function useObjectFromWSFileServer<T>(
     serverUrl,
     documentURI,
     (document) => {
+      console.debug("Parsing document:", documentURI);
       try {
         return JSON.parse(document) as T | undefined;
       } catch (error) {
@@ -256,8 +253,9 @@ const preprocessAnnotation = (annotation: Annotation) => {
   };
 };
 
+// TODO refactor to not use a wrapper function
 const useRetagFromAPI =
-  (retagServerUrl: string, APIKey: string) =>
+  (retagServerUrl: string) =>
   async (currentDocument: string, annotation: Annotation) => {
     console.debug("Retagging annotation:", annotation);
     const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
@@ -270,8 +268,7 @@ const useRetagFromAPI =
       body: JSON.stringify({
         codeWithSnippetDelimited,
         updatedCodeWithoutDelimiters: currentDocument,
-        delimiter,
-        APIKey,
+        delimiter
       }),
     }).then((res) => res.json());
 
@@ -499,9 +496,6 @@ function App() {
     setDocumentContent,
     prevState
   );
-
-  // Set up retagging function
-  const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
   const documentOutOfDate =
     annotations &&
