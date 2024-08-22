@@ -249,6 +249,16 @@ export class HelloWorldPanel {
           // are created within the webview context (i.e. inside media/main.js)
           case "showErrorMessage":
             window.showErrorMessage(message.data.error);
+          case "getDocumentContent":
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+              this._panel.webview.postMessage(
+                JSON.stringify({
+                  command: "returnDocumentContent",
+                  data: { documentContent: editor.document.getText() },
+                })
+              );
+            }
         }
       },
       undefined,

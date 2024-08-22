@@ -326,7 +326,8 @@ function listenForEditorMessages(
   setStart: (start: number) => void,
   setEnd: (end: number) => void,
   setDocumentContent: (documentContent: string) => void,
-  prevState?: any
+  prevState: any,
+  handleAddAnnotationResp: (start: number, end: number, newDocumentContent: string) => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -366,6 +367,9 @@ function listenForEditorMessages(
           documentContent: data.documentContent,
         });
         return;
+      case "returnDocumentContent":
+        handleAddAnnotationResp(data.start, data.end, data.newDocumentContent);
+        return;
       default:
         return;
     }
@@ -392,6 +396,17 @@ function App() {
     documentURI
   );
 
+  const showErrorMessage = (error: string) => {
+    vscode.postMessage(
+      JSON.stringify({
+        command: "showErrorMessage",
+        data: {
+          error,
+        },
+      })
+    );
+  };
+
   const handleAddAnnotationConf = () => {
     vscode.postMessage(
       JSON.stringify({
@@ -410,30 +425,22 @@ function App() {
   const handleAddAnnotationResp = (start: number, end: number, newDocumentContent: string) => {
     if (newDocumentContent !== documentContent) {
       // Ensure file hasn't been changed since annotation was added
-      // TODO: implement showError on host
-      vscode.postMessage(
-        JSON.stringify({
-          command: "showErrorMessage",
-          data: {
-            error: "Document content has changed since annotation was added",
-          },
-        })
-      );
+      showErrorMessage("Document content has changed since annotation was added");
       return;
     } // Ensure all required variables for annotation are defined
     console.log("START: " + start);
     console.log("END: " + end);
     if (!start || !end) {
-      setError("Error adding annotations: no highlighted text");
+      showErrorMessage("Error adding annotations: no highlighted text");
       return;
     } else if (start === end) {
-      setError("Error adding annotations: selection must not be empty");
+      showErrorMessage("Error adding annotations: selection must not be empty");
       return;
     } else if (!documentContent) {
-      setError("Error adding annotations: no document content");
+      showErrorMessage("Error adding annotations: no document content");
       return;
     } else if (!newTool) {
-      setError("Error adding annotations: no tool selected");
+      showErrorMessage("Error adding annotations: no tool selected");
       return;
     }
 
@@ -451,7 +458,6 @@ function App() {
       },
     };
     setAnnotations([...annotations, newAnnotation]);
-    setError(undefined);
   };
 
   const annotations = annotationState?.annotations || [];
@@ -473,7 +479,6 @@ function App() {
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
-  const [error, setError] = useState(undefined as string | undefined);
   const [chooseAnnotationType, setChooseAnnotationType] = useState(
     prevState?.chooseAnnotationType || false
   );
@@ -501,7 +506,8 @@ function App() {
     setStart,
     setEnd,
     setDocumentContent,
-    prevState
+    prevState,
+    handleAddAnnotationResp
   );
 
   const documentOutOfDate =
@@ -509,7 +515,7 @@ function App() {
     annotations.some((annotation: Annotation) => {
       return annotation.document !== currentDocument;
     });
-  
+
   // Set up retagging function
   const retag = retagServerURL ? useRetagFromAPI(retagServerURL) : undefined;
 
@@ -566,11 +572,6 @@ function App() {
             <button onClick={handleAddAnnotationConf}>Confirm</button>
           </div>
         )}
-        <div>
-          <text>{error}</text>
-          <br></br>
-          <button onClick={() => setError(undefined)}>Clear Error</button>
-        </div>
       </main>
     );
   } else {
