@@ -247,6 +247,8 @@ export class HelloWorldPanel {
             return;
           // Add more switch case statements here as more webview message commands
           // are created within the webview context (i.e. inside media/main.js)
+          case "showErrorMessage":
+            window.showErrorMessage(message.data.error);
         }
       },
       undefined,

@@ -255,8 +255,7 @@ const preprocessAnnotation = (annotation: Annotation) => {
 
 // TODO refactor to not use a wrapper function
 const useRetagFromAPI =
-  (retagServerUrl: string) =>
-  async (currentDocument: string, annotation: Annotation) => {
+  (retagServerUrl: string) => async (currentDocument: string, annotation: Annotation) => {
     console.debug("Retagging annotation:", annotation);
     const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
 
@@ -268,7 +267,7 @@ const useRetagFromAPI =
       body: JSON.stringify({
         codeWithSnippetDelimited,
         updatedCodeWithoutDelimiters: currentDocument,
-        delimiter
+        delimiter,
       }),
     }).then((res) => res.json());
 
@@ -408,8 +407,20 @@ function App() {
     vscode.setState({ ...prevState, confirmAnnotation: false });
   };
 
-  const handleAddAnnotationResp = (start: number, end: number, documentContent: string) => {
-    // Ensure all required variables for annotation are defined
+  const handleAddAnnotationResp = (start: number, end: number, newDocumentContent: string) => {
+    if (newDocumentContent !== documentContent) {
+      // Ensure file hasn't been changed since annotation was added
+      // TODO: implement showError on host
+      vscode.postMessage(
+        JSON.stringify({
+          command: "showErrorMessage",
+          data: {
+            error: "Document content has changed since annotation was added",
+          },
+        })
+      );
+      return;
+    } // Ensure all required variables for annotation are defined
     console.log("START: " + start);
     console.log("END: " + end);
     if (!start || !end) {
