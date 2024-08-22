@@ -1,1 +1,9 @@
-abcdef
+This document is a test.
+
+Here is a string: abc
+
+Here is a color: #752a8c
+
+Here is another color: #00ff00
+
+Here is a number: 42
