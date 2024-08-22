@@ -487,10 +487,6 @@ function App() {
   const [newTool, setNewTool] = useState(prevState?.newTool || (defaultTool as string | undefined));
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
-  const [APIKey, setAPIKey] = useState(
-    // HACK For now, use browser storage to initialize API key
-    () => window.localStorage.getItem("APIKey") || undefined
-  );
   const [confirmAnnotation, setConfirmAnnotation] = useState(prevState?.confirmAnnotation || false);
 
   // Listen for configuration updates from editor
