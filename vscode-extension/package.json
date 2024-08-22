@@ -14,8 +14,12 @@
         "title": "Hello World (React + Vite): Show"
       },
       {
-        "command": "hello-world.addAnnotations",
-        "title": "Add Annotations"
+        "command": "hello-world.addAnnotation",
+        "title": "Add Annotation"
+      },
+      {
+        "command": "hello-world.removeAnnotation",
+        "title": "Remove Annotation"
       },
       {
         "command": "hello-world.sendTestMessage",
@@ -29,7 +33,11 @@
     "menus": {
       "editor/context": [
         {
-          "command": "hello-world.addAnnotations",
+          "command": "hello-world.addAnnotation",
+          "group": "navigation"
+        },
+        {
+          "command": "hello-world.removeAnnotation",
           "group": "navigation"
         }
       ]

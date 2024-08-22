@@ -75,11 +75,24 @@ export class HelloWorldPanel {
     //return path.join(path.dirname(documentURI), 'codetations', path.basename(documentURI) + ".annotations.json");
   }
 
-  public addAnnotations(): void {
-    const editor: any = vscode.window.activeTextEditor;
+  public addAnnotation(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "addAnnotation",
+        data: {
+          start: editor?.document.offsetAt(editor.selection.start),
+          end: editor?.document.offsetAt(editor.selection.end),
+        },
+      })
+    );
+  }
+
+  public removeAnnotation(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
+    this._panel.webview.postMessage(
+      JSON.stringify({
+        command: "removeAnnotation",
         data: {
           start: editor?.document.offsetAt(editor.selection.start),
           end: editor?.document.offsetAt(editor.selection.end),

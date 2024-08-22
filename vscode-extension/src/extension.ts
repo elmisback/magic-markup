@@ -148,8 +148,7 @@ export function activate(context: ExtensionContext) {
     {
       "/retag": async (req: any, res: any) => {
         console.log("Retagging document");
-        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } =
-          req.body;
+        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body;
         const APIKey = vscode.workspace.getConfiguration().get("hello-world.apiKey") as string;
         const out = await retagUpdate(
           codeWithSnippetDelimited,
@@ -206,13 +205,18 @@ export function activate(context: ExtensionContext) {
   };
 
   // Create a command for adding annotations
-  const addAnnotationsCommand = commands.registerCommand("hello-world.addAnnotations", () => {
+  const addAnnotationsCommand = commands.registerCommand("hello-world.addAnnotation", () => {
     if (HelloWorldPanel.currentPanel) {
-      HelloWorldPanel.currentPanel.addAnnotations();
+      HelloWorldPanel.currentPanel.addAnnotation();
     } else {
       chooseAnnotationType();
     }
   });
 
-  context.subscriptions.push(showHelloWorldCommand, sendMessageCommand, addAnnotationsCommand);
+  // Command for removing annotations
+  const removeAnnotationsCommand = commands.registerCommand("hello-world.removeAnnotation", () => {
+    HelloWorldPanel.currentPanel?.removeAnnotation();
+  });
+
+  context.subscriptions.push(showHelloWorldCommand, sendMessageCommand, addAnnotationsCommand, removeAnnotationsCommand);
 }

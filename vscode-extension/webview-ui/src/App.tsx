@@ -308,6 +308,7 @@ function listenForEditorMessages(
   setCurrentLineNumber: (currentLineNumber: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
+  handleRemoveAnnotation: (start: number, end: number) => void,
   handleChooseAnnType: (start: number, end: number) => void,
   updateAnnotationDecorations: () => void
 ) {
@@ -335,6 +336,10 @@ function listenForEditorMessages(
         return;
       case "addAnnotation":
         handleAddAnnotation(data.start, data.end);
+        return;
+      case "removeAnnotation":
+        console.log("Remove called in app.tsx");
+        handleRemoveAnnotation(data.start, data.end);
         return;
       case "chooseAnnotationType":
         handleChooseAnnType(data.start, data.end);
@@ -402,10 +407,7 @@ function App() {
     }
 
     for (let i = 0; i < annotations.length; i++) {
-      if (
-        (annotations[i].start >= start && annotations[i].end <= end) ||
-        (annotations[i].end >= start && annotations[i].end <= end)
-      ) {
+      if (annotations[i].start === start && annotations[i].end === end) {
         showErrorMessage("Error adding annotations: annotation already exists in selected area");
         return;
       }
@@ -458,6 +460,17 @@ function App() {
     setTempDocumentContent(currentDocument);
   };
 
+  const handleRemoveAnnotation = (start: number, end: number) => {
+    if (start === undefined || end === undefined) {
+      showErrorMessage("Error removing annotations: no highlighted text");
+    }
+    const newAnnotations = annotations.filter(
+      (annotation) => start > annotation.end || end < annotation.start
+    );
+    setAnnotations(newAnnotations);
+    updateAnnotationDecorations();
+  };
+
   const hideAnnotations = () => {
     vscode.postMessage({
       command: "hideAnnotations",
@@ -508,6 +521,7 @@ function App() {
     setCurrentLineNumber,
     setRetagServerURL,
     handleAddAnnotation,
+    handleRemoveAnnotation,
     handleChooseAnnType,
     updateAnnotationDecorations
   );
