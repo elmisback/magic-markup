@@ -87,6 +87,11 @@ function runWSFileServer(port: number) {
           const state = fs.readFileSync(documentURI, "utf8");
           ws.send(state);
         });
+        watcher.on("add", (path, stats) => {
+          console.debug("file added:", path);
+          const state = fs.readFileSync(documentURI, "utf8");
+          ws.send(state);
+        });
         ws.watcher = watcher;
 
         try {
