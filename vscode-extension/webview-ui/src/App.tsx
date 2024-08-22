@@ -107,20 +107,6 @@ function AnnotationSidebarView(props: {
   return (
     <>
       <h1>Annotations</h1>
-      {/* <ul>
-      {annotations.map((annotation, index) => (
-        <li key={index}>
-          <p>Document: {annotation.document}</p>
-          <p>Start: {annotation.start}</p>
-          <p>End: {annotation.end}</p>
-          <p>Tool: {annotation.tool}</p>
-          <p>Metadata: {JSON.stringify(annotation.metadata)}</p>
-          <p>Original Document: {annotation.original.document}</p>
-          <p>Original Start: {annotation.original.start}</p>
-          <p>Original End: {annotation.original.end}</p>
-        </li>
-      ))}
-    </ul> */}
       {annotations.map((annotation, index) => (
         <AnnotationEditorContainer
           key={index}
@@ -323,7 +309,7 @@ function listenForEditorMessages(
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
   handleChooseAnnType: (start: number, end: number) => void,
-  handleFileEdit: () => void
+  updateAnnotationDecorations: () => void
 ) {
   window.addEventListener("message", (event) => {
     console.debug("Codetations: webview received message:", event);
@@ -354,7 +340,7 @@ function listenForEditorMessages(
         handleChooseAnnType(data.start, data.end);
         return;
       case "handleFileEdit":
-        handleFileEdit();
+        updateAnnotationDecorations();
         return;
       default:
         return;
@@ -400,19 +386,35 @@ function App() {
   };
 
   const handleAddAnnotationConf = () => {
+    // Update state once confirm is clicked
     setConfirmAnnotation(false);
     setChooseAnnotationType(false);
+
+    if (!start || !end) {
+      showErrorMessage("Error adding annotations: no highlighted text");
+      return;
+    }
+
     if (currentDocument !== tempDocumentContent) {
       // Ensure file hasn't been changed since annotation was added
       showErrorMessage("Document content has changed since annotation was added");
       return;
-    } // Ensure all required variables for annotation are defined
+    }
+
+    for (let i = 0; i < annotations.length; i++) {
+      if (
+        (annotations[i].start >= start && annotations[i].end <= end) ||
+        (annotations[i].end >= start && annotations[i].end <= end)
+      ) {
+        showErrorMessage("Error adding annotations: annotation already exists in selected area");
+        return;
+      }
+    }
+
+    // Ensure all required variables for annotation are defined
     console.log("START: " + start);
     console.log("END: " + end);
-    if (!start || !end) {
-      showErrorMessage("Error adding annotations: no highlighted text");
-      return;
-    } else if (start === end) {
+    if (start === end) {
       showErrorMessage("Error adding annotations: selection must not be empty");
       return;
     } else if (!tempDocumentContent) {
@@ -482,10 +484,6 @@ function App() {
     }
   };
 
-  const handleFileEdit = () => {
-    setIsFresh(updateAnnotationDecorations());
-  };
-
   // Transient editor + UI state
   const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
@@ -511,7 +509,7 @@ function App() {
     setRetagServerURL,
     handleAddAnnotation,
     handleChooseAnnType,
-    handleFileEdit
+    updateAnnotationDecorations
   );
 
   const documentOutOfDate =

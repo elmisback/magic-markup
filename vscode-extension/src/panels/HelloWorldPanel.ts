@@ -19,6 +19,8 @@ export class HelloWorldPanel {
   public static currentPanel: HelloWorldPanel | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
+  private _prevTextEditor: vscode.TextEditor | undefined;
+  private _isFileEditListenerSet: boolean = false;
 
   /**
    * The HelloWorldPanel class private constructor (called only from the render method).
@@ -41,6 +43,12 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for changes in the active text editor
     this._setActiveTextEditorChangeListener(this._panel.webview);
+
+    // Set an event listener to listen for changes in the active file
+    this._setFileEditListener(this._panel.webview);
+
+    // Set previous text editor
+    this._prevTextEditor = vscode.window.activeTextEditor;
   }
 
   /**
@@ -202,13 +210,16 @@ export class HelloWorldPanel {
   }
 
   private _setFileEditListener(webview: Webview) {
-    vscode.workspace.onDidChangeTextDocument(() => {
-      this._panel.webview.postMessage(
-        JSON.stringify({
-          command: "handleFileEdit",
-        })
-      );
-    });
+    if (!this._isFileEditListenerSet) {
+      vscode.workspace.onDidChangeTextDocument(() => {
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "handleFileEdit",
+          })
+        );
+      });
+      this._isFileEditListenerSet = true;
+    }
   }
 
   /**
@@ -224,6 +235,7 @@ export class HelloWorldPanel {
             data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
           })
         );
+        this._prevTextEditor = vscode.window.activeTextEditor;
         // Find parent directory of documentURI that contains a git repository
         // If there isn't a git repository, use the same directory as the documentURI
         this._panel.webview.postMessage(
@@ -254,9 +266,11 @@ export class HelloWorldPanel {
     });
     // Function to show annotations
     const updateDecorations = (annotations: { start: number; end: number }[]) => {
-      const editor = vscode.window.activeTextEditor;
+      const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
-        window.showErrorMessage("Error showing annotations: no active text editor");
+        window.showErrorMessage(
+          "Error showing annotations: no active or previously active text editor"
+        );
         return;
       }
 
@@ -271,9 +285,12 @@ export class HelloWorldPanel {
 
     // Function to clear annotations from editor
     const clearDecorations = () => {
-      const editor = vscode.window.activeTextEditor;
+      console.log("Clearing decorations");
+      const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
-        vscode.window.showErrorMessage("Error hiding annotations: no active text editor");
+        vscode.window.showErrorMessage(
+          "Error hiding annotations: no active or previously active text editor"
+        );
         return;
       }
 
