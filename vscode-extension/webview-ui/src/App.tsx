@@ -256,8 +256,9 @@ const preprocessAnnotation = (annotation: Annotation) => {
   };
 };
 
+// TODO refactor to not use a wrapper function
 const useRetagFromAPI =
-  (retagServerUrl: string, APIKey: string) =>
+  (retagServerUrl: string) =>
   async (currentDocument: string, annotation: Annotation) => {
     console.debug("Retagging annotation:", annotation);
     const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
@@ -270,8 +271,7 @@ const useRetagFromAPI =
       body: JSON.stringify({
         codeWithSnippetDelimited,
         updatedCodeWithoutDelimiters: currentDocument,
-        delimiter,
-        APIKey,
+        delimiter
       }),
     }).then((res) => res.json());
 
