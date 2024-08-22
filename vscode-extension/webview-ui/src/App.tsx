@@ -225,6 +225,7 @@ function useObjectFromWSFileServer<T>(
     serverUrl,
     documentURI,
     (document) => {
+      console.debug("Parsing document:", documentURI);
       try {
         return JSON.parse(document) as T | undefined;
       } catch (error) {
@@ -392,6 +393,7 @@ function App() {
 
   const annotations = annotationState?.annotations || [];
   const setAnnotations = (annotations: Annotation[]) => {
+    console.debug("Setting annotations:", annotations);
     if (!setAnnotationState) {
       console.error("No setAnnotationState function yet");
       return;
