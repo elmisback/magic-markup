@@ -97,28 +97,57 @@ type RetagFunction = (
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
-  currentLineNumber: number | undefined;
+  charNum: number | undefined;
   selectedAnnotationId: number | undefined;
   setSelectedAnnotationId: (id: number | undefined) => void;
   hoveredAnnotationId: number | undefined;
   setHoveredAnnotationId: (id: number | undefined) => void;
 }) {
-  const { annotations, setAnnotations } = props;
+  const { annotations, setAnnotations, charNum } = props;
+  const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const findClosestAnnotationIndex = (annotations: Annotation[], charNum: number) => {
+    let closestIndex = -1;
+    let closestDistance = Infinity;
+    annotations.forEach((annotation, index) => {
+      const distance = Math.min(
+        Math.abs(annotation.start - charNum),
+        Math.abs(annotation.end - charNum)
+      );
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    });
+    return closestIndex;
+  };
+
+  useEffect(() => {
+    if (charNum !== undefined) {
+      const closestAnnotationIndex = findClosestAnnotationIndex(annotations, charNum);
+      if (closestAnnotationIndex !== -1 && annotationRefs.current[closestAnnotationIndex]) {
+        annotationRefs.current[closestAnnotationIndex]?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [charNum, annotations]);
+
   return (
     <>
       <h1>Annotations</h1>
       {annotations.map((annotation, index) => (
-        <AnnotationEditorContainer
-          key={index}
-          value={annotation}
-          setValue={(value) => {
-            annotations[index] = { ...annotations[index], ...value };
-            setAnnotations(annotations);
-          }}
-          hoveredAnnotation={null}
-          selectedAnnotation={undefined}
-          setSelectedAnnotation={() => {}}
-        />
+        <div key={index} ref={(ref) => (annotationRefs.current[index] = ref)}>
+          <AnnotationEditorContainer
+            key={index}
+            value={annotation}
+            setValue={(value) => {
+              annotations[index] = { ...annotations[index], ...value };
+              setAnnotations(annotations);
+            }}
+            hoveredAnnotation={null}
+            selectedAnnotation={undefined}
+            setSelectedAnnotation={() => {}}
+          />
+        </div>
       ))}
     </>
   );
@@ -305,7 +334,7 @@ function listenForEditorMessages(
   setDocumentURI: (documentURI: string) => void,
   setAnnotationURI: (annotationURI: string) => void,
   setFileServerURL: (serverUrl: string) => void,
-  setCurrentLineNumber: (currentLineNumber: number) => void,
+  setCharNum: (charNum: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
   handleRemoveAnnotation: (start: number, end: number) => void,
@@ -328,8 +357,9 @@ function listenForEditorMessages(
       case "setFileServerURL":
         setFileServerURL(data.fileServerURL);
         return;
-      case "setCurrentLineNumber":
-        setCurrentLineNumber(data.currentLineNumber);
+      case "handleCursorPositionChange":
+        console.log("Cursor position change to " + data.position);
+        setCharNum(data.position);
         return;
       case "setRetagServerURL":
         setRetagServerURL(data.retagServerURL);
@@ -498,7 +528,7 @@ function App() {
   };
 
   // Transient editor + UI state
-  const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
+  const [charNum, setCharNum] = useState(undefined as number | undefined);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
   const [chooseAnnotationType, setChooseAnnotationType] = useState(false);
@@ -518,7 +548,7 @@ function App() {
     setDocumentURI,
     setAnnotationURI,
     setFileServerUrl,
-    setCurrentLineNumber,
+    setCharNum,
     setRetagServerURL,
     handleAddAnnotation,
     handleRemoveAnnotation,
@@ -549,7 +579,7 @@ function App() {
         <AnnotationSidebarView
           annotations={annotations}
           setAnnotations={(annotations) => {}}
-          currentLineNumber={currentLineNumber}
+          charNum={charNum}
           selectedAnnotationId={selectedAnnotationId}
           setSelectedAnnotationId={() => {}}
           hoveredAnnotationId={hoveredAnnotationId}

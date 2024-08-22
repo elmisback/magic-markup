@@ -21,6 +21,7 @@ export class HelloWorldPanel {
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
   private _isFileEditListenerSet: boolean = false;
+  private _isCursorPositionListenerSet: boolean = false;
 
   /**
    * The HelloWorldPanel class private constructor (called only from the render method).
@@ -43,6 +44,9 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for changes in the active text editor
     this._setActiveTextEditorChangeListener(this._panel.webview);
+
+    // Set an event listener to listen for changes in the cursor position
+    this._setCursorChangeListener(this._panel.webview);
 
     // Set an event listener to listen for changes in the active file
     this._setFileEditListener(this._panel.webview);
@@ -232,6 +236,23 @@ export class HelloWorldPanel {
         );
       });
       this._isFileEditListenerSet = true;
+    }
+  }
+
+  private _setCursorChangeListener(webview: Webview) {
+    if (!this._isCursorPositionListenerSet) {
+      vscode.window.onDidChangeTextEditorSelection(() => {
+        const editor = vscode.window.activeTextEditor;
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "handleCursorPositionChange",
+            data: {
+              position: editor?.document.offsetAt(editor.selection.start),
+            },
+          })
+        );
+      });
+      this._isCursorPositionListenerSet = true;
     }
   }
 
