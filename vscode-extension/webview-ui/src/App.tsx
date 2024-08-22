@@ -502,6 +502,9 @@ function App() {
     annotations.some((annotation: Annotation) => {
       return annotation.document !== currentDocument;
     });
+  
+  // Set up retagging function
+  const retag = retagServerURL ? useRetagFromAPI(retagServerURL) : undefined;
 
   if (!chooseAnnotationType) {
     return (
