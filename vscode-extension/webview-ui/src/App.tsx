@@ -394,6 +394,38 @@ function App() {
     documentURI
   );
 
+  const annotations = annotationState?.annotations || [];
+  const setAnnotations = (annotations: Annotation[]) => {
+    if (!setAnnotationState) {
+      console.error("No setAnnotationState function yet");
+      return;
+    }
+    setAnnotationState({ annotations });
+  };
+
+  // Transient editor + UI state
+  const prevState = vscode.getState();
+  const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
+  const [error, setError] = useState(undefined as string | undefined);
+  const [chooseAnnotationType, setChooseAnnotationType] = useState(
+    prevState?.chooseAnnotationType || false
+  );
+  const [start, setStart] = useState(prevState?.start || undefined);
+  const [end, setEnd] = useState(prevState?.end || undefined);
+  // TODO: make sure this state doesn't persist after user selects tool
+  // It shouldn't because I reset the state after the user selects a tool
+  const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
+  const defaultTool: string | undefined =
+    Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
+  const [newTool, setNewTool] = useState(prevState?.newTool || (defaultTool as string | undefined));
+  // Other configuration
+  const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
+
+  // Set up retagging function
+  const retag = retagServerURL ? useRetagFromAPI(retagServerURL) : undefined;
+
   const handleAddAnnotation = (start: number, end: number, documentContent: string) => {
     // Ensure all required variables for annotation are defined
     console.log("START: " + start);
@@ -429,39 +461,6 @@ function App() {
     setError(undefined);
   };
 
-  const annotations = annotationState?.annotations || [];
-  const setAnnotations = (annotations: Annotation[]) => {
-    if (!setAnnotationState) {
-      console.error("No setAnnotationState function yet");
-      return;
-    }
-    setAnnotationState({ annotations });
-  };
-
-  // Transient editor + UI state
-  const prevState = vscode.getState();
-  const [currentLineNumber, setCurrentLineNumber] = useState(undefined as number | undefined);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
-  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
-  const [error, setError] = useState(undefined as string | undefined);
-  const [chooseAnnotationType, setChooseAnnotationType] = useState(
-    prevState?.chooseAnnotationType || false
-  );
-  const [start, setStart] = useState(prevState?.start || undefined);
-  const [end, setEnd] = useState(prevState?.end || undefined);
-  // TODO: make sure this state doesn't persist after user selects tool
-  // It shouldn't because I reset the state after the user selects a tool
-  const [documentContent, setDocumentContent] = useState(prevState?.documentContent || undefined);
-  const defaultTool: string | undefined =
-    Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
-  const [newTool, setNewTool] = useState(prevState?.newTool || (defaultTool as string | undefined));
-  // Other configuration
-  const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
-  const [APIKey, setAPIKey] = useState(
-    // HACK For now, use browser storage to initialize API key
-    () => window.localStorage.getItem("APIKey") || undefined
-  );
-
   // Listen for configuration updates from editor
   listenForEditorMessages(
     setDocumentURI,
@@ -475,9 +474,6 @@ function App() {
     setEnd,
     setDocumentContent
   );
-
-  // Set up retagging function
-  const retag = retagServerURL && APIKey ? useRetagFromAPI(retagServerURL, APIKey) : undefined;
 
   const documentOutOfDate =
     annotations &&
