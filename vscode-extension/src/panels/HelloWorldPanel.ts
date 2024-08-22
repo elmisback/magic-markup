@@ -124,7 +124,7 @@ export class HelloWorldPanel {
       // Send the retag server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
         command: "setRetagServerURL",
-        data: { retagServerURL: `ws://localhost:${retagServerPort}` },
+        data: { retagServerURL: `http://localhost:${retagServerPort}/retag` },
       });
 
       if (vscode.window.activeTextEditor) {
@@ -190,7 +190,7 @@ export class HelloWorldPanel {
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}' http://localhost:*; connect-src 'self' ws://localhost:8072/; ">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}' http://localhost:*; connect-src 'self' ws://localhost:8072/ http://localhost:*; ">
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
           <title>Hello World</title>
         </head>
