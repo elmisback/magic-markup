@@ -109,6 +109,42 @@ The object must look like: {1: <code>, 2: <number>, 3: <number>, 4: <number>}
 
 The answer to 1 should be a code string only, without markdown formatting or extra notes.`;
 
+import vscode from 'vscode';
+
+async function copilotPromptGPT(t: string) {
+  // TODO finish this
+  const craftedPrompt = [
+    vscode.LanguageModelChatMessage.User(
+      'You are a helpful assistant designed to output JSON.'
+    ),
+    vscode.LanguageModelChatMessage.User(t)
+  ];
+  try {
+    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' });
+    const request = model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
+
+    // TODO figure out how to get the completion here
+  } catch (err) {
+    // Making the chat request might fail because
+    // - model does not exist
+    // - user consent not given
+    // - quota limits were exceeded
+    if (err instanceof vscode.LanguageModelError) {
+      console.log(err.message, err.code, err.cause);
+      if (err.cause instanceof Error && err.cause.message.includes('off_topic')) {
+        // stream.markdown(
+        //   vscode.l10n.t("I'm sorry, I can only explain computer science concepts.")
+        // );
+      }
+    } else {
+      // add other error handling logic
+      throw err;
+    }
+  }
+
+  
+}
+
 const retagUpdate = async (
   codeWithSnippetDelimited: string,
   updatedCodeWithoutDelimiters: string,
