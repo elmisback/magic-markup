@@ -11,7 +11,8 @@
     "commands": [
       {
         "command": "hello-world.showHelloWorld",
-        "title": "Hello World (React + Vite): Show"
+        "title": "Hello World (React + Vite): Show",
+        "icon": "$(zap)"
       },
       {
         "command": "hello-world.addAnnotation",
@@ -38,6 +39,12 @@
         },
         {
           "command": "hello-world.removeAnnotation",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "hello-world.showHelloWorld",
           "group": "navigation"
         }
       ]
