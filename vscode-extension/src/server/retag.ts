@@ -111,18 +111,32 @@ The answer to 1 should be a code string only, without markdown formatting or ext
 
 import vscode from 'vscode';
 
-async function copilotPromptGPT(t: string) {
-  // TODO finish this
+async function copilotPromptGPTForJSON(t: string) {
   const craftedPrompt = [
     vscode.LanguageModelChatMessage.User(
-      'You are a helpful assistant designed to output JSON.'
+      'You are a helpful assistant designed to output JSON. ONLY output raw JSON. Do not emit markdown formatting.'
     ),
-    vscode.LanguageModelChatMessage.User(t)
+    vscode.LanguageModelChatMessage.User(t),
+    vscode.LanguageModelChatMessage.User('Now respond with the JSON object only. ONLY output raw JSON. Do not emit markdown formatting.')
   ];
+  // const craftedPrompt = [
+  //   vscode.LanguageModelChatMessage.User(
+  //     'You are a cat! Think carefully and step by step like a cat would. Your job is to explain computer science concepts in the funny manner of a cat, using cat metaphors. Always start your response by stating what concept you are explaining. Always include code samples.'
+  //   ),
+  //   vscode.LanguageModelChatMessage.User('I want to understand recursion')
+  // ];
   try {
-    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' });
-    const request = model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
-
+    console.log('Selecting model...');
+    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4' });
+    console.log('Selected model:', model);
+    const response = await model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
+    console.log('Got response:', response);
+    let fullResponse = '';
+    for await (const chunk of response.text) {
+      console.log('Got chunk:', chunk);
+      fullResponse += chunk;
+    }
+    return fullResponse;
     // TODO figure out how to get the completion here
   } catch (err) {
     // Making the chat request might fail because
@@ -130,19 +144,18 @@ async function copilotPromptGPT(t: string) {
     // - user consent not given
     // - quota limits were exceeded
     if (err instanceof vscode.LanguageModelError) {
-      console.log(err.message, err.code, err.cause);
+      console.error('Problem with extension LM api:', err.message, err.code, err.cause);
       if (err.cause instanceof Error && err.cause.message.includes('off_topic')) {
         // stream.markdown(
         //   vscode.l10n.t("I'm sorry, I can only explain computer science concepts.")
         // );
+        throw err;
       }
     } else {
       // add other error handling logic
       throw err;
     }
   }
-
-  
 }
 
 const retagUpdate = async (
@@ -167,27 +180,33 @@ const retagUpdate = async (
 
   let gptOut = "";
   try {
-    const gptOutCompletion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant designed to output JSON.",
-        },
-        {
-          role: "user",
-          content: prompt_breakdown11({
-            codeWithSnippetDelimited,
-            updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
-            delimiter,
-          }),
-        },
-      ],
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-    });
-    console.log(gptOutCompletion);
+    // const gptOutCompletion = await openai.chat.completions.create({
+    //   messages: [
+    //     {
+    //       role: "system",
+    //       content: "You are a helpful assistant designed to output JSON.",
+    //     },
+    //     {
+    //       role: "user",
+    //       content: prompt_breakdown11({
+    //         codeWithSnippetDelimited,
+    //         updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
+    //         delimiter,
+    //       }),
+    //     },
+    //   ],
+    //   model: "gpt-4o",
+    //   response_format: { type: "json_object" },
+    // });
+    // console.log(gptOutCompletion);
 
-    gptOut = gptOutCompletion.choices[0]?.message.content || "";
+    // gptOut = gptOutCompletion.choices[0]?.message.content || "";
+
+    gptOut = await copilotPromptGPTForJSON( prompt_breakdown11({
+      codeWithSnippetDelimited,
+      updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
+      delimiter,
+    }) ) || '';
     console.log(gptOut);
   } catch (e) {
     return { error: e, errorType: "model" };
