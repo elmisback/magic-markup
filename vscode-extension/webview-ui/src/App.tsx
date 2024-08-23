@@ -131,10 +131,14 @@ function AnnotationSidebarView(props: {
     }
   }, [charNum, annotations]);
 
+  const key = (fn: (a: any) => number) => (a: Annotation, b: Annotation) =>
+    fn(a) < fn(b) ? -1 : fn(a) > fn(b) ? 1 : 0;
+
+
   return (
     <>
       <h1>Annotations</h1>
-      {annotations.map((annotation, index) => (
+      {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
         <div key={index} ref={(ref) => (annotationRefs.current[index] = ref)}>
           <AnnotationEditorContainer
             key={index}
