@@ -584,11 +584,6 @@ function App() {
           setHoveredAnnotationId={() => {}}
         />
 
-        {/* Show document content in a div for testing */}
-        <div>
-          <h1>Document</h1>
-          <pre>{currentDocument}</pre>
-        </div>
         <div>
           Tool: &nbsp;
           {/* select with dropdown */}
