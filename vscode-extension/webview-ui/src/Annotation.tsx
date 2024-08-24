@@ -1,4 +1,5 @@
 interface Annotation {
+  id: string;
   start: number;
   end: number;
   document: string;

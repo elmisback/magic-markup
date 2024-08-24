@@ -97,6 +97,7 @@ type RetagFunction = (
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
+  setCurrentDocument: ((document: string) => void) | undefined;
   charNum: number | undefined;
   selectedAnnotationId: number | undefined;
   setSelectedAnnotationId: (id: number | undefined) => void;
@@ -134,6 +135,8 @@ function AnnotationSidebarView(props: {
   const key = (fn: (a: any) => number) => (a: Annotation, b: Annotation) =>
     fn(a) < fn(b) ? -1 : fn(a) > fn(b) ? 1 : 0;
 
+  // HACK to add IDs to annotations
+  annotations.map((a, i) => {a.id = i.toString()})
 
   return (
     <>
@@ -144,8 +147,14 @@ function AnnotationSidebarView(props: {
             key={index}
             value={annotation}
             setValue={(value) => {
-              annotations[index] = { ...annotations[index], ...value };
-              setAnnotations(annotations);
+              console.log("Setting annotation:", value);
+              // annotations[index] = { ...annotations[index], ...value };
+              const newAnnotations = annotations.map(a => a.id === annotation.id ? {...a, ...value} : a);
+              console.log("New annotations:", newAnnotations);
+              setAnnotations(newAnnotations);
+              if (value.document) {
+                props.setCurrentDocument && props.setCurrentDocument(value.document);
+              }
             }}
             hoveredAnnotation={null}
             selectedAnnotation={undefined}
@@ -461,6 +470,7 @@ function App() {
 
     // Create new annotation based on message
     const newAnnotation: Annotation = {
+      id: annotations.length.toString(),
       start,
       end,
       document: tempDocumentContent,
@@ -580,7 +590,8 @@ function App() {
         )}
         <AnnotationSidebarView
           annotations={annotations}
-          setAnnotations={(annotations) => {}}
+          setAnnotations={setAnnotations}
+          setCurrentDocument={setCurrentDocument}
           charNum={charNum}
           selectedAnnotationId={selectedAnnotationId}
           setSelectedAnnotationId={() => {}}
