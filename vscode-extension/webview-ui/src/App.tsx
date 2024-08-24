@@ -27,14 +27,15 @@ const toolTypes: ToolTypes = {
 function AnnotationEditorContainer(props: {
   value: Annotation;
   setValue: (value: AnnotationUpdate) => void;
-  hoveredAnnotation: Annotation | null;
-  selectedAnnotation: Annotation | undefined;
-  setSelectedAnnotation: (value: Annotation | undefined) => void;
+  hoveredAnnotationId: string | undefined;
+  setHoveredAnnotationId: (value: string | undefined) => void;
+  selectedAnnotationId: string | undefined;
+  setSelectedAnnotationId: (value: string | undefined) => void;
 }) {
-  const { value, setValue, setSelectedAnnotation } = props;
+  const { value, setValue, setSelectedAnnotationId } = props;
 
   const handleClick = () => {
-    setSelectedAnnotation(value);
+    setSelectedAnnotationId(value.id);
 
     // Find the element by ID and scroll into view
     const startElement = document.getElementById(`annotation-${value.start}`);
@@ -44,12 +45,12 @@ function AnnotationEditorContainer(props: {
   };
 
   const style = {
-    backgroundColor:
-      props.selectedAnnotation === value
-        ? "lightgreen"
-        : props.hoveredAnnotation === value
-        ? "lightgray"
-        : "transparent",
+    border:
+      props.selectedAnnotationId === value.id
+        ? "1px solid lightgreen"
+        : props.hoveredAnnotationId === value.id
+        ? "1px solid lightgray"
+        : "1px solid transparent",
   };
 
   return (
@@ -99,10 +100,10 @@ function AnnotationSidebarView(props: {
   setAnnotations: (annotations: Annotation[]) => void;
   setCurrentDocument: ((document: string) => void) | undefined;
   charNum: number | undefined;
-  selectedAnnotationId: number | undefined;
-  setSelectedAnnotationId: (id: number | undefined) => void;
-  hoveredAnnotationId: number | undefined;
-  setHoveredAnnotationId: (id: number | undefined) => void;
+  selectedAnnotationId: string | undefined;
+  setSelectedAnnotationId: (id: string | undefined) => void;
+  hoveredAnnotationId: string | undefined;
+  setHoveredAnnotationId: (id: string | undefined) => void;
 }) {
   const { annotations, setAnnotations, charNum } = props;
   const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -156,9 +157,10 @@ function AnnotationSidebarView(props: {
                 props.setCurrentDocument && props.setCurrentDocument(value.document);
               }
             }}
-            hoveredAnnotation={null}
-            selectedAnnotation={undefined}
-            setSelectedAnnotation={() => {}}
+            hoveredAnnotationId={props.hoveredAnnotationId}
+            setHoveredAnnotationId={props.setHoveredAnnotationId}
+            selectedAnnotationId={props.selectedAnnotationId}
+            setSelectedAnnotationId={props.setSelectedAnnotationId}
           />
         </div>
       ))}
@@ -541,8 +543,8 @@ function App() {
 
   // Transient editor + UI state
   const [charNum, setCharNum] = useState(undefined as number | undefined);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as number | undefined);
-  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as number | undefined);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as string | undefined);
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as string | undefined);
   const [chooseAnnotationType, setChooseAnnotationType] = useState(false);
   const [start, setStart] = useState(undefined as number | undefined);
   const [end, setEnd] = useState(undefined as number | undefined);
@@ -567,6 +569,18 @@ function App() {
     handleChooseAnnType,
     updateAnnotationDecorations
   );
+
+  // find the selected annotation based on the character position
+  useEffect(() => {
+    if (charNum) {
+      const annotation = annotations.find(
+        (annotation) => annotation.start <= charNum && annotation.end >= charNum
+      );
+      if (annotation) {
+        setSelectedAnnotationId(annotation.id);
+      }
+    }
+  }, [charNum, annotations]);
 
   const documentOutOfDate =
     annotations &&
@@ -594,9 +608,9 @@ function App() {
           setCurrentDocument={setCurrentDocument}
           charNum={charNum}
           selectedAnnotationId={selectedAnnotationId}
-          setSelectedAnnotationId={() => {}}
+          setSelectedAnnotationId={setSelectedAnnotationId}
           hoveredAnnotationId={hoveredAnnotationId}
-          setHoveredAnnotationId={() => {}}
+          setHoveredAnnotationId={setHoveredAnnotationId}
         />
 
         <div>
