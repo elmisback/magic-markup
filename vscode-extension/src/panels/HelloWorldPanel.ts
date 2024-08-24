@@ -117,7 +117,7 @@ export class HelloWorldPanel {
         // Panel view type
         "showHelloWorld",
         // Panel title
-        "Hello World",
+        "Codetations",
         // The editor column the panel should be displayed in
         { viewColumn: ViewColumn.Two, preserveFocus: true },
         // Extra panel configurations
