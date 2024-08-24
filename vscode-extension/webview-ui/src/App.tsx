@@ -141,7 +141,7 @@ function AnnotationSidebarView(props: {
 
   return (
     <>
-      <h1>Annotations</h1>
+      <h3>Annotations</h3>
       {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
         <div key={index} ref={(ref) => (annotationRefs.current[index] = ref)}>
           <AnnotationEditorContainer
@@ -613,29 +613,41 @@ function App() {
           setHoveredAnnotationId={setHoveredAnnotationId}
         />
 
-        <div>
-          Tool: &nbsp;
-          {/* select with dropdown */}
-          {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
-          <select
-            value={newTool}
-            onChange={(e) => {
-              setNewTool(e.target.value);
-            }}>
-            {Object.keys(toolTypes).map((toolKey) => (
-              <option key={toolKey} value={toolKey}>
-                {toolKey}
-              </option>
-            ))}
-          </select>
-        </div>
         {confirmAnnotation && (
+          <>
+            <div>
+            Tool: &nbsp;
+            {/* select with dropdown */}
+            {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
+            <select
+              value={newTool}
+              onChange={(e) => {
+                setNewTool(e.target.value);
+              }}>
+              {Object.keys(toolTypes).map((toolKey) => (
+                <option key={toolKey} value={toolKey}>
+                  {toolKey}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             Add annotation?
             <br></br>
             <button onClick={handleAddAnnotationConf}>Confirm</button>
           </div>
+          </>
         )}
+
+        <br/>
+        <>
+        <p>
+        To add more annotations, highlight and use the right-click context menu.
+        </p>
+        <p>
+        To open the annotation panel, click on the lightning bolt icon in the top right corner of the editor.
+        </p>
+        </>
       </main>
     );
   } else {
