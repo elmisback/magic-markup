@@ -137,7 +137,9 @@ function AnnotationSidebarView(props: {
     fn(a) < fn(b) ? -1 : fn(a) > fn(b) ? 1 : 0;
 
   // HACK to add IDs to annotations
-  annotations.map((a, i) => {a.id = i.toString()})
+  annotations.map((a, i) => {
+    a.id = i.toString();
+  });
 
   return (
     <>
@@ -150,7 +152,9 @@ function AnnotationSidebarView(props: {
             setValue={(value) => {
               console.log("Setting annotation:", value);
               // annotations[index] = { ...annotations[index], ...value };
-              const newAnnotations = annotations.map(a => a.id === annotation.id ? {...a, ...value} : a);
+              const newAnnotations = annotations.map((a) =>
+                a.id === annotation.id ? { ...a, ...value } : a
+              );
               console.log("New annotations:", newAnnotations);
               setAnnotations(newAnnotations);
               if (value.document) {
@@ -352,7 +356,7 @@ function listenForEditorMessages(
   setCharNum: (charNum: number) => void,
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
-  handleRemoveAnnotation: (start: number, end: number) => void,
+  handleRemoveAnnotation: () => void,
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
   updateAnnotationDecorations: () => void
 ) {
@@ -382,7 +386,7 @@ function listenForEditorMessages(
         handleAddAnnotation(data.start, data.end);
         return;
       case "removeAnnotation":
-        handleRemoveAnnotation(data.start, data.end);
+        handleRemoveAnnotation();
         return;
       case "chooseAnnotationType":
         handleChooseAnnType(data.start, data.end, data.documentContent);
@@ -504,12 +508,12 @@ function App() {
     setTempDocumentContent(currentDocument);
   };
 
-  const handleRemoveAnnotation = (start: number, end: number) => {
-    if (start === undefined || end === undefined) {
-      showErrorMessage("Error removing annotations: no highlighted text");
+  const handleRemoveAnnotation = () => {
+    if (!selectedAnnotationId) {
+      showErrorMessage("Error removing annotations: no selected annotation");
     }
     const newAnnotations = annotations.filter(
-      (annotation) => start < annotation.start || end > annotation.end
+      (annotation) => annotation.id !== selectedAnnotationId
     );
     setAnnotations(newAnnotations);
     updateAnnotationDecorations();
@@ -616,37 +620,36 @@ function App() {
         {confirmAnnotation && (
           <>
             <div>
-            Tool: &nbsp;
-            {/* select with dropdown */}
-            {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
-            <select
-              value={newTool}
-              onChange={(e) => {
-                setNewTool(e.target.value);
-              }}>
-              {Object.keys(toolTypes).map((toolKey) => (
-                <option key={toolKey} value={toolKey}>
-                  {toolKey}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            Add annotation?
-            <br></br>
-            <button onClick={handleAddAnnotationConf}>Confirm</button>
-          </div>
+              Tool: &nbsp;
+              {/* select with dropdown */}
+              {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
+              <select
+                value={newTool}
+                onChange={(e) => {
+                  setNewTool(e.target.value);
+                }}>
+                {Object.keys(toolTypes).map((toolKey) => (
+                  <option key={toolKey} value={toolKey}>
+                    {toolKey}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              Add annotation?
+              <br></br>
+              <button onClick={handleAddAnnotationConf}>Confirm</button>
+            </div>
           </>
         )}
 
-        <br/>
+        <br />
         <>
-        <p>
-        To add more annotations, highlight and use the right-click context menu.
-        </p>
-        <p>
-        To open the annotation panel, click on the lightning bolt icon in the top right corner of the editor.
-        </p>
+          <p>To add more annotations, highlight and use the right-click context menu.</p>
+          <p>
+            To open the annotation panel, click on the lightning bolt icon in the top right corner
+            of the editor.
+          </p>
         </>
       </main>
     );

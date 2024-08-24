@@ -97,10 +97,6 @@ export class HelloWorldPanel {
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "removeAnnotation",
-        data: {
-          start: editor?.document.offsetAt(editor.selection.start),
-          end: editor?.document.offsetAt(editor.selection.end),
-        },
       })
     );
   }

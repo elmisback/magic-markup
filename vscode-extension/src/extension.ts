@@ -149,12 +149,12 @@ export function activate(context: ExtensionContext) {
       "/retag": async (req: any, res: any) => {
         console.log("Retagging document");
         const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body;
-        const APIKey = vscode.workspace.getConfiguration().get("hello-world.apiKey") as string;
+        const apiKey = vscode.workspace.getConfiguration().get("hello-world.apiKey") as string;
         const out = await retagUpdate(
           codeWithSnippetDelimited,
           updatedCodeWithoutDelimiters,
           delimiter,
-          APIKey
+          apiKey
         );
 
         res.json(out);
