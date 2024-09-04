@@ -61,7 +61,7 @@ function runWSFileServer(port: number) {
   wss.on("connection", (ws: MySocket) => {
     console.log("new connection");
     ws.on("message", (message) => {
-      console.log(`Received message => ${message}`);
+      console.debug(`Received message => ${message}`);
       const messageObj = JSON.parse(message.toString());
 
       if (messageObj.type === "listen") {
@@ -218,5 +218,10 @@ export function activate(context: ExtensionContext) {
     HelloWorldPanel.currentPanel?.removeAnnotation();
   });
 
-  context.subscriptions.push(showHelloWorldCommand, sendMessageCommand, addAnnotationsCommand, removeAnnotationsCommand);
+  context.subscriptions.push(
+    showHelloWorldCommand,
+    sendMessageCommand,
+    addAnnotationsCommand,
+    removeAnnotationsCommand
+  );
 }

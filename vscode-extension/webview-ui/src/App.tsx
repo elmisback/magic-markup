@@ -360,7 +360,7 @@ function listenForEditorMessages(
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
   updateAnnotationDecorations: () => void
 ) {
-  window.addEventListener("message", (event) => {
+  const handleMessage = (event: any) => {
     console.debug("Codetations: webview received message:", event);
     const message = JSON.parse(event.data);
     console.debug("Codetations: webview message command:", message.command);
@@ -397,6 +397,12 @@ function listenForEditorMessages(
       default:
         return;
     }
+  };
+  useEffect(() => {
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
   });
 }
 
@@ -515,6 +521,7 @@ function App() {
     const newAnnotations = annotations.filter(
       (annotation) => annotation.id !== selectedAnnotationId
     );
+    console.log("Annotation removed successfully");
     setAnnotations(newAnnotations);
     updateAnnotationDecorations();
   };
