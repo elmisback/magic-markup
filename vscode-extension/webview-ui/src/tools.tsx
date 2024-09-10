@@ -160,11 +160,12 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
-  const [code, setCode] = useState(props.value.metadata.code || "");
+  const [code, setCode] = useState<string[]>(props.value.metadata.code || [""]);
 
+  // Add a return statement to a code block if none is found.
   function addReturn(code: string): string {
     // Match the last line in the string
-    const lines: Array<String> = code.trim().split("\n");
+    const lines: string[] = code.trim().split("\n");
 
     if (lines.length === 0) {
       return "";
@@ -178,7 +179,14 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 
   function runAndUpdateCode(): void {
     try {
-      if (code === "") {
+      let empty: Boolean = true;
+      for (let i = 0; i < code.length; i++) {
+        if (code[i].trim() !== "") {
+          empty = false;
+          break;
+        }
+      }
+      if (empty) {
         props.utils.setMetadata({
           error: "No code to run",
           response: undefined,
@@ -186,9 +194,9 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         });
         return;
       }
-      let result = new Function(code)();
+      let result = new Function(code.join("\n"))();
       if (result === undefined) {
-        const newCode: string = addReturn(code);
+        const newCode: string = addReturn(code.join("\n"));
         try {
           result = new Function(newCode)();
         } catch {}
@@ -217,7 +225,38 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           Response: &nbsp; <ObjectInspector data={props.value.metadata.response} />
         </div>
       )}
-      <textarea rows={4} cols={72} value={code} onChange={(e) => setCode(e.target.value)} />
+      {code.map((c, i) => (
+        <div>
+          <textarea
+            key={i}
+            rows={4}
+            cols={72}
+            value={c}
+            onChange={(e) => {
+              const newCode = [...code];
+              newCode[i] = e.target.value;
+              setCode(newCode);
+            }}
+          />
+          <button
+            onClick={() => {
+              const newCode = [...code];
+              newCode.splice(i, 1);
+              setCode(newCode);
+            }}>
+            Remove Code Block
+          </button>
+        </div>
+      ))}
+      <br></br>
+      <button
+        onClick={() => {
+          const newCode = [...code];
+          newCode.push("");
+          setCode(newCode);
+        }}>
+        Add Code Block
+      </button>
       <br></br>
       <button onClick={runAndUpdateCode}>Run Highlighted Code</button>
       <br></br>
