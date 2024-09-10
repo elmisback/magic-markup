@@ -1,13 +1,31 @@
-import { AnnotationEditorProps } from "./App";
 import React, { TextareaHTMLAttributes, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import ReactMarkdown from "react-markdown";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
 
 interface ImageData {
   file: File;
   src: string;
+}
+
+interface AnnotationUpdate {
+  document?: string;
+  metadata?: any;
+}
+
+interface AnnotationEditorProps {
+  value: Annotation;
+  setValue: (value: AnnotationUpdate) => void;
+  utils?: any;
+}
+
+interface Annotation {
+  id: string;
+  start: number;
+  end: number;
+  document: string;
+  tool: string;
+  metadata: any;
+  original: { document: string; start: number; end: number };
 }
 
 // const MarkdownComment: React.FC<AnnotationEditorProps> = (props) => {

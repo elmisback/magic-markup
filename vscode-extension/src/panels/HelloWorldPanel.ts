@@ -18,6 +18,7 @@ import * as fs from "fs";
 export class HelloWorldPanel {
   public static currentPanel: HelloWorldPanel | undefined;
   private readonly _panel: WebviewPanel;
+  private readonly _toolsPath: string;
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
   private _isFileEditListenerSet: boolean = false;
@@ -29,8 +30,10 @@ export class HelloWorldPanel {
    * @param panel A reference to the webview panel
    * @param extensionUri The URI of the directory containing the extension
    */
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+  private constructor(panel: WebviewPanel, extensionUri: Uri, toolsPath: string) {
     this._panel = panel;
+
+    this._toolsPath = toolsPath;
 
     // Set an event listener to listen for when the panel is disposed (i.e. when the user closes
     // the panel or when the panel is closed programmatically)
@@ -107,7 +110,12 @@ export class HelloWorldPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
+  public static render(
+    extensionUri: Uri,
+    retagServerPort: number,
+    fileServerPort: number,
+    toolsPath: string
+  ) {
     if (HelloWorldPanel.currentPanel) {
       // If the webview panel already exists reveal it
       HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
@@ -133,7 +141,7 @@ export class HelloWorldPanel {
         }
       );
 
-      HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri);
+      HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri, toolsPath);
 
       // Send the retag server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
@@ -146,6 +154,14 @@ export class HelloWorldPanel {
         command: "setRetagServerURL",
         data: { retagServerURL: `http://localhost:${retagServerPort}/retag` },
       });
+
+      if (fs.existsSync(toolsPath)) {
+        // Send the tools path to the webview
+        HelloWorldPanel.currentPanel.sendMessageObject({
+          command: "setTools",
+          data: require(toolsPath).tools,
+        });
+      }
 
       if (vscode.window.activeTextEditor) {
         // Send the file server url to the webview

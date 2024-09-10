@@ -169,7 +169,12 @@ export function activate(context: ExtensionContext) {
 
   // Create the show hello world command
   const showHelloWorldCommand = commands.registerCommand("hello-world.showHelloWorld", () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+    HelloWorldPanel.render(
+      context.extensionUri,
+      retagServerPort,
+      fileServerPort,
+      path.join(context.extensionPath, "src", "utilities", "tools.tsx")
+    );
   });
 
   // Create a command that allows a user to set an API key for the extension
@@ -192,7 +197,12 @@ export function activate(context: ExtensionContext) {
   });
 
   const chooseAnnotationType = () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+    HelloWorldPanel.render(
+      context.extensionUri,
+      retagServerPort,
+      fileServerPort,
+      path.join(context.extensionPath, "src", "utilities", "tools.tsx")
+    );
     const editor = vscode.window.activeTextEditor;
     HelloWorldPanel.currentPanel?.sendMessageObject({
       command: "chooseAnnotationType",
