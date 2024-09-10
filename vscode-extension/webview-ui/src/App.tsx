@@ -1,6 +1,7 @@
 import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
+import { tools } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
 import * as path from "path";
 
@@ -19,6 +20,10 @@ type ToolTypes = {
   [key: string]: React.FC<AnnotationEditorProps>;
 };
 
+const toolTypes: ToolTypes = {
+  ...tools,
+};
+
 function AnnotationEditorContainer(props: {
   value: Annotation;
   setValue: (value: AnnotationUpdate) => void;
@@ -26,7 +31,6 @@ function AnnotationEditorContainer(props: {
   setHoveredAnnotationId: (value: string | undefined) => void;
   selectedAnnotationId: string | undefined;
   setSelectedAnnotationId: (value: string | undefined) => void;
-  toolTypes: ToolTypes;
 }) {
   const { value, setValue, setSelectedAnnotationId } = props;
 
@@ -61,7 +65,7 @@ function AnnotationEditorContainer(props: {
       <div>Original Start: {value.original.start}</div>
       <div>Original End: {value.original.end}</div> */}
       {/* <div>Editor:</div> */}
-      {props.toolTypes[value.tool]?.({
+      {toolTypes[value.tool]?.({
         value,
         setValue: (v: AnnotationUpdate) =>
           setValue({ ...value, document: v.document, metadata: v.metadata }),
@@ -100,7 +104,6 @@ function AnnotationSidebarView(props: {
   setSelectedAnnotationId: (id: string | undefined) => void;
   hoveredAnnotationId: string | undefined;
   setHoveredAnnotationId: (id: string | undefined) => void;
-  toolTypes: ToolTypes;
 }) {
   const { annotations, setAnnotations, charNum } = props;
   const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -162,7 +165,6 @@ function AnnotationSidebarView(props: {
             setHoveredAnnotationId={props.setHoveredAnnotationId}
             selectedAnnotationId={props.selectedAnnotationId}
             setSelectedAnnotationId={props.setSelectedAnnotationId}
-            toolTypes={props.toolTypes}
           />
         </div>
       ))}
@@ -356,8 +358,7 @@ function listenForEditorMessages(
   handleAddAnnotation: (start: number, end: number) => void,
   handleRemoveAnnotation: () => void,
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
-  updateAnnotationDecorations: () => void,
-  setTools: (tools: ToolTypes) => void
+  updateAnnotationDecorations: () => void
 ) {
   const handleMessage = (event: any) => {
     console.debug("Codetations: webview received message:", event);
@@ -392,9 +393,6 @@ function listenForEditorMessages(
         return;
       case "handleFileEdit":
         updateAnnotationDecorations();
-        return;
-      case "setTools":
-        setTools(data.tools);
         return;
       default:
         return;
@@ -562,7 +560,6 @@ function App() {
   const [start, setStart] = useState(undefined as number | undefined);
   const [end, setEnd] = useState(undefined as number | undefined);
   const [tempDocumentContent, setTempDocumentContent] = useState(undefined as string | undefined);
-  const [toolTypes, setToolTypes] = useState<ToolTypes>({});
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState(defaultTool as string | undefined);
@@ -581,8 +578,7 @@ function App() {
     handleAddAnnotation,
     handleRemoveAnnotation,
     handleChooseAnnType,
-    updateAnnotationDecorations,
-    setToolTypes
+    updateAnnotationDecorations
   );
 
   // find the selected annotation based on the character position
@@ -626,7 +622,6 @@ function App() {
           setSelectedAnnotationId={setSelectedAnnotationId}
           hoveredAnnotationId={hoveredAnnotationId}
           setHoveredAnnotationId={setHoveredAnnotationId}
-          toolTypes={toolTypes}
         />
 
         {confirmAnnotation && (
