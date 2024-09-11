@@ -248,14 +248,15 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           cols={72}
           value={pinBody ? props.utils.getText() : code[1]}
           onChange={(e) => {
-            const newCode = [...code];
-            newCode[1] = e.target.value;
-            setCode(newCode);
+            if (!pinBody) {
+              const newCode = [...code];
+              newCode[1] = e.target.value;
+              setCode(newCode);
+            }
           }}
         />
         <br></br>
         Pin body to annotated document text:
-        <br></br>
         <input
           type="checkbox"
           checked={pinBody}
