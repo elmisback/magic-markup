@@ -160,7 +160,8 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
-  const [code, setCode] = useState<string[]>(props.value.metadata.code || [""]);
+  const [code, setCode] = useState<string[]>(props.value.metadata.code || [[""], [""], [""]]);
+  const [pinBody, setPinBody] = useState<boolean>(props.value.metadata.pinBody || false);
 
   // Add a return statement to a code block if none is found.
   function addReturn(code: string): string {
@@ -181,7 +182,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
     try {
       let empty: Boolean = true;
       for (let i = 0; i < code.length; i++) {
-        if (code[i].trim() !== "") {
+        if (String(code[i]).trim() !== "") {
           empty = false;
           break;
         }
@@ -225,38 +226,58 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           Response: &nbsp; <ObjectInspector data={props.value.metadata.response} />
         </div>
       )}
-      {code.map((c, i) => (
-        <div>
-          <textarea
-            key={i}
-            rows={4}
-            cols={72}
-            value={c}
-            onChange={(e) => {
-              const newCode = [...code];
-              newCode[i] = e.target.value;
-              setCode(newCode);
-            }}
-          />
-          <button
-            onClick={() => {
-              const newCode = [...code];
-              newCode.splice(i, 1);
-              setCode(newCode);
-            }}>
-            Remove Code Block
-          </button>
-        </div>
-      ))}
-      <br></br>
-      <button
-        onClick={() => {
-          const newCode = [...code];
-          newCode.push("");
-          setCode(newCode);
-        }}>
-        Add Code Block
-      </button>
+      <div>
+        Head
+        <br></br>
+        <textarea
+          key={0}
+          rows={4}
+          cols={72}
+          value={code[0]}
+          onChange={(e) => {
+            const newCode = [...code];
+            newCode[0] = e.target.value;
+            setCode(newCode);
+          }}
+        />
+        Body
+        <br></br>
+        <textarea
+          key={1}
+          rows={4}
+          cols={72}
+          value={pinBody ? props.utils.getText() : code[1]}
+          onChange={(e) => {
+            const newCode = [...code];
+            newCode[1] = e.target.value;
+            setCode(newCode);
+          }}
+        />
+        <br></br>
+        Pin body to annotated document text:
+        <br></br>
+        <input
+          type="checkbox"
+          checked={pinBody}
+          onChange={() => {
+            setPinBody(!pinBody);
+            props.utils.setMetadata({ pinBody: !pinBody });
+          }}></input>
+        <br></br>
+        Tail
+        <br></br>
+        <textarea
+          key={2}
+          rows={4}
+          cols={72}
+          value={code[2]}
+          onChange={(e) => {
+            const newCode = [...code];
+            newCode[2] = e.target.value;
+            setCode(newCode);
+          }}
+        />
+      </div>
       <br></br>
       <button onClick={runAndUpdateCode}>Run Highlighted Code</button>
       <br></br>
