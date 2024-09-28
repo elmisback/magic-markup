@@ -225,9 +225,13 @@ export class HelloWorldPanel {
   private _setFileEditListener(webview: Webview) {
     if (!this._isFileEditListenerSet) {
       vscode.workspace.onDidChangeTextDocument(() => {
+        const editor = vscode.window.activeTextEditor;
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "handleFileEdit",
+            data: {
+              position: editor?.document.offsetAt(editor.selection.start),
+            },
           })
         );
       });
