@@ -4,6 +4,7 @@ import { useDropzone } from "react-dropzone";
 import ReactMarkdown from "react-markdown";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
+import e from "cors";
 
 interface ImageData {
   file: File;
@@ -160,6 +161,8 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
+  const [apiResName, setApiResName] = useState<string>(props.value.metadata.apiResName || "");
+  const [apiRes, setApiRes] = useState<string>(props.value.metadata.apiRes || "");
   const [code, setCode] = useState<string[]>(props.value.metadata.code || [[""], [""], [""]]);
   const [pinBody, setPinBody] = useState<boolean>(props.value.metadata.pinBody || false);
 
@@ -178,7 +181,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
     return lines.join("\n");
   }
 
-  function runAndUpdateCode(): void {
+  async function runAndUpdateCode(): Promise<void> {
     try {
       let empty: Boolean = true;
       for (let i = 0; i < code.length; i++) {
@@ -186,6 +189,9 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           empty = false;
           break;
         }
+      }
+      if (apiRes !== "" && apiResName === "") {
+        empty = false;
       }
       if (empty) {
         props.utils.setMetadata({
@@ -195,23 +201,40 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         });
         return;
       }
-      let result = new Function(code.join("\n"))();
+
+      let joinedCode: string = code.join("\n");
+      if (apiRes !== "" && apiResName !== "") {
+        joinedCode = `const ${apiResName} = Promise.resolve(${apiRes});\n${joinedCode}`;
+      }
+
+      // Define async function to await promises inside the code
+      const asyncFunction = new Function(`return (async () => { ${joinedCode} })();`);
+
+      // Await the result of the async function
+      let result = await asyncFunction();
+
       if (result === undefined) {
-        const newCode: string = addReturn(code.join("\n"));
+        const newCode: string = addReturn(joinedCode);
         try {
-          result = new Function(newCode)();
+          const asyncReturnFunction = new Function(`return (async () => { ${newCode} })();`);
+          result = await asyncReturnFunction();
         } catch {}
       }
+
       props.utils.setMetadata({
         response: result || "Undefined",
         error: undefined,
-        code: code,
+        code,
+        apiRes,
+        apiResName,
       });
     } catch (e) {
       props.utils.setMetadata({
         response: undefined,
         error: e instanceof Error ? e.message : String(e),
-        code: code,
+        code,
+        apiRes,
+        apiResName,
       });
     }
   }
@@ -227,6 +250,20 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         </div>
       )}
       <div>
+        Cached API Response
+        <br></br>
+        Head Mock Response Variable Name:
+        <br></br>
+        <input value={apiResName} onChange={(e) => setApiResName(e.target.value)}></input>
+        <br></br>
+        Mock Response:
+        <textarea
+          key={3}
+          rows={4}
+          cols={72}
+          value={apiRes}
+          onChange={(e) => setApiRes(e.target.value)}
+        />
         Head
         <br></br>
         <textarea
