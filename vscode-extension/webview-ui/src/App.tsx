@@ -545,32 +545,35 @@ function App() {
    * @returns true if the annotations are up to date, false otherwise
    */
   const updateAnnotationDecorations = (position: number): void => {
-    if (annotations[0].document === currentDocument) {
+    if (annotations.length === 0 || annotations[0].document === currentDocument) {
       showAnnotations();
       return;
     }
 
     let disable: boolean = false;
     if (position !== -1) {
-      let newAnnotations: (Annotation | undefined)[];
+      let newAnnotations: Annotation[];
+      if (!currentDocument) {
+        return;
+      }
       newAnnotations = annotations.map((annotation) => {
-        if (annotation.end < position) {
-          return annotation;
-        } else if (position < annotation.start - 15 || position > annotation.end + 15) {
+        if (annotation.end + 15 < position) {
+          return { ...annotation, document: currentDocument };
+        } else if (position < annotation.start - 15) {
           console.log("Pushing annotations");
-          annotation.start += 1;
-          annotation.end += 1;
-          return annotation;
+          return {
+            ...annotation,
+            start: annotation.start + 1,
+            end: annotation.end + 1,
+            document: currentDocument,
+          };
         } else {
           disable = true;
-          return;
+          return annotation;
         }
       });
-      if (typeof newAnnotations[0] === "undefined") {
-        disable = true;
-      }
       if (!disable) {
-        setAnnotations(annotations);
+        setAnnotations(newAnnotations);
         showAnnotations();
       } else {
         hideAnnotations();
