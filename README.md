@@ -1,5 +1,31 @@
 # 🪄⚓ Magic Markup
 
+# Installation
+Clone this repo, then:
+```bash
+$ cd vscode-extension
+$ npm run install:all
+```
+and then, in VSCode, use Run and Debug > Run Extension to test the installation.
+
+You should see 3 terminals with build output open:  
+
+![image](https://github.com/user-attachments/assets/86b4af17-6f17-47f1-8115-218081df386e)
+
+If the system seems stuck after a recompile, you may need to enter one of these terminals and send a newline with enter to unstick the build, or you can just stop the Extension Host window and restart debugging.
+
+In the window that opens, navigate to `test.txt` in the `examples` directory, and then click the lightning bolt icon to open Codetations.  
+
+![image](https://github.com/user-attachments/assets/fd7ba386-06c4-4b4b-80fe-e9cf5a70ad41)
+
+If successful, you should see annotation highlights appear:  
+
+![image](https://github.com/user-attachments/assets/a665fc43-2159-4108-93c8-99c4a8ace3e1)
+
+# Old README below
+
+
+
 * Observable demo: https://observablehq.com/@elmisback/magic-markup-demo
 * Retagging function: https://observablehq.com/@elmisback/magic-markup-retag
 * Benchmark generation tools: https://observablehq.com/@elmisback/tcu-benchmark-generator
