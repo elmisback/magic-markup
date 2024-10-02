@@ -5,8 +5,9 @@ Clone this repo, then:
 ```bash
 $ cd vscode-extension
 $ npm run install:all
+$ code .   # Make sure to open the directory in a new VSCode window
 ```
-and then, in VSCode, use Run and Debug > Run Extension to test the installation.
+then use Run and Debug > Run Extension in the new VSCode window to test the installation.
 
 You should see 3 terminals with build output open:  
 
