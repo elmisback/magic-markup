@@ -2,7 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
-import React, { useState, useEffect, useRef } from "react";
+import React, { CSSProperties, useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
   document?: string;
@@ -43,13 +43,15 @@ function AnnotationEditorContainer(props: {
     }
   };
 
-  const style = {
+  const style: CSSProperties = {
     border:
       props.selectedAnnotationId === value.id
         ? "1px solid lightgreen"
         : props.hoveredAnnotationId === value.id
         ? "1px solid lightgray"
         : "1px solid transparent",
+    padding: "8px",
+    boxSizing: "border-box",
   };
 
   return (

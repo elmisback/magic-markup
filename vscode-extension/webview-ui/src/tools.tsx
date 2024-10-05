@@ -11,89 +11,10 @@ interface ImageData {
   src: string;
 }
 
-// const MarkdownComment: React.FC<AnnotationEditorProps> = (props) => {
-//   const [markdown, setMarkdown] = useState(props.value.metadata.markdown || "");
-//   const [uploadedImages, setUploadedImages] = useState<ImageData[]>(
-//     props.value.metadata.images || []
-//   );
-
-//   useEffect(() => {
-//     props.utils.setMetadata({ markdown, images: uploadedImages });
-//   }, [markdown, uploadedImages]);
-
-//   const onDrop = useCallback(
-//     (acceptedFiles: File[]) => {
-//       acceptedFiles.forEach((file) => {
-//         const reader = new FileReader();
-//         reader.onload = () => {
-//           const binaryStr = reader.result as string;
-//           const newImage: ImageData = { file, src: binaryStr };
-//           setUploadedImages((prev) => [...prev, newImage]);
-//           props.utils.setMetadata({
-//             markdown,
-//             images: [...uploadedImages, newImage],
-//           });
-//         };
-//         reader.readAsDataURL(file);
-//       });
-//     },
-//     [markdown, uploadedImages]
-//   );
-
-//   const { getRootProps, getInputProps } = useDropzone({ onDrop });
-
-//   const handleMarkdownChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-//     const newMarkdown = event.target.value;
-//     setMarkdown(newMarkdown);
-//     props.utils.setMetadata({
-//       markdown: newMarkdown,
-//       images: uploadedImages,
-//     });
-//   };
-
-//   const insertImage = (src: string) => {
-//     const newMarkdown = `${markdown}\n![image](${src})`;
-//     setMarkdown(newMarkdown);
-//     props.utils.setMetadata({
-//       markdown: newMarkdown,
-//       images: uploadedImages,
-//     });
-//   };
-
-//   return (
-//     <div>
-//       <textarea
-//         value={markdown}
-//         onChange={handleMarkdownChange}
-//         rows={10}
-//         cols={50}
-//         placeholder="Enter your markdown here..."
-//       />
-//       <div
-//         {...getRootProps()}
-//         style={{
-//           border: "1px dashed #ccc",
-//           padding: "20px",
-//           marginTop: "10px",
-//         }}>
-//         <input {...getInputProps()} />
-//         <p>Drag 'n' drop some files here, or click to select files</p>
-//       </div>
-//       <div style={{ marginTop: "10px" }}>
-//         {uploadedImages.map((img, index) => (
-//           <div key={index} style={{ marginBottom: "10px" }}>
-//             <img src={img.src} alt="Uploaded" style={{ maxWidth: "200px" }} />
-//             <button onClick={() => insertImage(img.src)}>Insert Image</button>
-//           </div>
-//         ))}
-//       </div>
-//       <div style={{ marginTop: "20px" }}>
-//         <h3>Preview</h3>
-//         <ReactMarkdown>{markdown}</ReactMarkdown>
-//       </div>
-//     </div>
-//   );
-// };
+const commonTextStyle: React.CSSProperties = {
+  fontFamily: "Arial, sans-serif",
+  fontSize: "14px",
+};
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
@@ -101,16 +22,43 @@ const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
       type="color"
       value={props.utils.getText()}
       onChange={(e) => props.utils.setText(e.target.value)}
+      style={commonTextStyle}
     />
   );
 };
 
 const Comment: React.FC<AnnotationEditorProps> = (props) => {
+  const [comment, setComment] = useState(props.value.metadata.comment || "");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      props.utils.setMetadata({ comment });
+    }, 3);
+
+    // TODO: update debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [comment]);
+
   return (
-    <textarea
-      value={props.value.metadata.comment || ""}
-      onChange={(e) => props.utils.setMetadata({ comment: e.target.value })}
-    />
+    <div style={{ marginBottom: "10px" }}>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Enter your comment here..."
+        style={{
+          ...commonTextStyle,
+          width: "100%",
+          height: "80px",
+          padding: "10px",
+          border: "1px solid #ccc",
+          borderRadius: "4px",
+        }}
+      />
+      <div style={{ marginTop: "5px", fontSize: "12px" }}>Author: erikv05</div>
+    </div>
   );
 };
 
@@ -129,7 +77,7 @@ const ImageUpload: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div>
-      <input type="file" accept="image/*" onChange={handleImageUpload} />
+      <input type="file" accept="image/*" onChange={handleImageUpload} style={commonTextStyle} />
       {props.value.metadata.image && <img src={props.value.metadata.image} alt="Uploaded" />}
     </div>
   );
@@ -150,10 +98,10 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
         value={htmlContent}
         onChange={handleChange}
         placeholder="Write your HTML code here"
-        style={{ width: "100%", height: "150px" }}
+        style={{ ...commonTextStyle, width: "100%", height: "150px" }}
       />
       <div style={{ marginTop: "10px", border: "1px solid #ccc", padding: "10px" }}>
-        <h3>Preview:</h3>
+        <h3 style={commonTextStyle}>Preview:</h3>
         <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
       </div>
     </div>
@@ -163,27 +111,22 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   const [apiResName, setApiResName] = useState<string>(props.value.metadata.apiResName || "");
   const [apiRes, setApiRes] = useState<string>(props.value.metadata.apiRes || "");
-  const [code, setCode] = useState<string[]>(props.value.metadata.code || [[""], [""], [""]]);
+  const [code, setCode] = useState<string[]>(props.value.metadata.code || ["", "", ""]);
   const [pinBody, setPinBody] = useState<boolean>(props.value.metadata.pinBody || false);
 
-  // Add a return statement to a code block if none is found.
   function addReturn(code: string): string {
-    // Match the last line in the string
-    const lines: string[] = code.trim().split("\n");
-
+    const lines = code.trim().split("\n");
     if (lines.length === 0) {
       return "";
     }
-
     const lastLine = lines[lines.length - 1];
     lines[lines.length - 1] = `return ${lastLine.trim()}`;
-
     return lines.join("\n");
   }
 
   async function runAndUpdateCode(): Promise<void> {
     try {
-      let empty: Boolean = true;
+      let empty = true;
       for (let i = 0; i < code.length; i++) {
         if (String(code[i]).trim() !== "") {
           empty = false;
@@ -202,19 +145,16 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         return;
       }
 
-      let joinedCode: string = code.join("\n");
+      let joinedCode = code.join("\n");
       if (apiRes !== "" && apiResName !== "") {
         joinedCode = `const ${apiResName} = Promise.resolve(${apiRes});\n${joinedCode}`;
       }
 
-      // Define async function to await promises inside the code
       const asyncFunction = new Function(`return (async () => { ${joinedCode} })();`);
-
-      // Await the result of the async function
       let result = await asyncFunction();
 
       if (result === undefined) {
-        const newCode: string = addReturn(joinedCode);
+        const newCode = addReturn(joinedCode);
         try {
           const asyncReturnFunction = new Function(`return (async () => { ${newCode} })();`);
           result = await asyncReturnFunction();
@@ -240,94 +180,167 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   }
 
   return (
-    <div>
+    <div style={{ marginBottom: "10px" }}>
       {props.value.metadata.error && (
-        <div style={{ color: "red" }}>An error occurred: {props.value.metadata.error}</div>
-      )}
-      {props.value.metadata.response && (
-        <div>
-          Response: &nbsp; <ObjectInspector data={props.value.metadata.response} />
+        <div style={{ color: "red", marginBottom: "10px", ...commonTextStyle }}>
+          An error occurred: {props.value.metadata.error}
         </div>
       )}
-      <div>
-        Cached API Response
-        <br></br>
-        Head Mock Response Variable Name:
-        <br></br>
-        <input value={apiResName} onChange={(e) => setApiResName(e.target.value)}></input>
-        <br></br>
-        Mock Response:
-        <textarea
-          key={3}
-          rows={4}
-          cols={72}
-          value={apiRes}
-          onChange={(e) => setApiRes(e.target.value)}
-        />
-        Head
-        <br></br>
-        <textarea
-          key={0}
-          rows={4}
-          cols={72}
-          value={code[0]}
-          onChange={(e) => {
-            const newCode = [...code];
-            newCode[0] = e.target.value;
-            setCode(newCode);
-          }}
-        />
-        Body
-        <br></br>
-        <textarea
-          key={1}
-          rows={4}
-          cols={72}
-          value={pinBody ? props.utils.getText() : code[1]}
-          onChange={(e) => {
-            if (!pinBody) {
+      {props.value.metadata.response && (
+        <div style={{ marginBottom: "10px", ...commonTextStyle }}>
+          <strong>Response:</strong> <ObjectInspector data={props.value.metadata.response} />
+        </div>
+      )}
+      <div style={{ marginBottom: "10px" }}>
+        <label style={commonTextStyle}>
+          <strong>Cached API Response</strong>
+        </label>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Mock Response Variable Name:</label>
+          <input
+            value={apiResName}
+            placeholder="Enter valid variable name here..."
+            onChange={(e) => setApiResName(e.target.value)}
+            style={{
+              ...commonTextStyle,
+              width: "100%",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Mock Response:</label>
+          <br></br>
+          <textarea
+            rows={4}
+            value={apiRes}
+            placeholder="Enter valid JavaScript object here..."
+            onChange={(e) => setApiRes(e.target.value)}
+            style={{
+              ...commonTextStyle,
+              width: "100%",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Head:</label>
+          <br></br>
+          <textarea
+            rows={4}
+            value={code[0]}
+            placeholder="Enter JS code here..."
+            onChange={(e) => {
               const newCode = [...code];
-              newCode[1] = e.target.value;
+              newCode[0] = e.target.value;
               setCode(newCode);
-            }
-          }}
-        />
-        <br></br>
-        Pin body to annotated document text:
-        <input
-          type="checkbox"
-          checked={pinBody}
-          onChange={() => {
-            setPinBody(!pinBody);
-            props.utils.setMetadata({ pinBody: !pinBody });
-          }}></input>
-        <br></br>
-        Tail
-        <br></br>
-        <textarea
-          key={2}
-          rows={4}
-          cols={72}
-          value={code[2]}
-          onChange={(e) => {
-            const newCode = [...code];
-            newCode[2] = e.target.value;
-            setCode(newCode);
-          }}
-        />
+            }}
+            style={{
+              ...commonTextStyle,
+              width: "100%",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Body:</label>
+          <br></br>
+          <textarea
+            rows={4}
+            placeholder="Enter JS code here..."
+            value={pinBody ? props.utils.getText() : code[1]}
+            onChange={(e) => {
+              if (!pinBody) {
+                const newCode = [...code];
+                newCode[1] = e.target.value;
+                setCode(newCode);
+              }
+            }}
+            style={{
+              ...commonTextStyle,
+              width: "100%",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+          <div>
+            <label style={commonTextStyle}>
+              <input
+                type="checkbox"
+                checked={pinBody}
+                onChange={() => {
+                  setPinBody(!pinBody);
+                  props.utils.setMetadata({ pinBody: !pinBody });
+                }}
+              />
+              Pin body to annotated document text
+            </label>
+          </div>
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Tail:</label>
+          <br></br>
+          <textarea
+            rows={4}
+            placeholder="Enter JS code here..."
+            value={code[2]}
+            onChange={(e) => {
+              const newCode = [...code];
+              newCode[2] = e.target.value;
+              setCode(newCode);
+            }}
+            style={{
+              ...commonTextStyle,
+              width: "100%",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
       </div>
-      <br></br>
-      <button onClick={runAndUpdateCode}>Run Highlighted Code</button>
-      <br></br>
-      <button
-        onClick={() =>
-          props.utils.setMetadata({
-            response: undefined,
-            error: undefined,
-          })
-        }>
-        Clear Output
-      </button>
+      <div style={{ marginBottom: "10px" }}>
+        <button
+          onClick={runAndUpdateCode}
+          style={{
+            marginRight: "10px",
+            ...commonTextStyle,
+            padding: "5px 10px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}>
+          Run Highlighted Code
+        </button>
+        <button
+          onClick={() =>
+            props.utils.setMetadata({
+              response: undefined,
+              error: undefined,
+            })
+          }
+          style={{
+            ...commonTextStyle,
+            padding: "5px 10px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}>
+          Clear Output
+        </button>
+      </div>
     </div>
   );
 };
@@ -339,7 +352,6 @@ export const tools = {
   comment: Comment,
   colorPicker: ColorPicker,
   runCodeSegment: RunCodeSegment,
-  // markdownComment: MarkdownComment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
 };
