@@ -3,7 +3,6 @@ import "./App.css";
 import Annotation from "./Annotation";
 import { tools } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
-import * as path from "path";
 
 interface AnnotationUpdate {
   document?: string;
@@ -358,7 +357,7 @@ function listenForEditorMessages(
   handleAddAnnotation: (start: number, end: number) => void,
   handleRemoveAnnotation: () => void,
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
-  updateAnnotationDecorations: () => void
+  updateAnnotationDecorations: (position: number) => void
 ) {
   const handleMessage = (event: any) => {
     console.debug("Codetations: webview received message:", event);
@@ -392,7 +391,7 @@ function listenForEditorMessages(
         handleChooseAnnType(data.start, data.end, data.documentContent);
         return;
       case "handleFileEdit":
-        updateAnnotationDecorations();
+        updateAnnotationDecorations(data.position);
         return;
       default:
         return;
@@ -523,7 +522,7 @@ function App() {
     );
     console.log("Annotation removed successfully");
     setAnnotations(newAnnotations);
-    updateAnnotationDecorations();
+    updateAnnotationDecorations(-1);
   };
 
   const hideAnnotations = () => {
@@ -538,17 +537,47 @@ function App() {
       data: { annotations },
     });
   };
+
   // Check if document content in annotations lines up with current document
-  const updateAnnotationDecorations = (): boolean => {
-    if (annotations.length === 0) {
-      hideAnnotations();
-      return true;
-    } else if (annotations[0].document === currentDocument) {
+  /**
+   *
+   * @param position the position of the cursor
+   * @returns true if the annotations are up to date, false otherwise
+   */
+  const updateAnnotationDecorations = (position: number): void => {
+    if (annotations.length === 0 || annotations[0].document === currentDocument) {
       showAnnotations();
-      return true;
-    } else {
-      hideAnnotations();
-      return false;
+      return;
+    }
+
+    let disable: boolean = false;
+    if (position !== -1) {
+      let newAnnotations: Annotation[];
+      if (!currentDocument) {
+        return;
+      }
+      newAnnotations = annotations.map((annotation) => {
+        if (annotation.end + 15 < position) {
+          return { ...annotation, document: currentDocument };
+        } else if (position < annotation.start - 15) {
+          console.log("Pushing annotations");
+          return {
+            ...annotation,
+            start: annotation.start + 1,
+            end: annotation.end + 1,
+            document: currentDocument,
+          };
+        } else {
+          disable = true;
+          return annotation;
+        }
+      });
+      if (!disable) {
+        setAnnotations(newAnnotations);
+        showAnnotations();
+      } else {
+        hideAnnotations();
+      }
     }
   };
 
@@ -563,7 +592,6 @@ function App() {
   const defaultTool: string | undefined =
     Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState(defaultTool as string | undefined);
-  const [isFresh, setIsFresh] = useState(updateAnnotationDecorations());
   // Other configuration
   const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
   const [confirmAnnotation, setConfirmAnnotation] = useState(false);
