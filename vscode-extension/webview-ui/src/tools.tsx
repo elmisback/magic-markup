@@ -203,7 +203,6 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             onChange={(e) => setApiResName(e.target.value)}
             style={{
               ...commonTextStyle,
-              width: "100%",
               marginBottom: "10px",
               padding: "5px",
               border: "1px solid #ccc",
