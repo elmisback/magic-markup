@@ -23,6 +23,10 @@
         "title": "Remove Annotation"
       },
       {
+        "command": "hello-world.setAnnotationColor",
+        "title": "Set Annotation Color"
+      },
+      {
         "command": "hello-world.sendTestMessage",
         "title": "Hello World (React + Vite): Test"
       },
@@ -39,6 +43,10 @@
         },
         {
           "command": "hello-world.removeAnnotation",
+          "group": "navigation"
+        },
+        {
+          "command": "hello-world.setAnnotationColor",
           "group": "navigation"
         }
       ],

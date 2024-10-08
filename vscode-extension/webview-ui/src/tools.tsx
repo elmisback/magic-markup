@@ -57,7 +57,7 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           borderRadius: "4px",
         }}
       />
-      <div style={{ marginTop: "5px", fontSize: "12px" }}>Author: erikv05</div>
+      <div style={{ marginTop: "5px", fontSize: "12px" }}>Author: Test User</div>
     </div>
   );
 };

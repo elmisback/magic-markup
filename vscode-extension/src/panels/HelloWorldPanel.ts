@@ -101,6 +101,21 @@ export class HelloWorldPanel {
     );
   }
 
+  public setAnnotationColor(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
+    // Get the color from the user
+    vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
+      this._panel.webview.postMessage(
+        JSON.stringify({
+          command: "setAnnotationColor",
+          data: {
+            color: color,
+          },
+        })
+      );
+    });
+  }
+
   /**
    * Renders the current webview panel if it exists otherwise a new webview panel
    * will be created and displayed.
@@ -299,7 +314,10 @@ export class HelloWorldPanel {
       backgroundColor: "rgba(255,255,0,0.3)", // Yellow highlight with some transparency
     });
     // Function to show annotations
-    const updateDecorations = (annotations: { start: number; end: number }[]) => {
+    const updateDecorations = (annotations: { start: number; end: number, metadata: { color: 'string' } }[]) => {
+      if (!vscode.window.activeTextEditor?.document.fileName) {
+        return;
+      }
       const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
         window.showErrorMessage(
@@ -311,10 +329,25 @@ export class HelloWorldPanel {
       const decorations: vscode.DecorationOptions[] = annotations.map((annotation) => {
         const startPos = editor.document.positionAt(annotation.start);
         const endPos = editor.document.positionAt(annotation.end);
-        return { range: new vscode.Range(startPos, endPos) };
+        return {
+          range: new vscode.Range(startPos, endPos), renderOptions: {
+            after: {
+              backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)"
+            }
+          }
+        };
       });
 
-      editor.setDecorations(annotationDecorationType, decorations);
+      // editor.setDecorations(annotationDecorationType, decorations);
+      // instead, we create a new decoration type with the color specified in the annotation
+      annotations.map((annotation) => {
+        const startPos = editor.document.positionAt(annotation.start);
+        const endPos = editor.document.positionAt(annotation.end);
+        const decorationType = vscode.window.createTextEditorDecorationType({
+          backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)"
+        });
+        editor.setDecorations(decorationType, [new vscode.Range(startPos, endPos)]);
+      });
     };
 
     // Function to clear annotations from editor

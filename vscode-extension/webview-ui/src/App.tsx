@@ -358,6 +358,7 @@ function listenForEditorMessages(
   setRetagServerURL: (retagServerURL: string) => void,
   handleAddAnnotation: (start: number, end: number) => void,
   handleRemoveAnnotation: () => void,
+  handleSetAnnotationColor: (color: string) => void,
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
   updateAnnotationDecorations: (position: number) => void
 ) {
@@ -388,6 +389,9 @@ function listenForEditorMessages(
         return;
       case "removeAnnotation":
         handleRemoveAnnotation();
+        return;
+      case "setAnnotationColor":
+        handleSetAnnotationColor(data.color);
         return;
       case "chooseAnnotationType":
         handleChooseAnnType(data.start, data.end, data.documentContent);
@@ -527,6 +531,26 @@ function App() {
     updateAnnotationDecorations(-1);
   };
 
+  const handleSetAnnotationColor = (color: string) => {
+    const selectedAnnotation = annotations.find(
+      (annotation) => annotation.id === selectedAnnotationId
+    );
+
+    if (!selectedAnnotation) {
+      showErrorMessage("Error setting annotation color: no selected annotation");
+      return;
+    }
+
+    const updatedAnnotations = annotations.map((annotation) =>
+      annotation.id === selectedAnnotationId
+        ? { ...annotation, metadata: { ...annotation.metadata, color } }
+        : annotation
+    );
+
+    setAnnotations(updatedAnnotations);
+    showAnnotations();
+  }
+
   const hideAnnotations = () => {
     vscode.postMessage({
       command: "hideAnnotations",
@@ -607,6 +631,7 @@ function App() {
     setRetagServerURL,
     handleAddAnnotation,
     handleRemoveAnnotation,
+    handleSetAnnotationColor,
     handleChooseAnnType,
     updateAnnotationDecorations
   );

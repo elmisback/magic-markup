@@ -218,10 +218,16 @@ export function activate(context: ExtensionContext) {
     HelloWorldPanel.currentPanel?.removeAnnotation();
   });
 
+  // Command for setting annotation color
+  const setAnnotationColorCommand = commands.registerCommand("hello-world.setAnnotationColor", () => {
+    HelloWorldPanel.currentPanel?.setAnnotationColor();
+  });
+
   context.subscriptions.push(
     showHelloWorldCommand,
     sendMessageCommand,
     addAnnotationsCommand,
-    removeAnnotationsCommand
+    removeAnnotationsCommand,
+    setAnnotationColorCommand,
   );
 }
