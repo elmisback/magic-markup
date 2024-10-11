@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
+import "./App.css";
 
 interface ImageData {
   file: File;
@@ -47,21 +48,20 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
   }, [comment]);
 
   return (
-    <div style={{ marginBottom: "10px" }}>
+    <div style={{ marginBottom: "10px", width: "280px" }}>
       <textarea
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="Enter your comment here..."
-        style={{
-          ...commonTextStyle,
-          width: "100%",
-          height: "80px",
-          padding: "10px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
-        }}
+        className="textarea"
       />
-      <div style={{ fontFamily: "Poppins, sans-serif", marginTop: "5px", fontSize: "12px" }}>
+      <div
+        style={{
+          fontFamily: "Poppins, sans-serif",
+          marginTop: "5px",
+          fontSize: "12px",
+          color: "black",
+        }}>
         Author: Test User
       </div>
     </div>
@@ -104,7 +104,7 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
         value={htmlContent}
         onChange={handleChange}
         placeholder="Write your HTML code here"
-        style={{ ...commonTextStyle, width: "100%", height: "150px" }}
+        className="textarea"
       />
       <div style={{ marginTop: "10px", border: "1px solid #ccc", padding: "10px" }}>
         <h3 style={commonTextStyle}>Preview:</h3>
@@ -225,14 +225,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             value={apiRes}
             placeholder="Enter valid JavaScript object here..."
             onChange={(e) => setApiRes(e.target.value)}
-            style={{
-              ...commonTextStyle,
-              width: "100%",
-              marginBottom: "10px",
-              padding: "5px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-            }}
+            className="textarea"
           />
         </div>
         <div style={{ marginBottom: "10px" }}>
@@ -247,14 +240,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
               newCode[0] = e.target.value;
               setCode(newCode);
             }}
-            style={{
-              ...commonTextStyle,
-              width: "100%",
-              marginBottom: "10px",
-              padding: "5px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-            }}
+            className="textarea"
           />
         </div>
         <div style={{ marginBottom: "10px" }}>
@@ -306,14 +292,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
               newCode[2] = e.target.value;
               setCode(newCode);
             }}
-            style={{
-              ...commonTextStyle,
-              width: "100%",
-              marginBottom: "10px",
-              padding: "5px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-            }}
+            className="textarea"
           />
         </div>
       </div>

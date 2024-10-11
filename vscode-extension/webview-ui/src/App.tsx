@@ -132,7 +132,7 @@ function AnnotationSidebarView(props: {
   });
 
   return (
-    <>
+    <div style={{ padding: "10px" }}>
       <svg
         width="30"
         height="30"
@@ -177,7 +177,7 @@ function AnnotationSidebarView(props: {
           />
         </div>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -368,7 +368,7 @@ function listenForEditorMessages(
   handleRemoveAnnotation: () => void,
   handleSetAnnotationColor: (color: string) => void,
   handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
-  updateAnnotationDecorations: (position: number) => void
+  updateAnnotationDecorations: () => void
 ) {
   const handleMessage = (event: any) => {
     console.debug("Codetations: webview received message:", event);
@@ -405,7 +405,7 @@ function listenForEditorMessages(
         handleChooseAnnType(data.start, data.end, data.documentContent);
         return;
       case "handleFileEdit":
-        updateAnnotationDecorations(data.position);
+        updateAnnotationDecorations();
         return;
       default:
         return;
@@ -536,7 +536,7 @@ function App() {
     );
     console.log("Annotation removed successfully");
     setAnnotations(newAnnotations);
-    updateAnnotationDecorations(-1);
+    updateAnnotationDecorations();
   };
 
   const handleSetAnnotationColor = (color: string) => {
@@ -578,41 +578,42 @@ function App() {
    * @param position the position of the cursor
    * @returns true if the annotations are up to date, false otherwise
    */
-  const updateAnnotationDecorations = (position: number): void => {
+  const updateAnnotationDecorations = (): void => {
     if (annotations.length === 0 || annotations[0].document === currentDocument) {
       showAnnotations();
-      return;
+    } else {
+      hideAnnotations();
     }
 
-    let disable: boolean = false;
-    if (position !== -1) {
-      let newAnnotations: Annotation[];
-      if (!currentDocument) {
-        return;
-      }
-      newAnnotations = annotations.map((annotation) => {
-        if (annotation.end + 15 < position) {
-          return { ...annotation, document: currentDocument };
-        } else if (position < annotation.start - 15) {
-          console.log("Pushing annotations");
-          return {
-            ...annotation,
-            start: annotation.start + 1,
-            end: annotation.end + 1,
-            document: currentDocument,
-          };
-        } else {
-          disable = true;
-          return annotation;
-        }
-      });
-      if (!disable) {
-        setAnnotations(newAnnotations);
-        showAnnotations();
-      } else {
-        hideAnnotations();
-      }
-    }
+    // let disable: boolean = false;
+    // if (position !== -1) {
+    //   let newAnnotations: Annotation[];
+    //   if (!currentDocument) {
+    //     return;
+    //   }
+    //   newAnnotations = annotations.map((annotation) => {
+    //     if (annotation.end + 15 < position) {
+    //       return { ...annotation, document: currentDocument };
+    //     } else if (position < annotation.start - 15) {
+    //       console.log("Pushing annotations");
+    //       return {
+    //         ...annotation,
+    //         start: annotation.start + 1,
+    //         end: annotation.end + 1,
+    //         document: currentDocument,
+    //       };
+    //     } else {
+    //       disable = true;
+    //       return annotation;
+    //     }
+    //   });
+    //   if (!disable) {
+    //     setAnnotations(newAnnotations);
+    //     showAnnotations();
+    //   } else {
+    //     hideAnnotations();
+    //   }
+    // }
   };
 
   // Transient editor + UI state

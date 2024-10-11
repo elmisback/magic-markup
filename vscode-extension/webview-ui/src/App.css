@@ -20,8 +20,21 @@ main {
   margin-bottom: 10px; /* Space between tiles */
   border-radius: 5px; /* Rounded corners */
   transition: background-color 0.3s; /* Smooth transition for background color */
+  width: 300px;
 }
 
 .annotation-tile.selected {
   background-color: #e0e0e0; /* Slightly darker background when selected */
+}
+
+textarea {
+  resize: vertical;
+  width: 280px;
+  height: 80px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  color: black;
 }

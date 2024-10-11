@@ -244,9 +244,6 @@ export class HelloWorldPanel {
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "handleFileEdit",
-            data: {
-              position: editor?.document.offsetAt(editor.selection.start),
-            },
           })
         );
       });
@@ -314,7 +311,9 @@ export class HelloWorldPanel {
       backgroundColor: "rgba(255,255,0,0.3)", // Yellow highlight with some transparency
     });
     // Function to show annotations
-    const updateDecorations = (annotations: { start: number; end: number, metadata: { color: 'string' } }[]) => {
+    const updateDecorations = (
+      annotations: { start: number; end: number; metadata: { color: "string" } }[]
+    ) => {
       if (!vscode.window.activeTextEditor?.document.fileName) {
         return;
       }
@@ -330,11 +329,12 @@ export class HelloWorldPanel {
         const startPos = editor.document.positionAt(annotation.start);
         const endPos = editor.document.positionAt(annotation.end);
         return {
-          range: new vscode.Range(startPos, endPos), renderOptions: {
+          range: new vscode.Range(startPos, endPos),
+          renderOptions: {
             after: {
-              backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)"
-            }
-          }
+              backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)",
+            },
+          },
         };
       });
 
@@ -344,7 +344,7 @@ export class HelloWorldPanel {
         const startPos = editor.document.positionAt(annotation.start);
         const endPos = editor.document.positionAt(annotation.end);
         const decorationType = vscode.window.createTextEditorDecorationType({
-          backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)"
+          backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)",
         });
         editor.setDecorations(decorationType, [new vscode.Range(startPos, endPos)]);
       });
