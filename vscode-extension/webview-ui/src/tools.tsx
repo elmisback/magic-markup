@@ -12,18 +12,22 @@ interface ImageData {
 }
 
 const commonTextStyle: React.CSSProperties = {
-  fontFamily: "Arial, sans-serif",
+  fontFamily: "Poppins, sans-serif",
   fontSize: "14px",
+  color: "black",
 };
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
   return (
-    <input
-      type="color"
-      value={props.utils.getText()}
-      onChange={(e) => props.utils.setText(e.target.value)}
-      style={commonTextStyle}
-    />
+    <div className="center-vertical">
+      <label style={{ ...commonTextStyle, marginRight: "10px" }}>Selected Color: </label>
+      <input
+        type="color"
+        value={props.utils.getText()}
+        onChange={(e) => props.utils.setText(e.target.value)}
+        style={commonTextStyle}
+      />
+    </div>
   );
 };
 
@@ -57,7 +61,9 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           borderRadius: "4px",
         }}
       />
-      <div style={{ marginTop: "5px", fontSize: "12px" }}>Author: Test User</div>
+      <div style={{ fontFamily: "Poppins, sans-serif", marginTop: "5px", fontSize: "12px" }}>
+        Author: Test User
+      </div>
     </div>
   );
 };
@@ -197,6 +203,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
         </label>
         <div style={{ marginBottom: "10px" }}>
           <label style={commonTextStyle}>Mock Response Variable Name:</label>
+          <br />
           <input
             value={apiResName}
             placeholder="Enter valid variable name here..."
