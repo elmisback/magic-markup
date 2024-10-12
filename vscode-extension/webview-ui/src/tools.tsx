@@ -214,6 +214,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
               padding: "5px",
               border: "1px solid #ccc",
               borderRadius: "4px",
+              width: "240px",
             }}
           />
         </div>
