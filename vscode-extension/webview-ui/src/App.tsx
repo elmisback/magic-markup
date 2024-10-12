@@ -480,8 +480,6 @@ function App() {
     }
 
     // Ensure all required variables for annotation are defined
-    console.log("START: " + start);
-    console.log("END: " + end);
     if (start === end) {
       showErrorMessage("Error adding annotations: selection must not be empty");
       return;
@@ -509,6 +507,7 @@ function App() {
     };
     setAnnotations([...annotations, newAnnotation]);
     setTempDocumentContent(undefined);
+    updateAnnotationDecorations();
   };
 
   const annotations = annotationState?.annotations || [];
@@ -559,17 +558,23 @@ function App() {
     showAnnotations();
   };
 
+  const [annotationsShown, setAnnotationsShown] = useState(false);
+
   const hideAnnotations = () => {
+    setAnnotationsShown(false);
     vscode.postMessage({
       command: "hideAnnotations",
     });
   };
 
   const showAnnotations = () => {
-    vscode.postMessage({
-      command: "showAnnotations",
-      data: { annotations },
-    });
+    if (!annotationsShown) {
+      vscode.postMessage({
+        command: "showAnnotations",
+        data: { annotations },
+      });
+      setAnnotationsShown(true);
+    }
   };
 
   // Check if document content in annotations lines up with current document
@@ -579,7 +584,11 @@ function App() {
    * @returns true if the annotations are up to date, false otherwise
    */
   const updateAnnotationDecorations = (): void => {
-    if (annotations.length === 0 || annotations[0].document === currentDocument) {
+    console.log("ann doc: " + annotations[0].document);
+    console.log("doc: " + currentDocument);
+    if (annotations.length == 0) {
+      showAnnotations();
+    } else if (annotations[0].document === currentDocument) {
       showAnnotations();
     } else {
       hideAnnotations();

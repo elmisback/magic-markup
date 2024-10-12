@@ -22,6 +22,7 @@ export class HelloWorldPanel {
   private _prevTextEditor: vscode.TextEditor | undefined;
   private _isFileEditListenerSet: boolean = false;
   private _isCursorPositionListenerSet: boolean = false;
+  private _prevDecorationTypes: vscode.TextEditorDecorationType[] = [];
 
   /**
    * The HelloWorldPanel class private constructor (called only from the render method).
@@ -325,29 +326,19 @@ export class HelloWorldPanel {
         return;
       }
 
-      const decorations: vscode.DecorationOptions[] = annotations.map((annotation) => {
-        const startPos = editor.document.positionAt(annotation.start);
-        const endPos = editor.document.positionAt(annotation.end);
-        return {
-          range: new vscode.Range(startPos, endPos),
-          renderOptions: {
-            after: {
-              backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)",
-            },
-          },
-        };
-      });
-
       // editor.setDecorations(annotationDecorationType, decorations);
       // instead, we create a new decoration type with the color specified in the annotation
+      const types: vscode.TextEditorDecorationType[] = [];
       annotations.map((annotation) => {
         const startPos = editor.document.positionAt(annotation.start);
         const endPos = editor.document.positionAt(annotation.end);
         const decorationType = vscode.window.createTextEditorDecorationType({
           backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)",
         });
+        types.push(decorationType);
         editor.setDecorations(decorationType, [new vscode.Range(startPos, endPos)]);
       });
+      this._prevDecorationTypes = types;
     };
 
     // Function to clear annotations from editor
@@ -360,7 +351,9 @@ export class HelloWorldPanel {
         return;
       }
 
-      editor.setDecorations(annotationDecorationType, []);
+      this._prevDecorationTypes.map((type) => {
+        editor.setDecorations(type, []);
+      });
     };
 
     webview.onDidReceiveMessage(
