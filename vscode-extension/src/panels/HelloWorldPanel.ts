@@ -324,10 +324,6 @@ export class HelloWorldPanel {
    * @param context A reference to the extension context
    */
   private _setWebviewMessageListener(webview: Webview) {
-    // Create a decoration type
-    const annotationDecorationType = vscode.window.createTextEditorDecorationType({
-      backgroundColor: "rgba(255,255,0,0.3)", // Yellow highlight with some transparency
-    });
     // Function to show annotations
     const updateDecorations = (
       annotations: { start: number; end: number; metadata: { color: "string" } }[]
@@ -342,6 +338,8 @@ export class HelloWorldPanel {
         );
         return;
       }
+
+      this.clearDecorations();
 
       // editor.setDecorations(annotationDecorationType, decorations);
       // instead, we create a new decoration type with the color specified in the annotation

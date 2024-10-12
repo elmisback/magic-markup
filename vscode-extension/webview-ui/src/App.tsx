@@ -558,23 +558,17 @@ function App() {
     showAnnotations();
   };
 
-  const [annotationsShown, setAnnotationsShown] = useState(false);
-
   const hideAnnotations = () => {
-    setAnnotationsShown(false);
     vscode.postMessage({
       command: "hideAnnotations",
     });
   };
 
   const showAnnotations = () => {
-    if (!annotationsShown) {
-      vscode.postMessage({
-        command: "showAnnotations",
-        data: { annotations },
-      });
-      setAnnotationsShown(true);
-    }
+    vscode.postMessage({
+      command: "showAnnotations",
+      data: { annotations },
+    });
   };
 
   // Check if document content in annotations lines up with current document
@@ -584,8 +578,6 @@ function App() {
    * @returns true if the annotations are up to date, false otherwise
    */
   const updateAnnotationDecorations = (): void => {
-    console.log("ann doc: " + annotations[0].document);
-    console.log("doc: " + currentDocument);
     if (annotations.length == 0) {
       showAnnotations();
     } else if (annotations[0].document === currentDocument) {
