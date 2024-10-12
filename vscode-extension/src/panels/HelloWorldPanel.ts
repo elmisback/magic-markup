@@ -117,6 +117,21 @@ export class HelloWorldPanel {
     });
   }
 
+  // Function to clear annotations from editor
+  public clearDecorations = () => {
+    const editor = vscode.window.activeTextEditor || this._prevTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage(
+        "Error hiding annotations: no active or previously active text editor"
+      );
+      return;
+    }
+
+    this._prevDecorationTypes.map((type) => {
+      editor.setDecorations(type, []);
+    });
+  };
+
   /**
    * Renders the current webview panel if it exists otherwise a new webview panel
    * will be created and displayed.
@@ -186,6 +201,8 @@ export class HelloWorldPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
+    HelloWorldPanel.currentPanel?.clearDecorations();
+
     HelloWorldPanel.currentPanel = undefined;
 
     // Dispose of the current webview panel
@@ -341,21 +358,6 @@ export class HelloWorldPanel {
       this._prevDecorationTypes = types;
     };
 
-    // Function to clear annotations from editor
-    const clearDecorations = () => {
-      const editor = vscode.window.activeTextEditor || this._prevTextEditor;
-      if (!editor) {
-        vscode.window.showErrorMessage(
-          "Error hiding annotations: no active or previously active text editor"
-        );
-        return;
-      }
-
-      this._prevDecorationTypes.map((type) => {
-        editor.setDecorations(type, []);
-      });
-    };
-
     webview.onDidReceiveMessage(
       (message: any) => {
         const command = message.command;
@@ -374,7 +376,7 @@ export class HelloWorldPanel {
             updateDecorations(message.data.annotations);
             return;
           case "hideAnnotations":
-            clearDecorations();
+            this.clearDecorations();
             return;
         }
       },
