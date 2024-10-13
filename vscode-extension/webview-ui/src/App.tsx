@@ -45,16 +45,6 @@ function AnnotationEditorContainer(props: {
 
   return (
     <div className="annotation-container" onClick={handleClick}>
-      {/* <h2>Annotation</h2>*/}
-      {/* <div>Start: {value.start}</div>
-      <div>End: {value.end}</div>
-      <div>Document: {value.document}</div>
-      <div>Tool: {value.tool}</div>
-      <div>Metadata: {JSON.stringify(value.metadata)}</div>
-      <div>Original Document: {value.original.document}</div>
-      <div>Original Start: {value.original.start}</div>
-      <div>Original End: {value.original.end}</div> */}
-      {/* <div>Editor:</div> */}
       {toolTypes[value.tool]?.({
         value,
         setValue: (v: AnnotationUpdate) =>
@@ -115,9 +105,13 @@ function AnnotationSidebarView(props: {
   };
 
   useEffect(() => {
-    if (charNum !== undefined) {
+    if (charNum) {
       const closestAnnotationIndex = findClosestAnnotationIndex(annotations, charNum);
-      if (closestAnnotationIndex !== -1 && annotationRefs.current[closestAnnotationIndex]) {
+      if (
+        closestAnnotationIndex !== -1 &&
+        annotationRefs &&
+        annotationRefs.current[closestAnnotationIndex]
+      ) {
         annotationRefs.current[closestAnnotationIndex]?.scrollIntoView({ behavior: "smooth" });
       }
     }
@@ -578,7 +572,7 @@ function App() {
    * @returns true if the annotations are up to date, false otherwise
    */
   const updateAnnotationDecorations = (): void => {
-    if (annotations.length == 0) {
+    if (annotations.length === 0) {
       showAnnotations();
     } else if (annotations[0].document === currentDocument) {
       showAnnotations();
