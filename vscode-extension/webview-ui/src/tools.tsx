@@ -33,19 +33,36 @@ const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const Comment: React.FC<AnnotationEditorProps> = (props) => {
+  type Reply = {
+    datetime: string;
+    text: string;
+  };
+
   const [comment, setComment] = useState(props.value.metadata.comment || "");
+  const [replies, setReplies] = useState<Reply[]>(props.value.metadata.replies || []);
+  const [newReplyText, setNewReplyText] = useState("");
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      props.utils.setMetadata({ comment });
-    }, 3);
-
-    // TODO: update debounce
+      props.utils.setMetadata({ comment, replies });
+    }, 300);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [comment]);
+  }, [comment, replies]);
+
+  const handleAddReply = () => {
+    if (newReplyText.trim() !== "") {
+      setReplies([...replies, { text: newReplyText, datetime: new Date().toLocaleString() }]);
+      setNewReplyText("");
+    }
+  };
+
+  const handleDeleteReply = (index: number) => {
+    const newReplies = replies.filter((_, i) => i !== index);
+    setReplies(newReplies);
+  };
 
   return (
     <div style={{ marginBottom: "10px", width: "280px" }}>
@@ -63,6 +80,43 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           color: "black",
         }}>
         Author: Test User
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <strong style={{ color: "#525252" }}>Replies:</strong>
+        {replies.map((reply, index) => (
+          <div
+            key={index}
+            onClick={() => handleDeleteReply(index)}
+            style={{
+              marginTop: "5px",
+              paddingLeft: "10px",
+              borderLeft: "2px solid #ccc",
+              color: "#525252",
+              cursor: "pointer",
+            }}>
+            <i>Test User on {reply.datetime}:</i> {reply.text}
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <textarea
+          value={newReplyText}
+          onChange={(e) => setNewReplyText(e.target.value)}
+          placeholder="Enter your reply here..."
+          className="textarea"
+        />
+        <button
+          onClick={handleAddReply}
+          style={{
+            marginTop: "5px",
+            ...commonTextStyle,
+            padding: "5px 10px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}>
+          Add Reply
+        </button>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ main {
   justify-content: center;
   align-items: flex-start;
   height: 100%;
+  padding: 10px;
 }
 
 .center-vertical {
