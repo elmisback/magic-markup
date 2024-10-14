@@ -7,6 +7,7 @@ import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
 
+type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
   file: File;
   src: string;
@@ -18,7 +19,7 @@ const commonTextStyle: React.CSSProperties = {
   color: "black",
 };
 
-const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+const ColorPicker: AnnotationType = (props) => {
   return (
     <div className="color-picker">
       <input
