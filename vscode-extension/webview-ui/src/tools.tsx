@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
+import './tools.css';
 
 interface ImageData {
   file: File;
@@ -18,22 +19,16 @@ const commonTextStyle: React.CSSProperties = {
 };
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
-  // allow color name to be set
-  const [colorName, setColorName] = useState(props.value.metadata.colorName || "");
-
-  const handleColorNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setColorName(e.target.value);
-    props.utils.setMetadata({ colorName: e.target.value });
-  }
-
   return (
-    <div className="color-picker" style={{display: 'flex', gap: '5px'}}>
-      <input value={colorName} style={{ width: "30%", backgroundColor: 'transparent', border: "2px solid #ccc", borderRadius: '4px' }} onChange={handleColorNameChange}></input>
+    <div className="color-picker">
+      <input
+        value={props.value.metadata.colorName}
+        onChange={(e) => props.utils.setMetadata({ colorName: e.target.value })}
+      />
       <input
         type="color"
         value={props.utils.getText()}
         onChange={(e) => props.utils.setText(e.target.value)}
-        style={commonTextStyle}
       />
     </div>
   );
@@ -94,20 +89,12 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           fontSize: "12px",
         }}
         />
-        {/* <div
-          contentEditable='true'
-          style={{
-            padding: "4px",
-            width: "100%",
-            // border: "1px solid #ccc",
-            // borderRadius: "4px",
-          }}
-          onChange={(e) => setComment(e.currentTarget.textContent)}
-        >
-          {comment}
-        </div> */}
-
-        </div>
+      </div>
+      {/* reply button */}
+      <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginLeft: '40px' }}>
+        ⤷
+        <div style={{ fontSize: '12px' }}>Reply</div>
+      </div>
       
     </div>
   );
