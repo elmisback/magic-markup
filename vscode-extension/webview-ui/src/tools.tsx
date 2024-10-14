@@ -18,9 +18,17 @@ const commonTextStyle: React.CSSProperties = {
 };
 
 const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+  // allow color name to be set
+  const [colorName, setColorName] = useState(props.value.metadata.colorName || "");
+
+  const handleColorNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setColorName(e.target.value);
+    props.utils.setMetadata({ colorName: e.target.value });
+  }
+
   return (
-    <div className="center-vertical">
-      <label style={{ ...commonTextStyle, marginRight: "10px" }}>Selected Color: </label>
+    <div className="color-picker" style={{display: 'flex', gap: '5px'}}>
+      <input value={colorName} style={{ width: "30%", backgroundColor: 'transparent', border: "2px solid #ccc", borderRadius: '4px' }} onChange={handleColorNameChange}></input>
       <input
         type="color"
         value={props.utils.getText()}
@@ -48,6 +56,28 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div style={{ marginBottom: "10px" }}>
+      <div style={{ fontFamily: "Poppins, sans-serif", display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ fontWeight: 'bold', fontSize: "12px" }}>Alex Smith</div>
+        <div style={{
+          fontSize: "10px", 
+          // align bottom of line
+         }}>Today at 12:00 PM</div>
+      </div>
+      <div style={{ display: 'flex' }}>
+        {/* user icon */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="30"
+          height="30"
+          fill="currentColor"
+          viewBox="0 0 64 64"
+          style={{ margin: "10px", marginLeft: "5px" }}
+        >
+          <circle cx="32" cy="32" r="30" fill="none" stroke="#999" stroke-width="2"/>
+          <circle cx="32" cy="20" r="12" fill="#ccc" stroke="#999" stroke-width="2"/>
+          <path d="M16 52c0-8.8 7.2-16 16-16s16 7.2 16 16v4H16v-4z" fill="#ccc" stroke="#999" stroke-width="2"/>
+        </svg>
+      
       <textarea
         value={comment}
         onChange={(e) => setComment(e.target.value)}
@@ -56,14 +86,29 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           ...commonTextStyle,
           width: "calc(100% - 22px)",
           height: "80px",
-          padding: "10px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
+          padding: "4px",
+          border: "none", //"1px solid #ccc",
+          // borderRadius: "4px",
+          backgroundColor: "transparent",
+          lineHeight: "16px",
+          fontSize: "12px",
         }}
-      />
-      <div style={{ fontFamily: "Poppins, sans-serif", marginTop: "5px", fontSize: "12px" }}>
-        Author: Test User
-      </div>
+        />
+        {/* <div
+          contentEditable='true'
+          style={{
+            padding: "4px",
+            width: "100%",
+            // border: "1px solid #ccc",
+            // borderRadius: "4px",
+          }}
+          onChange={(e) => setComment(e.currentTarget.textContent)}
+        >
+          {comment}
+        </div> */}
+
+        </div>
+      
     </div>
   );
 };
@@ -90,7 +135,10 @@ const ImageUpload: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
-  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || "");
+  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || 
+    //get text
+    props.utils.getText() || ""
+  );
 
   const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (e) => {
     const newHtmlContent = e.target.value;
@@ -100,17 +148,14 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div>
-      <textarea
+      {/* <textarea
         value={htmlContent}
         onChange={handleChange}
         placeholder="Write your HTML code here"
         style={{ ...commonTextStyle, width: "100%", height: "150px" }}
-      />
-      <div style={{ marginTop: "10px", border: "1px solid #ccc", padding: "10px" }}>
-        <h3 style={commonTextStyle}>Preview:</h3>
-        <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-      </div>
-    </div>
+      /> */}
+      <div dangerouslySetInnerHTML={{ __html: htmlContent }} style={{ height: '50px', resize: 'both', overflow: 'auto', border: "1px solid #ccc", }} />
+    </div >
   );
 };
 
@@ -119,6 +164,8 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   const [apiRes, setApiRes] = useState<string>(props.value.metadata.apiRes || "");
   const [code, setCode] = useState<string[]>(props.value.metadata.code || ["", "", ""]);
   const [pinBody, setPinBody] = useState<boolean>(props.value.metadata.pinBody || false);
+  const [showHead, setShowHead] = useState<boolean>(props.value.metadata.showHead || false);
+  const [showTail, setShowTail] = useState<boolean>(props.value.metadata.showTail || false);
 
   function addReturn(code: string): string {
     const lines = code.trim().split("\n");
@@ -362,4 +409,12 @@ export const tools = {
   runCodeSegment: RunCodeSegment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
+};
+
+export const toolNames = {
+  comment: "Comment",
+  colorPicker: "Color Picker",
+  runCodeSegment: "Run Code Segment",
+  imageUpload: "Image Upload",
+  displayHTML: "HTML Preview",
 };

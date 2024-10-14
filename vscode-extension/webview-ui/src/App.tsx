@@ -1,7 +1,7 @@
 import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
-import { tools } from "./tools";
+import { tools, toolNames } from "./tools";
 import React, { CSSProperties, useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
@@ -131,6 +131,10 @@ function AnnotationSidebarView(props: {
     a.id = i.toString();
   });
 
+  const handleClick = (id: string) => () => {
+    props.setSelectedAnnotationId(id);
+  }
+
   // <svg
   //       width="30"
   //       height="30"
@@ -154,9 +158,28 @@ function AnnotationSidebarView(props: {
         <div
           key={index}
           ref={(ref) => (annotationRefs.current[index] = ref)}
-          className={`annotation-tile ${
-            props.selectedAnnotationId === annotation.id ? "selected" : ""
-          }`}>
+          className={`annotation-tile ${props.selectedAnnotationId === annotation.id ? "selected" : ""
+            }`} style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              borderLeft: // use color from annotation metadata for left side if available
+                annotation.metadata?.color ? `5px solid ${annotation.metadata.color}` : "5px solid rgba(255,255,0,0.3)",
+          }} onClick={handleClick(annotation.id)}>
+          <div className="annotation-info"
+            style={{
+              // use flexbox to align items
+              display: "flex",
+              gap: "4px",
+              fontSize: "smaller"
+            }}
+          >
+            <div className="line-number">
+              Line {annotation.document.slice(0, annotation.start).split("\n").length}
+            </div>
+            -
+            <div className="annotation-type" style={{fontWeight: 'bold'} }>{toolNames[annotation.tool as keyof typeof toolNames]}</div>
+          </div>
           <AnnotationEditorContainer
             key={index}
             value={annotation}
