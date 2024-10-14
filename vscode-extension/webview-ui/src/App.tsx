@@ -737,14 +737,14 @@ function App() {
           </>
         )}
 
-        <br />
-        <>
+        {/* <br />
+        <> */}
           <p>To add more annotations, highlight and use the right-click context menu.</p>
-          <p>
+          {/* <p>
             To open the annotation panel, click on the lightning bolt icon in the top right corner
             of the editor.
-          </p>
-        </>
+          </p> */}
+        {/* </> */}
       </main>
     );
   } else {
