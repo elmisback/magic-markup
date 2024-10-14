@@ -10,3 +10,7 @@
   border: 2px solid #ccc;
   border-radius: 4px;
 }
+
+.color-picker input[type="color"] {
+  width: 40px;
+}
