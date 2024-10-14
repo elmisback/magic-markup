@@ -54,7 +54,7 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
         placeholder="Enter your comment here..."
         style={{
           ...commonTextStyle,
-          width: "100%",
+          width: "calc(100% - 22px)",
           height: "80px",
           padding: "10px",
           border: "1px solid #ccc",
@@ -187,30 +187,22 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div style={{ marginBottom: "10px" }}>
-      {props.value.metadata.error && (
-        <div style={{ color: "red", marginBottom: "10px", ...commonTextStyle }}>
-          An error occurred: {props.value.metadata.error}
-        </div>
-      )}
-      {props.value.metadata.response && (
-        <div style={{ marginBottom: "10px", ...commonTextStyle }}>
-          <strong>Response:</strong> <ObjectInspector data={props.value.metadata.response} />
-        </div>
-      )}
+      
       <div style={{ marginBottom: "10px" }}>
         <label style={commonTextStyle}>
           <strong>Cached API Response</strong>
         </label>
         <div style={{ marginBottom: "10px" }}>
-          <label style={commonTextStyle}>Mock Response Variable Name:</label>
-          <br />
-          <input
-            value={apiResName}
-            placeholder="Enter valid variable name here..."
-            onChange={(e) => setApiResName(e.target.value)}
+          <label style={commonTextStyle}>Mock Response:</label>
+          <br></br>
+          <textarea
+            rows={4}
+            value={apiRes}
+            placeholder="Enter a JavaScript object..."
+            onChange={(e) => setApiRes(e.target.value)}
             style={{
               ...commonTextStyle,
-              marginBottom: "10px",
+              width: "-webkit-fill-available",
               padding: "5px",
               border: "1px solid #ccc",
               borderRadius: "4px",
@@ -218,17 +210,16 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           />
         </div>
         <div style={{ marginBottom: "10px" }}>
-          <label style={commonTextStyle}>Mock Response:</label>
-          <br></br>
-          <textarea
-            rows={4}
-            value={apiRes}
-            placeholder="Enter valid JavaScript object here..."
-            onChange={(e) => setApiRes(e.target.value)}
+          <label style={commonTextStyle}>Mock Response Variable Name:</label>
+          <br />
+          <input
+            value={apiResName}
+            placeholder="Enter a variable name..."
+            onChange={(e) => setApiResName(e.target.value)}
             style={{
               ...commonTextStyle,
-              width: "100%",
               marginBottom: "10px",
+              width: "-webkit-fill-available",
               padding: "5px",
               border: "1px solid #ccc",
               borderRadius: "4px",
@@ -241,7 +232,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <textarea
             rows={4}
             value={code[0]}
-            placeholder="Enter JS code here..."
+            placeholder="Enter other JS preprocessing code..."
             onChange={(e) => {
               const newCode = [...code];
               newCode[0] = e.target.value;
@@ -249,7 +240,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             }}
             style={{
               ...commonTextStyle,
-              width: "100%",
+              width: "-webkit-fill-available",
               marginBottom: "10px",
               padding: "5px",
               border: "1px solid #ccc",
@@ -262,7 +253,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <br></br>
           <textarea
             rows={4}
-            placeholder="Enter JS code here..."
+            placeholder="Enter a JavaScript expression..."
             value={pinBody ? props.utils.getText() : code[1]}
             onChange={(e) => {
               if (!pinBody) {
@@ -273,8 +264,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             }}
             style={{
               ...commonTextStyle,
-              width: "100%",
-              marginBottom: "10px",
+              width: "-webkit-fill-available",
               padding: "5px",
               border: "1px solid #ccc",
               borderRadius: "4px",
@@ -299,7 +289,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <br></br>
           <textarea
             rows={4}
-            placeholder="Enter JS code here..."
+            placeholder="Enter other JS postprocessing code..."
             value={code[2]}
             onChange={(e) => {
               const newCode = [...code];
@@ -308,7 +298,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             }}
             style={{
               ...commonTextStyle,
-              width: "100%",
+              width: "-webkit-fill-available",
               marginBottom: "10px",
               padding: "5px",
               border: "1px solid #ccc",
@@ -317,6 +307,16 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           />
         </div>
       </div>
+      {props.value.metadata.error && (
+        <div style={{ color: "red", marginBottom: "10px", ...commonTextStyle }}>
+          An error occurred: {props.value.metadata.error}
+        </div>
+      )}
+      {props.value.metadata.response && (
+        <div style={{ marginBottom: "10px", ...commonTextStyle }}>
+          <strong>Response:</strong> <ObjectInspector data={props.value.metadata.response} />
+        </div>
+      )}
       <div style={{ marginBottom: "10px" }}>
         <button
           onClick={runAndUpdateCode}
@@ -328,24 +328,26 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             borderRadius: "4px",
             cursor: "pointer",
           }}>
-          Run Highlighted Code
+          Run Code
         </button>
-        <button
-          onClick={() =>
-            props.utils.setMetadata({
-              response: undefined,
-              error: undefined,
-            })
-          }
-          style={{
-            ...commonTextStyle,
-            padding: "5px 10px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}>
-          Clear Output
-        </button>
+        { props.value.metadata.response
+         && <button
+            onClick={() =>
+              props.utils.setMetadata({
+                response: undefined,
+                error: undefined,
+              })
+            }
+            style={{
+              ...commonTextStyle,
+              padding: "5px 10px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}>
+            Clear Output
+          </button>
+        }
       </div>
     </div>
   );
