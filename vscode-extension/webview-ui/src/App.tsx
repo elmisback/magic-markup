@@ -584,6 +584,7 @@ function App() {
       ) === annotations[0].document.substring(annotations[0].start)
     ) {
       // case 1: all changes are before the first annotation
+      console.log("Case 1");
       const newAnnotations: Annotation[] = annotations.map((annotation) => {
         return (annotation = {
           ...annotation,
@@ -601,15 +602,16 @@ function App() {
       showAnnotations();
     } else if (
       currentDocument &&
-      annotations[Math.max(annotations.length - 2, 0)].end < currentDocument.length &&
-      currentDocument.substring(0, annotations[Math.max(annotations.length - 2, 0)].end) ===
-        annotations[Math.max(annotations.length - 2, 0)].document.substring(
+      annotations[Math.max(annotations.length - 1, 0)].end < currentDocument.length &&
+      currentDocument.substring(0, annotations[Math.max(annotations.length - 1, 0)].end) ===
+        annotations[Math.max(annotations.length - 1, 0)].document.substring(
           0,
-          annotations[Math.max(annotations.length - 2, 0)].end
+          annotations[Math.max(annotations.length - 1, 0)].end
         )
     ) {
       // case 2: all changes are after the last annotation
       // no need to update indices
+      console.log("Case 2");
       const newAnnotations: Annotation[] = annotations.map((annotation) => {
         return (annotation = {
           ...annotation,
@@ -618,39 +620,54 @@ function App() {
       });
       setAnnotations(newAnnotations);
       showAnnotations();
+    } else if (annotations.length >= 2 && currentDocument) {
+      // case 3: changes are in the middle of the annotations
+      console.log("case 3");
+      let firstAnnInd: number = -1;
+      for (let i: number = 0; i < annotations.length - 1; i++) {
+        const leftAnn = annotations[i];
+        const rightAnn = annotations[i + 1];
+        if (leftAnn.document !== rightAnn.document) {
+          continue;
+        }
+        const lenDiff: number = currentDocument.length - leftAnn.document.length;
+        if (
+          // TODO finish bounds checks
+          rightAnn.end + lenDiff < currentDocument.length &&
+          leftAnn.end < currentDocument.length &&
+          leftAnn.document.substring(0, leftAnn.end) ===
+            currentDocument.substring(0, leftAnn.end) &&
+          rightAnn.document.substring(rightAnn.start) ===
+            currentDocument.substring(rightAnn.start + lenDiff)
+        ) {
+          firstAnnInd = i;
+          break;
+        }
+      }
+      if (firstAnnInd === -1) {
+        console.log("case 3 hide");
+        hideAnnotations();
+      } else {
+        console.log("case 3 show ind " + firstAnnInd);
+        const newAnnotations: Annotation[] = annotations.map((annotation, index) => {
+          if (index <= firstAnnInd) {
+            return annotation;
+          } else {
+            return {
+              ...annotation,
+              start: annotation.start + currentDocument.length - annotation.document.length,
+              end: annotation.end + currentDocument.length - annotation.document.length,
+              document: currentDocument,
+            };
+          }
+        });
+        setAnnotations(newAnnotations);
+        showAnnotations;
+      }
     } else {
+      console.log("Case 4");
       hideAnnotations();
     }
-
-    // let disable: boolean = false;
-    // if (position !== -1) {
-    //   let newAnnotations: Annotation[];
-    //   if (!currentDocument) {
-    //     return;
-    //   }
-    //   newAnnotations = annotations.map((annotation) => {
-    //     if (annotation.end + 15 < position) {
-    //       return { ...annotation, document: currentDocument };
-    //     } else if (position < annotation.start - 15) {
-    //       console.log("Pushing annotations");
-    //       return {
-    //         ...annotation,
-    //         start: annotation.start + 1,
-    //         end: annotation.end + 1,
-    //         document: currentDocument,
-    //       };
-    //     } else {
-    //       disable = true;
-    //       return annotation;
-    //     }
-    //   });
-    //   if (!disable) {
-    //     setAnnotations(newAnnotations);
-    //     showAnnotations();
-    //   } else {
-    //     hideAnnotations();
-    //   }
-    // }
   };
 
   // Transient editor + UI state
