@@ -576,6 +576,48 @@ function App() {
       showAnnotations();
     } else if (annotations[0].document === currentDocument) {
       showAnnotations();
+    } else if (
+      currentDocument &&
+      annotations[0].start + currentDocument.length - annotations[0].document.length >= 0 &&
+      currentDocument.substring(
+        annotations[0].start + currentDocument.length - annotations[0].document.length
+      ) === annotations[0].document.substring(annotations[0].start)
+    ) {
+      // case 1: all changes are before the first annotation
+      const newAnnotations: Annotation[] = annotations.map((annotation) => {
+        return (annotation = {
+          ...annotation,
+          original: {
+            document: annotation.document,
+            start: annotation.start,
+            end: annotation.end,
+          },
+          start: annotation.start + currentDocument.length - annotation.document.length,
+          end: annotation.end + currentDocument.length - annotation.document.length,
+          document: currentDocument,
+        });
+      });
+      setAnnotations(newAnnotations);
+      showAnnotations();
+    } else if (
+      currentDocument &&
+      annotations[Math.max(annotations.length - 2, 0)].end < currentDocument.length &&
+      currentDocument.substring(0, annotations[Math.max(annotations.length - 2, 0)].end) ===
+        annotations[Math.max(annotations.length - 2, 0)].document.substring(
+          0,
+          annotations[Math.max(annotations.length - 2, 0)].end
+        )
+    ) {
+      // case 2: all changes are after the last annotation
+      // no need to update indices
+      const newAnnotations: Annotation[] = annotations.map((annotation) => {
+        return (annotation = {
+          ...annotation,
+          document: currentDocument,
+        });
+      });
+      setAnnotations(newAnnotations);
+      showAnnotations();
     } else {
       hideAnnotations();
     }
