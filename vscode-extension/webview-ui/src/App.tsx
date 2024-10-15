@@ -584,7 +584,6 @@ function App() {
       ) === annotations[0].document.substring(annotations[0].start)
     ) {
       // case 1: all changes are before the first annotation
-      console.log("Case 1");
       const newAnnotations: Annotation[] = annotations.map((annotation) => {
         return (annotation = {
           ...annotation,
@@ -611,7 +610,6 @@ function App() {
     ) {
       // case 2: all changes are after the last annotation
       // no need to update indices
-      console.log("Case 2");
       const newAnnotations: Annotation[] = annotations.map((annotation) => {
         return (annotation = {
           ...annotation,
@@ -645,10 +643,8 @@ function App() {
         }
       }
       if (firstAnnInd === -1) {
-        console.log("case 3 hide");
         hideAnnotations();
       } else {
-        console.log("case 3 show ind " + firstAnnInd);
         const newAnnotations: Annotation[] = annotations.map((annotation, index) => {
           if (index <= firstAnnInd) {
             return annotation;
@@ -665,7 +661,6 @@ function App() {
         showAnnotations;
       }
     } else {
-      console.log("Case 4");
       hideAnnotations();
     }
   };
