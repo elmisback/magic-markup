@@ -5,8 +5,9 @@ import ReactMarkdown from "react-markdown";
 import { useState, useEffect } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
-import "./App.css";
+import './tools.css';
 
+type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
   file: File;
   src: string;
@@ -18,15 +19,17 @@ const commonTextStyle: React.CSSProperties = {
   color: "black",
 };
 
-const ColorPicker: React.FC<AnnotationEditorProps> = (props) => {
+const ColorPicker: AnnotationType = (props) => {
   return (
-    <div className="center-vertical">
-      <label style={{ ...commonTextStyle, marginRight: "10px" }}>Selected Color: </label>
+    <div className="color-picker">
+      <input
+        value={props.value.metadata.colorName}
+        onChange={(e) => props.utils.setMetadata({ colorName: e.target.value })}
+      />
       <input
         type="color"
         value={props.utils.getText()}
         onChange={(e) => props.utils.setText(e.target.value)}
-        style={commonTextStyle}
       />
     </div>
   );
@@ -65,7 +68,29 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
   };
 
   return (
-    <div style={{ marginBottom: "10px", width: "280px" }}>
+    <div style={{ marginBottom: "10px" }}>
+      <div style={{ fontFamily: "Poppins, sans-serif", display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ fontWeight: 'bold', fontSize: "12px" }}>Alex Smith</div>
+        <div style={{
+          fontSize: "10px", 
+          // align bottom of line
+         }}>Today at 12:00 PM</div>
+      </div>
+      <div style={{ display: 'flex' }}>
+        {/* user icon */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="30"
+          height="30"
+          fill="currentColor"
+          viewBox="0 0 64 64"
+          style={{ margin: "10px", marginLeft: "5px" }}
+        >
+          <circle cx="32" cy="32" r="30" fill="none" stroke="#999" stroke-width="2"/>
+          <circle cx="32" cy="20" r="12" fill="#ccc" stroke="#999" stroke-width="2"/>
+          <path d="M16 52c0-8.8 7.2-16 16-16s16 7.2 16 16v4H16v-4z" fill="#ccc" stroke="#999" stroke-width="2"/>
+        </svg>
+      
       <textarea
         value={comment}
         onChange={(e) => setComment(e.target.value)}
@@ -74,12 +99,22 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
       />
       <div
         style={{
-          fontFamily: "Poppins, sans-serif",
-          marginTop: "5px",
+          ...commonTextStyle,
+          width: "calc(100% - 22px)",
+          height: "80px",
+          padding: "4px",
+          border: "none", //"1px solid #ccc",
+          // borderRadius: "4px",
+          backgroundColor: "transparent",
+          lineHeight: "16px",
           fontSize: "12px",
-          color: "black",
-        }}>
-        Author: Test User
+        }}
+        />
+      </div>
+      {/* reply button */}
+      <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginLeft: '40px' }}>
+        ⤷
+        <div style={{ fontSize: '12px' }}>Reply</div>
       </div>
       <div style={{ marginTop: "10px" }}>
         <strong style={{ color: "#525252" }}>Replies:</strong>
@@ -144,7 +179,10 @@ const ImageUpload: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
-  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || "");
+  const [htmlContent, setHtmlContent] = useState(props.value.metadata.html || 
+    //get text
+    props.utils.getText() || ""
+  );
 
   const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (e) => {
     const newHtmlContent = e.target.value;
@@ -154,17 +192,14 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div>
-      <textarea
+      {/* <textarea
         value={htmlContent}
         onChange={handleChange}
         placeholder="Write your HTML code here"
-        className="textarea"
-      />
-      <div style={{ marginTop: "10px", border: "1px solid #ccc", padding: "10px" }}>
-        <h3 style={commonTextStyle}>Preview:</h3>
-        <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-      </div>
-    </div>
+        style={{ ...commonTextStyle, width: "100%", height: "150px" }}
+      /> */}
+      <div dangerouslySetInnerHTML={{ __html: htmlContent }} style={{ height: '50px', resize: 'both', overflow: 'auto', border: "1px solid #ccc", }} />
+    </div >
   );
 };
 
@@ -173,6 +208,8 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   const [apiRes, setApiRes] = useState<string>(props.value.metadata.apiRes || "");
   const [code, setCode] = useState<string[]>(props.value.metadata.code || ["", "", ""]);
   const [pinBody, setPinBody] = useState<boolean>(props.value.metadata.pinBody || false);
+  const [showHead, setShowHead] = useState<boolean>(props.value.metadata.showHead || false);
+  const [showTail, setShowTail] = useState<boolean>(props.value.metadata.showTail || false);
 
   function addReturn(code: string): string {
     const lines = code.trim().split("\n");
@@ -241,46 +278,43 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 
   return (
     <div style={{ marginBottom: "10px" }}>
-      {props.value.metadata.error && (
-        <div style={{ color: "red", marginBottom: "10px", ...commonTextStyle }}>
-          An error occurred: {props.value.metadata.error}
-        </div>
-      )}
-      {props.value.metadata.response && (
-        <div style={{ marginBottom: "10px", ...commonTextStyle }}>
-          <strong>Response:</strong> <ObjectInspector data={props.value.metadata.response} />
-        </div>
-      )}
+      
       <div style={{ marginBottom: "10px" }}>
         <label style={commonTextStyle}>
           <strong>Cached API Response</strong>
         </label>
-        <div style={{ marginBottom: "10px" }}>
-          <label style={commonTextStyle}>Mock Response Variable Name:</label>
-          <br />
-          <input
-            value={apiResName}
-            placeholder="Enter valid variable name here..."
-            onChange={(e) => setApiResName(e.target.value)}
-            style={{
-              ...commonTextStyle,
-              marginBottom: "10px",
-              padding: "5px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              width: "240px",
-            }}
-          />
-        </div>
         <div style={{ marginBottom: "10px" }}>
           <label style={commonTextStyle}>Mock Response:</label>
           <br></br>
           <textarea
             rows={4}
             value={apiRes}
-            placeholder="Enter valid JavaScript object here..."
+            placeholder="Enter a JavaScript object..."
             onChange={(e) => setApiRes(e.target.value)}
-            className="textarea"
+            style={{
+              ...commonTextStyle,
+              width: "-webkit-fill-available",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={commonTextStyle}>Mock Response Variable Name:</label>
+          <br />
+          <input
+            value={apiResName}
+            placeholder="Enter a variable name..."
+            onChange={(e) => setApiResName(e.target.value)}
+            style={{
+              ...commonTextStyle,
+              marginBottom: "10px",
+              width: "-webkit-fill-available",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
           />
         </div>
         <div style={{ marginBottom: "10px" }}>
@@ -289,13 +323,20 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <textarea
             rows={4}
             value={code[0]}
-            placeholder="Enter JS code here..."
+            placeholder="Enter other JS preprocessing code..."
             onChange={(e) => {
               const newCode = [...code];
               newCode[0] = e.target.value;
               setCode(newCode);
             }}
-            className="textarea"
+            style={{
+              ...commonTextStyle,
+              width: "-webkit-fill-available",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
           />
         </div>
         <div style={{ marginBottom: "10px" }}>
@@ -303,7 +344,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <br></br>
           <textarea
             rows={4}
-            placeholder="Enter JS code here..."
+            placeholder="Enter a JavaScript expression..."
             value={pinBody ? props.utils.getText() : code[1]}
             onChange={(e) => {
               if (!pinBody) {
@@ -314,8 +355,7 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             }}
             style={{
               ...commonTextStyle,
-              width: "100%",
-              marginBottom: "10px",
+              width: "-webkit-fill-available",
               padding: "5px",
               border: "1px solid #ccc",
               borderRadius: "4px",
@@ -340,17 +380,34 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
           <br></br>
           <textarea
             rows={4}
-            placeholder="Enter JS code here..."
+            placeholder="Enter other JS postprocessing code..."
             value={code[2]}
             onChange={(e) => {
               const newCode = [...code];
               newCode[2] = e.target.value;
               setCode(newCode);
             }}
-            className="textarea"
+            style={{
+              ...commonTextStyle,
+              width: "-webkit-fill-available",
+              marginBottom: "10px",
+              padding: "5px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+            }}
           />
         </div>
       </div>
+      {props.value.metadata.error && (
+        <div style={{ color: "red", marginBottom: "10px", ...commonTextStyle }}>
+          An error occurred: {props.value.metadata.error}
+        </div>
+      )}
+      {props.value.metadata.response && (
+        <div style={{ marginBottom: "10px", ...commonTextStyle }}>
+          <strong>Response:</strong> <ObjectInspector data={props.value.metadata.response} />
+        </div>
+      )}
       <div style={{ marginBottom: "10px" }}>
         <button
           onClick={runAndUpdateCode}
@@ -362,24 +419,26 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
             borderRadius: "4px",
             cursor: "pointer",
           }}>
-          Run Highlighted Code
+          Run Code
         </button>
-        <button
-          onClick={() =>
-            props.utils.setMetadata({
-              response: undefined,
-              error: undefined,
-            })
-          }
-          style={{
-            ...commonTextStyle,
-            padding: "5px 10px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}>
-          Clear Output
-        </button>
+        { props.value.metadata.response
+         && <button
+            onClick={() =>
+              props.utils.setMetadata({
+                response: undefined,
+                error: undefined,
+              })
+            }
+            style={{
+              ...commonTextStyle,
+              padding: "5px 10px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}>
+            Clear Output
+          </button>
+        }
       </div>
     </div>
   );
@@ -394,4 +453,12 @@ export const tools = {
   runCodeSegment: RunCodeSegment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
+};
+
+export const toolNames = {
+  comment: "Comment",
+  colorPicker: "Color Picker",
+  runCodeSegment: "Run Code Segment",
+  imageUpload: "Image Upload",
+  displayHTML: "HTML Preview",
 };

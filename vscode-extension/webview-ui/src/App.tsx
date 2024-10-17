@@ -1,7 +1,7 @@
 import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
-import { tools } from "./tools";
+import { tools, toolNames } from "./tools";
 import React, { CSSProperties, useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
@@ -125,31 +125,55 @@ function AnnotationSidebarView(props: {
     a.id = i.toString();
   });
 
+  const handleClick = (id: string) => () => {
+    props.setSelectedAnnotationId(id);
+  }
+
+  // <svg
+  //       width="30"
+  //       height="30"
+  //       viewBox="0 0 30 30"
+  //       xmlns="http://www.w3.org/2000/svg"
+  //       xmlnsXlink="http://www.w3.org/1999/xlink">
+  //       <title>ic_fluent_comment_24_regular</title>
+  //       <desc>Created with Sketch.</desc>
+  //       <g id="🔍-Product-Icons" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
+  //         <g id="ic_fluent_comment_24_regular" fill="#212121" fillRule="nonzero">
+  //           <path
+  //             d="M5.25,18 C3.45507456,18 2,16.5449254 2,14.75 L2,6.25 C2,4.45507456 3.45507456,3 5.25,3 L18.75,3 C20.5449254,3 22,4.45507456 22,6.25 L22,14.75 C22,16.5449254 20.5449254,18 18.75,18 L13.0124851,18 L7.99868152,21.7506795 C7.44585139,22.1641649 6.66249789,22.0512036 6.2490125,21.4983735 C6.08735764,21.2822409 6,21.0195912 6,20.7499063 L5.99921427,18 L5.25,18 Z M12.5135149,16.5 L18.75,16.5 C19.7164983,16.5 20.5,15.7164983 20.5,14.75 L20.5,6.25 C20.5,5.28350169 19.7164983,4.5 18.75,4.5 L5.25,4.5 C4.28350169,4.5 3.5,5.28350169 3.5,6.25 L3.5,14.75 C3.5,15.7164983 4.28350169,16.5 5.25,16.5 L7.49878573,16.5 L7.49899997,17.2497857 L7.49985739,20.2505702 L12.5135149,16.5 Z"
+  //             id="🎨-Color"></path>
+  //         </g>
+  //       </g>
+  //     </svg>
+
   return (
-    <div style={{ padding: "10px" }}>
-      <svg
-        width="30"
-        height="30"
-        viewBox="0 0 30 30"
-        xmlns="http://www.w3.org/2000/svg"
-        xmlnsXlink="http://www.w3.org/1999/xlink">
-        <title>ic_fluent_comment_24_regular</title>
-        <desc>Created with Sketch.</desc>
-        <g id="🔍-Product-Icons" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
-          <g id="ic_fluent_comment_24_regular" fill="#212121" fillRule="nonzero">
-            <path
-              d="M5.25,18 C3.45507456,18 2,16.5449254 2,14.75 L2,6.25 C2,4.45507456 3.45507456,3 5.25,3 L18.75,3 C20.5449254,3 22,4.45507456 22,6.25 L22,14.75 C22,16.5449254 20.5449254,18 18.75,18 L13.0124851,18 L7.99868152,21.7506795 C7.44585139,22.1641649 6.66249789,22.0512036 6.2490125,21.4983735 C6.08735764,21.2822409 6,21.0195912 6,20.7499063 L5.99921427,18 L5.25,18 Z M12.5135149,16.5 L18.75,16.5 C19.7164983,16.5 20.5,15.7164983 20.5,14.75 L20.5,6.25 C20.5,5.28350169 19.7164983,4.5 18.75,4.5 L5.25,4.5 C4.28350169,4.5 3.5,5.28350169 3.5,6.25 L3.5,14.75 C3.5,15.7164983 4.28350169,16.5 5.25,16.5 L7.49878573,16.5 L7.49899997,17.2497857 L7.49985739,20.2505702 L12.5135149,16.5 Z"
-              id="🎨-Color"></path>
-          </g>
-        </g>
-      </svg>
+    <>
       {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
         <div
           key={index}
           ref={(ref) => (annotationRefs.current[index] = ref)}
-          className={`annotation-tile ${
-            props.selectedAnnotationId === annotation.id ? "selected" : ""
-          }`}>
+          className={`annotation-tile ${props.selectedAnnotationId === annotation.id ? "selected" : ""
+            }`} style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              borderLeft: // use color from annotation metadata for left side if available
+                annotation.metadata?.color ? `5px solid ${annotation.metadata.color}` : "5px solid rgba(255,255,0,0.3)",
+          }} onClick={handleClick(annotation.id)}>
+          <div className="annotation-info"
+            style={{
+              // use flexbox to align items
+              display: "flex",
+              gap: "4px",
+              fontSize: "smaller"
+            }}
+          >
+            <div className="line-number">
+              Line {annotation.document.slice(0, annotation.start).split("\n").length}
+            </div>
+            -
+            <div className="annotation-type" style={{fontWeight: 'bold'} }>{toolNames[annotation.tool as keyof typeof toolNames]}</div>
+          </div>
           <AnnotationEditorContainer
             key={index}
             value={annotation}
@@ -171,7 +195,7 @@ function AnnotationSidebarView(props: {
           />
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -763,14 +787,14 @@ function App() {
           </>
         )}
 
-        <br />
-        <>
+        {/* <br />
+        <> */}
           <p>To add more annotations, highlight and use the right-click context menu.</p>
-          <p>
+          {/* <p>
             To open the annotation panel, click on the lightning bolt icon in the top right corner
             of the editor.
-          </p>
-        </>
+          </p> */}
+        {/* </> */}
       </main>
     );
   } else {

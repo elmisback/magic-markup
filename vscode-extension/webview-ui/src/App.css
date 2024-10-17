@@ -17,11 +17,17 @@ main {
 .annotation-tile {
   background-color: #f5f5f5; /* Light grey background */
   border: 1px solid #ddd; /* Light border */
-  padding: 10px; /* Padding inside the tile */
+  padding: 5px 7px; /* Padding inside the tile */
   margin-bottom: 10px; /* Space between tiles */
   border-radius: 5px; /* Rounded corners */
   transition: background-color 0.3s; /* Smooth transition for background color */
-  width: 300px;
+  /* drop shadow */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: -webkit-fill-available;
+}
+
+.annotation-tile * {
+  max-width: -webkit-fill-available !important;
 }
 
 .annotation-tile.selected {

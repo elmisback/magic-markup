@@ -1,0 +1,16 @@
+.color-picker {
+  display: flex;
+  gap: 5px;
+}
+
+/* style={{ width: "30%", backgroundColor: 'transparent', border: "2px solid #ccc", borderRadius: '4px' }} */
+.color-picker input {
+  width: 30%;
+  background-color: transparent;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+}
+
+.color-picker input[type="color"] {
+  width: 40px;
+}
