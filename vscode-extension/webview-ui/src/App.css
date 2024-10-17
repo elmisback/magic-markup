@@ -34,7 +34,7 @@ main {
   background-color: #e0e0e0; /* Slightly darker background when selected */
 }
 
-textarea {
+/* textarea {
   resize: vertical;
   width: 280px;
   height: 80px;
@@ -44,4 +44,4 @@ textarea {
   font-family: "Poppins", sans-serif;
   font-size: 14px;
   color: black;
-}
+} */

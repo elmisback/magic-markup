@@ -96,8 +96,6 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
         onChange={(e) => setComment(e.target.value)}
         placeholder="Enter your comment here..."
         className="textarea"
-      />
-      <div
         style={{
           ...commonTextStyle,
           width: "calc(100% - 22px)",
@@ -116,7 +114,7 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
         ⤷
         <div style={{ fontSize: '12px' }}>Reply</div>
       </div>
-      <div style={{ marginTop: "10px" }}>
+      {/* <div style={{ marginTop: "10px" }}>
         <strong style={{ color: "#525252" }}>Replies:</strong>
         {replies.map((reply, index) => (
           <div
@@ -152,7 +150,7 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
           }}>
           Add Reply
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };
