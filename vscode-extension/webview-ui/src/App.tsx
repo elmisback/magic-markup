@@ -532,7 +532,6 @@ function App() {
     };
     setAnnotations([...annotations, newAnnotation]);
     setTempDocumentContent(undefined);
-    updateAnnotationDecorations();
   };
 
   const annotations = annotationState?.annotations || [];
@@ -560,7 +559,6 @@ function App() {
     );
     console.log("Annotation removed successfully");
     setAnnotations(newAnnotations);
-    updateAnnotationDecorations();
   };
 
   const handleSetAnnotationColor = (color: string) => {
