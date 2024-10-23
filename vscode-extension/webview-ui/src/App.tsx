@@ -549,7 +549,6 @@ function App() {
     );
 
     setAnnotations(updatedAnnotations);
-    showAnnotations();
   };
 
   const hideAnnotations = () => {
@@ -559,6 +558,7 @@ function App() {
   };
 
   const showAnnotations = () => {
+    console.log("Showing annotations with " + annotations);
     vscode.postMessage({
       command: "showAnnotations",
       data: { annotations },
@@ -630,7 +630,6 @@ function App() {
         }
         const lenDiff: number = currentDocument.length - leftAnn.document.length;
         if (
-          // TODO finish bounds checks
           rightAnn.end + lenDiff < currentDocument.length &&
           leftAnn.end < currentDocument.length &&
           leftAnn.document.substring(0, leftAnn.end) ===
@@ -693,6 +692,12 @@ function App() {
     handleChooseAnnType,
     updateAnnotationDecorations
   );
+
+  useEffect(() => {
+    if (currentDocument) {
+      updateAnnotationDecorations();
+    }
+  }, [annotations, currentDocument]);
 
   // find the selected annotation based on the character position
   useEffect(() => {
