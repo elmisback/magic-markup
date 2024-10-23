@@ -127,7 +127,7 @@ function AnnotationSidebarView(props: {
 
   const handleClick = (id: string) => () => {
     props.setSelectedAnnotationId(id);
-  }
+  };
 
   // <svg
   //       width="30"
@@ -152,27 +152,34 @@ function AnnotationSidebarView(props: {
         <div
           key={index}
           ref={(ref) => (annotationRefs.current[index] = ref)}
-          className={`annotation-tile ${props.selectedAnnotationId === annotation.id ? "selected" : ""
-            }`} style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-              borderLeft: // use color from annotation metadata for left side if available
-                annotation.metadata?.color ? `5px solid ${annotation.metadata.color}` : "5px solid rgba(255,255,0,0.3)",
-          }} onClick={handleClick(annotation.id)}>
-          <div className="annotation-info"
+          className={`annotation-tile ${
+            props.selectedAnnotationId === annotation.id ? "selected" : ""
+          }`}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+            // use color from annotation metadata for left side if available
+            borderLeft: annotation.metadata?.color
+              ? `5px solid ${annotation.metadata.color}`
+              : "5px solid rgba(255,255,0,0.3)",
+          }}
+          onClick={handleClick(annotation.id)}>
+          <div
+            className="annotation-info"
             style={{
               // use flexbox to align items
               display: "flex",
               gap: "4px",
-              fontSize: "smaller"
-            }}
-          >
+              fontSize: "smaller",
+            }}>
             <div className="line-number">
               Line {annotation.document.slice(0, annotation.start).split("\n").length}
             </div>
             -
-            <div className="annotation-type" style={{fontWeight: 'bold'} }>{toolNames[annotation.tool as keyof typeof toolNames]}</div>
+            <div className="annotation-type" style={{ fontWeight: "bold" }}>
+              {toolNames[annotation.tool as keyof typeof toolNames]}
+            </div>
           </div>
           <AnnotationEditorContainer
             key={index}
@@ -573,7 +580,6 @@ function App() {
     );
 
     setAnnotations(updatedAnnotations);
-    showAnnotations();
   };
 
   const hideAnnotations = () => {
@@ -730,6 +736,10 @@ function App() {
     }
   }, [charNum, annotations]);
 
+  useEffect(() => {
+    updateAnnotationDecorations();
+  }, [annotations, currentDocument]);
+
   const documentOutOfDate =
     annotations &&
     annotations.some((annotation: Annotation) => {
@@ -789,8 +799,8 @@ function App() {
 
         {/* <br />
         <> */}
-          <p>To add more annotations, highlight and use the right-click context menu.</p>
-          {/* <p>
+        <p>To add more annotations, highlight and use the right-click context menu.</p>
+        {/* <p>
             To open the annotation panel, click on the lightning bolt icon in the top right corner
             of the editor.
           </p> */}
