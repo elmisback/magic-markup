@@ -328,9 +328,6 @@ export class HelloWorldPanel {
     const updateDecorations = (
       annotations: { start: number; end: number; metadata: { color: "string" } }[]
     ) => {
-      if (!vscode.window.activeTextEditor?.document.fileName) {
-        return;
-      }
       const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
         window.showErrorMessage(

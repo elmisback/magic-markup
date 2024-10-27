@@ -648,7 +648,6 @@ function App() {
       showAnnotations();
     } else if (annotations.length >= 2 && currentDocument) {
       // case 3: changes are in the middle of the annotations
-      console.log("case 3");
       let firstAnnInd: number = -1;
       for (let i: number = 0; i < annotations.length - 1; i++) {
         const leftAnn = annotations[i];
