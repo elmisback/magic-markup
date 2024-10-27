@@ -2,7 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools, toolNames } from "./tools";
-import React, { CSSProperties, useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
   document?: string;
@@ -88,9 +88,14 @@ function AnnotationSidebarView(props: {
   const { annotations, setAnnotations, charNum } = props;
   const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const sortAnnotations = (annotations: Annotation[]): Annotation[] => {
+    return annotations.slice().sort((a, b) => a.start - b.start);
+  };
+
   const findClosestAnnotationIndex = (annotations: Annotation[], charNum: number) => {
     let closestIndex = -1;
     let closestDistance = Infinity;
+
     annotations.forEach((annotation, index) => {
       const distance = Math.min(
         Math.abs(annotation.start - charNum),
@@ -101,12 +106,16 @@ function AnnotationSidebarView(props: {
         closestIndex = index;
       }
     });
+
     return closestIndex;
   };
 
   useEffect(() => {
     if (charNum) {
-      const closestAnnotationIndex = findClosestAnnotationIndex(annotations, charNum);
+      const closestAnnotationIndex = findClosestAnnotationIndex(
+        sortAnnotations(annotations),
+        charNum
+      );
       if (
         closestAnnotationIndex !== -1 &&
         annotationRefs &&
