@@ -609,19 +609,22 @@ function App() {
    * @returns true if the annotations are up to date, false otherwise
    */
   const updateAnnotationDecorations = (): void => {
-    if (annotations.length === 0) {
+    const sortedAnnotations = annotations.sort((a, b) => a.start - b.start);
+    
+    if (sortedAnnotations.length === 0) {
       showAnnotations();
-    } else if (annotations[0].document === currentDocument) {
+    } else if (sortedAnnotations[0].document === currentDocument) {
       showAnnotations();
     } else if (
       currentDocument &&
-      annotations[0].start + currentDocument.length - annotations[0].document.length >= 0 &&
+      sortedAnnotations[0].start + currentDocument.length - sortedAnnotations[0].document.length >= 0 &&
       currentDocument.substring(
-        annotations[0].start + currentDocument.length - annotations[0].document.length
-      ) === annotations[0].document.substring(annotations[0].start)
+        sortedAnnotations[0].start + currentDocument.length - sortedAnnotations[0].document.length
+      ) === sortedAnnotations[0].document.substring(sortedAnnotations[0].start)
     ) {
       // case 1: all changes are before the first annotation
-      const newAnnotations: Annotation[] = annotations.map((annotation) => {
+      console.log("case 1");
+      const newAnnotations: Annotation[] = sortedAnnotations.map((annotation) => {
         return (annotation = {
           ...annotation,
           original: {
@@ -638,16 +641,17 @@ function App() {
       showAnnotations();
     } else if (
       currentDocument &&
-      annotations[Math.max(annotations.length - 1, 0)].end < currentDocument.length &&
-      currentDocument.substring(0, annotations[Math.max(annotations.length - 1, 0)].end) ===
-        annotations[Math.max(annotations.length - 1, 0)].document.substring(
+      sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end < currentDocument.length &&
+      currentDocument.substring(0, sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end) ===
+        sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].document.substring(
           0,
-          annotations[Math.max(annotations.length - 1, 0)].end
+          sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end
         )
     ) {
       // case 2: all changes are after the last annotation
       // no need to update indices
-      const newAnnotations: Annotation[] = annotations.map((annotation) => {
+      console.log("case 2");
+      const newAnnotations: Annotation[] = sortedAnnotations.map((annotation) => {
         return (annotation = {
           ...annotation,
           document: currentDocument,
@@ -655,18 +659,21 @@ function App() {
       });
       setAnnotations(newAnnotations);
       showAnnotations();
-    } else if (annotations.length >= 2 && currentDocument) {
+    } else if (sortedAnnotations.length >= 2 && currentDocument) {
       // case 3: changes are in the middle of the annotations
+      console.log("case 3");
       let firstAnnInd: number = -1;
-      for (let i: number = 0; i < annotations.length - 1; i++) {
-        const leftAnn = annotations[i];
-        const rightAnn = annotations[i + 1];
+      for (let i: number = 0; i < sortedAnnotations.length - 1; i++) {
+        const leftAnn = sortedAnnotations[i];
+        const rightAnn = sortedAnnotations[i + 1];
         if (leftAnn.document !== rightAnn.document) {
+          console.log(`Mismatch in annotation documents: couldn't move annotations ${i} and ${i + 1}`);
           continue;
         }
+
         const lenDiff: number = currentDocument.length - leftAnn.document.length;
+        console.log("Len diff: ", lenDiff);
         if (
-          // TODO finish bounds checks
           rightAnn.end + lenDiff < currentDocument.length &&
           leftAnn.end < currentDocument.length &&
           leftAnn.document.substring(0, leftAnn.end) ===
@@ -679,9 +686,11 @@ function App() {
         }
       }
       if (firstAnnInd === -1) {
+        console.log("Case 3: No annotations match");
         hideAnnotations();
       } else {
-        const newAnnotations: Annotation[] = annotations.map((annotation, index) => {
+
+        const newAnnotations: Annotation[] = sortedAnnotations.map((annotation, index) => {
           if (index <= firstAnnInd) {
             return annotation;
           } else {
@@ -697,6 +706,8 @@ function App() {
         showAnnotations;
       }
     } else {
+      // case 4: retag
+      console.log("case 4");
       hideAnnotations();
     }
   };
