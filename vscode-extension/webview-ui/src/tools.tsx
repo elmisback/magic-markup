@@ -45,15 +45,15 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
   const [replies, setReplies] = useState<Reply[]>(props.value.metadata.replies || []);
   const [newReplyText, setNewReplyText] = useState("");
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      props.utils.setMetadata({ comment, replies });
-    }, 300);
+  // useEffect(() => {
+  //   const handler = setTimeout(() => {
+  //     props.utils.setMetadata({ comment, replies });
+  //   }, 300);
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [comment, replies]);
+  //   return () => {
+  //     clearTimeout(handler);
+  //   };
+  // }, [comment, replies]);
 
   const handleAddReply = () => {
     if (newReplyText.trim() !== "") {
@@ -66,7 +66,7 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
     const newReplies = replies.filter((_, i) => i !== index);
     setReplies(newReplies);
   };
-
+          // setComment(e.target.value)}
   return (
     <div style={{ marginBottom: "10px" }}>
       <div style={{ fontFamily: "Poppins, sans-serif", display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -92,8 +92,8 @@ const Comment: React.FC<AnnotationEditorProps> = (props) => {
         </svg>
       
       <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
+        value={props.value.metadata.comment}
+        onChange={(e) => props.utils.setMetadata({ comment: e.target.value })}
         placeholder="Enter your comment here..."
         className="textarea"
         style={{
