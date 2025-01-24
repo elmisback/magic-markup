@@ -1,37 +1,27 @@
-# Hello World (React + Vite)
+# Codetations VSCode Extension
 
-This is an implementation of the default [Hello World](https://github.com/microsoft/vscode-webview-ui-toolkit-samples/tree/main/default/hello-world) sample extension that demonstrates how to set up and use a [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Webview UI Toolkit](https://github.com/microsoft/vscode-webview-ui-toolkit) webview extension.
+## Features
 
-![A screenshot of the sample extension.](./assets/hello-world.png)
+- Annotate code with comments and notes.
+- View all annotations in a dedicated webview.
 
-## Documentation
+## Usage
 
-For a deeper dive into how this sample works, read the guides below.
+### Adding a New Annotation
 
-- [Extension structure](./docs/extension-structure.md)
-- [Extension commands](./docs/extension-commands.md)
-- [Extension development cycle](./docs/extension-development-cycle.md)
+1. Select the text in your code where you want to add an annotation.
+2. Right-click and choose `Add Annotation` from the context menu.
+![alt text](image-1.png)
+3. Select the type of annotation you want to add in the webview that appears.
+4. Click `Confirm` to add the annotation.
 
-## Run The Sample
+### Opening the Webview
 
-```bash
-# Copy sample extension locally
-npx degit microsoft/vscode-webview-ui-toolkit-samples/frameworks/hello-world-react-vite hello-world
+1. Open any file in VSCode.
+2. Click on the lightning bolt icon in the upper right corner of the window to show annotations for the current file.
 
-# Navigate into sample directory
-cd hello-world
+![alt text](image.png)
 
-# Install dependencies for both the extension and webview UI source code
-npm run install:all
+## License
 
-# Build webview UI source code
-npm run build:webview
-
-# Open sample in VS Code
-code .
-```
-
-Once the sample is open inside VS Code you can run the extension by doing the following:
-
-1. Press `F5` to open a new Extension Development Host window
-2. Inside the host window, open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac) and type `Hello World (React + Vite): Show`
+This project is licensed under the MIT License.
