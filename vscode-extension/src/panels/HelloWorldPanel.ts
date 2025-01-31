@@ -61,21 +61,26 @@ export class HelloWorldPanel {
   private static getAnnotationsURI(documentURI: string): string {
     let currentDir = path.dirname(documentURI);
     const annotationsFilename = (dir: string, documentURI: string) => {
-      const annotationsDir = path.join(dir, "codetations");
-      if (!fs.existsSync(annotationsDir)) {
-        fs.mkdirSync(annotationsDir);
-      }
+      // Get relative path from git root/base dir to the document
+      const relPath = path.relative(dir, documentURI);
+      // Create the full annotations directory path including subdirectories
+      const annotationsDir = path.join(dir, 'codetations', path.dirname(relPath));
+      
+      // Create all intermediate directories recursively
+      fs.mkdirSync(annotationsDir, { recursive: true });
+      
+      // Return full path including filename
       return path.join(annotationsDir, path.basename(documentURI) + ".annotations.json");
     };
+  
+    // Look for git root or fallback to document directory
     while (currentDir !== path.parse(currentDir).root) {
       if (fs.existsSync(path.join(currentDir, ".git"))) {
         return annotationsFilename(currentDir, documentURI);
-        //return path.join(currentDir, 'codetations', path.basename(documentURI) + ".annotations.json");
       }
       currentDir = path.dirname(currentDir);
     }
     return annotationsFilename(path.dirname(documentURI), documentURI);
-    //return path.join(path.dirname(documentURI), 'codetations', path.basename(documentURI) + ".annotations.json");
   }
 
   public addAnnotation(): void {
