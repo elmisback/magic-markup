@@ -372,9 +372,7 @@ export class HelloWorldPanel {
             return;
           case "scrollToPosition":
             const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
-            console.log(editor, message.data.position);
             const position = editor?.document.positionAt(message.data.position);
-            console.log(editor, position, editor?.document.positionAt);
             if (!position) { return; }
             editor?.revealRange(new vscode.Range(position, position));
             return;
