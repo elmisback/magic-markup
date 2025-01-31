@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'package.json'
 
 jobs:
   check-and-publish:
