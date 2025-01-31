@@ -25,13 +25,13 @@ const runEndpointDictWithErrorHandlingOnPort = (
     app.post(endpoint, async (req: any, res: any) => {
       console.log(endpoint, req.body);
       try {
-        handler(req, res);
+        await handler(req, res);
       } catch (e) {
         vscode.window
           .showErrorMessage(`Error running ${endpoint}: ${e}`, "Copy to clipboard")
           .then((action) => {
             if (action === "Copy to clipboard") {
-              vscode.env.clipboard.writeText(e as string);
+              vscode.env.clipboard.writeText((e as Error).cause?.toString() || (e as Error).stack || (e as Error).message);
             }
           });
         console.error(e);
