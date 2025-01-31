@@ -133,7 +133,7 @@ async function copilotPromptGPTForJSON(t: string) {
     console.log('Got response:', response);
     let fullResponse = '';
     for await (const chunk of response.text) {
-      console.log('Got chunk:', chunk);
+      console.debug('Got chunk:', chunk);
       fullResponse += chunk;
     }
     return fullResponse;
