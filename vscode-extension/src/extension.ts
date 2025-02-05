@@ -11,34 +11,6 @@ import chokidar from "chokidar";
 
 import retagUpdate from "./server/retag";
 
-export class ActiveEditorTracker {
-  private lastNonWebviewEditor?: vscode.TextEditor;
-  private disposable: vscode.Disposable;
-
-  constructor() {
-      // Initialize by checking current active editor
-      const activeEditor = vscode.window.activeTextEditor;
-      if (activeEditor && activeEditor.document.uri.scheme !== 'webview') {
-          this.lastNonWebviewEditor = activeEditor;
-      }
-
-      // Set up the change event listener
-      this.disposable = vscode.window.onDidChangeActiveTextEditor(editor => {
-          if (editor && editor.document.uri.scheme !== 'webview') {
-              this.lastNonWebviewEditor = editor;
-          }
-      });
-  }
-
-  public getLastNonWebviewEditor(): vscode.TextEditor | undefined {
-      return this.lastNonWebviewEditor;
-  }
-
-  public dispose() {
-      this.disposable.dispose();
-  }
-}
-
 // Helper to run REST endpoints
 const runEndpointDictWithErrorHandlingOnPort = (
   port: number,
@@ -195,11 +167,9 @@ export function activate(context: ExtensionContext) {
   const fileServerPort = 8072;
   const fileServer = runWSFileServer(8072);
 
-  const tracker = new ActiveEditorTracker();
-
   // Create the show hello world command
   const showHelloWorldCommand = commands.registerCommand("hello-world.showHelloWorld", () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort, tracker);
+    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
   });
 
   // Create a command that allows a user to set an API key for the extension
@@ -222,7 +192,7 @@ export function activate(context: ExtensionContext) {
   });
 
   const chooseAnnotationType = () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort, tracker);
+    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
     const editor = vscode.window.activeTextEditor;
     HelloWorldPanel.currentPanel?.sendMessageObject({
       command: "chooseAnnotationType",
@@ -252,9 +222,8 @@ export function activate(context: ExtensionContext) {
   const setAnnotationColorCommand = commands.registerCommand("hello-world.setAnnotationColor", () => {
     HelloWorldPanel.currentPanel?.setAnnotationColor();
   });
-  
+
   context.subscriptions.push(
-    tracker,
     showHelloWorldCommand,
     sendMessageCommand,
     addAnnotationsCommand,

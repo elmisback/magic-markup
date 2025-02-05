@@ -4,7 +4,6 @@ import { getNonce } from "../utilities/getNonce";
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { ActiveEditorTracker } from "../extension";
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -18,9 +17,9 @@ import { ActiveEditorTracker } from "../extension";
  */
 export class HelloWorldPanel {
   public static currentPanel: HelloWorldPanel | undefined;
-  public static tracker: ActiveEditorTracker;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
+  private _prevTextEditor: vscode.TextEditor | undefined;
   private _isFileEditListenerSet: boolean = false;
   private _isCursorPositionListenerSet: boolean = false;
   private _prevDecorationTypes: vscode.TextEditorDecorationType[] = [];
@@ -52,6 +51,9 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for changes in the active file
     this._setFileEditListener(this._panel.webview);
+
+    // Set previous text editor
+    this._prevTextEditor = vscode.window.activeTextEditor;
   }
 
   /**
@@ -84,7 +86,7 @@ export class HelloWorldPanel {
   }
 
   public addAnnotation(): void {
-    const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "addAnnotation",
@@ -97,6 +99,7 @@ export class HelloWorldPanel {
   }
 
   public removeAnnotation(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "removeAnnotation",
@@ -105,6 +108,7 @@ export class HelloWorldPanel {
   }
 
   public setAnnotationColor(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
     // Get the color from the user
     vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
       this._panel.webview.postMessage(
@@ -120,7 +124,7 @@ export class HelloWorldPanel {
 
   // Function to clear annotations from editor
   public clearDecorations = () => {
-    const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
+    const editor = vscode.window.activeTextEditor || this._prevTextEditor;
     if (!editor) {
       vscode.window.showErrorMessage(
         "Error hiding annotations: no active or previously active text editor"
@@ -139,7 +143,7 @@ export class HelloWorldPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number, tracker: ActiveEditorTracker) {
+  public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
     if (HelloWorldPanel.currentPanel) {
       // If the webview panel already exists reveal it
       HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
@@ -166,7 +170,6 @@ export class HelloWorldPanel {
       );
 
       HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri);
-      HelloWorldPanel.tracker = tracker;
 
       // Send the retag server url to the webview
       HelloWorldPanel.currentPanel.sendMessageObject({
@@ -179,20 +182,19 @@ export class HelloWorldPanel {
         command: "setRetagServerURL",
         data: { retagServerURL: `http://localhost:${retagServerPort}/retag` },
       });
-      const editor = tracker.getLastNonWebviewEditor();
 
-      if (editor) {
+      if (vscode.window.activeTextEditor) {
         // Send the file server url to the webview
         HelloWorldPanel.currentPanel.sendMessageObject({
           command: "setDocumentURI",
-          data: { documentURI: editor.document.fileName },
+          data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
         });
 
         HelloWorldPanel.currentPanel.sendMessageObject({
           command: "setAnnotationsURI",
           data: {
             annotationsURI: path.join(
-              HelloWorldPanel.getAnnotationsURI(editor.document.fileName)
+              HelloWorldPanel.getAnnotationsURI(vscode.window.activeTextEditor?.document.fileName)
             ),
           },
         });
@@ -261,6 +263,7 @@ export class HelloWorldPanel {
   private _setFileEditListener(webview: Webview) {
     if (!this._isFileEditListenerSet) {
       vscode.workspace.onDidChangeTextDocument(() => {
+        const editor = vscode.window.activeTextEditor;
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "handleFileEdit",
@@ -274,7 +277,7 @@ export class HelloWorldPanel {
   private _setCursorChangeListener(webview: Webview) {
     if (!this._isCursorPositionListenerSet) {
       vscode.window.onDidChangeTextEditorSelection(() => {
-        const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
+        const editor = vscode.window.activeTextEditor;
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "handleCursorPositionChange",
@@ -294,14 +297,14 @@ export class HelloWorldPanel {
    */
   private _setActiveTextEditorChangeListener(webview: Webview) {
     vscode.window.onDidChangeActiveTextEditor(() => {
-      const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
-      if (editor) {
+      if (vscode.window.activeTextEditor) {
         this._panel.webview.postMessage(
           JSON.stringify({
             command: "setDocumentURI",
-            data: { documentURI: editor.document.fileName },
+            data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
           })
         );
+        this._prevTextEditor = vscode.window.activeTextEditor;
         // Find parent directory of documentURI that contains a git repository
         // If there isn't a git repository, use the same directory as the documentURI
         this._panel.webview.postMessage(
@@ -309,7 +312,7 @@ export class HelloWorldPanel {
             command: "setAnnotationsURI",
             data: {
               annotationsURI: HelloWorldPanel.getAnnotationsURI(
-                editor.document.fileName
+                vscode.window.activeTextEditor?.document.fileName
               ),
             },
           })
@@ -330,7 +333,7 @@ export class HelloWorldPanel {
     const updateDecorations = (
       annotations: { start: number; end: number; metadata: { color: "string" } }[]
     ) => {
-      const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
+      const editor = vscode.window.activeTextEditor || this._prevTextEditor;
       if (!editor) {
         window.showErrorMessage(
           "Error showing annotations: no active or previously active text editor"
@@ -374,12 +377,6 @@ export class HelloWorldPanel {
             return;
           case "hideAnnotations":
             this.clearDecorations();
-            return;
-          case "scrollToPosition":
-            const editor = HelloWorldPanel.tracker.getLastNonWebviewEditor();
-            const position = editor?.document.positionAt(message.data.position);
-            if (!position) { return; }
-            editor?.revealRange(new vscode.Range(position, position));
             return;
         }
       },

@@ -136,16 +136,6 @@ function AnnotationSidebarView(props: {
 
   const handleClick = (id: string) => () => {
     props.setSelectedAnnotationId(id);
-    // scroll editor
-    const annotation = annotations.find((a) => a.id === id);
-    if (annotation) {
-      vscode.postMessage({
-        command: "scrollToPosition",
-        data: {
-          position: annotation.start,
-        },
-      });
-    }
   };
 
   // <svg
