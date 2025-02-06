@@ -75,7 +75,7 @@
     "start:webview": "cd webview-ui && npm run start",
     "build:webview": "cd webview-ui && npm run build",
     "watch:webview": "cd webview-ui && npm run watch",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:webview && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
