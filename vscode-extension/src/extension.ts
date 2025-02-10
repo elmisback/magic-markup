@@ -82,14 +82,23 @@ function runWSFileServer(port: number) {
           awaitWriteFinish: false,
         });
 
+        // TODO: figure out why this is called twice on file change
         watcher.on("change", (path, stats) => {
           console.debug("file changed:", path);
           const state = fs.readFileSync(documentURI, "utf8");
+          if (!state) {
+            console.error("change: no state to send");
+            return;
+          }
           ws.send(state);
         });
         watcher.on("add", (path, stats) => {
           console.debug("file added:", path);
           const state = fs.readFileSync(documentURI, "utf8");
+          if (!state) {
+            console.error("change: no state to send");
+            return;
+          }
           ws.send(state);
         });
         ws.watcher = watcher;
