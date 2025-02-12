@@ -127,7 +127,7 @@ async function copilotPromptGPTForJSON(t: string) {
   // ];
   try {
     console.log('Selecting model...');
-    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'claude-3.5-sonnet' });
+    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' });
     console.log('Selected model:', model);
     const response = await model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
     console.log('Got response:', response);
