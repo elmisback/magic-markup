@@ -4,7 +4,7 @@
   "publisher": "codetations",
   "repository": "github:elmisback/codetations",
   "description": "Rich code annotations for VS Code",
-  "version": "0.0.8",
+  "version": "0.0.10",
   "engines": {
     "vscode": "^1.91.0"
   },
@@ -13,7 +13,7 @@
     "commands": [
       {
         "command": "hello-world.showHelloWorld",
-        "title": "Hello World (React + Vite): Show",
+        "title": "Codetations: Show",
         "icon": "$(zap)"
       },
       {
@@ -30,11 +30,11 @@
       },
       {
         "command": "hello-world.sendTestMessage",
-        "title": "Hello World (React + Vite): Test"
+        "title": "Codetations: Test"
       },
       {
         "command": "hello-world.setAPIKey",
-        "title": "Hello World (React + Vite): Set API Key"
+        "title": "Codetations: Set API Key"
       }
     ],
     "menus": {
@@ -60,7 +60,7 @@
       ]
     },
     "configuration": {
-      "title": "Hello World (React + Vite)",
+      "title": "Codetations",
       "properties": {
         "hello-world.apiKey": {
           "type": "string",
