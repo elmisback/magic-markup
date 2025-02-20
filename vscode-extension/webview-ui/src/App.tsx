@@ -367,6 +367,10 @@ function RetagHeadlineWarning(props: {
   const { currentDocument, annotations, setAnnotations, retag } = props;
 
   const [isLoading, setIsLoading] = useState(false);
+  const [retagFailed, setRetagFailed] = useState(false);
+
+  // Check if any annotations still need retagging
+  const needsRetag = currentDocument && annotations.some(a => a.document !== currentDocument);
 
   return (
     <>
@@ -378,15 +382,20 @@ function RetagHeadlineWarning(props: {
               disabled={isLoading}
               onClick={async () => {
                 setIsLoading(true);
+                setRetagFailed(false);
                 try {
-                  // Update the annotations after awaiting retagging promises
                   const newAnnotations = await Promise.all(
                     annotations.map(async (annotation) => {
-                      // TODO error handling
                       return (await retag(currentDocument, annotation)) || annotation;
                     })
                   );
                   setAnnotations(newAnnotations);
+                  // Check if retagging was successful
+                  if (newAnnotations.some(a => a.document !== currentDocument)) {
+                    setRetagFailed(true);
+                  }
+                } catch (e) {
+                  setRetagFailed(true);
                 } finally {
                   setIsLoading(false);
                 }
@@ -398,7 +407,7 @@ function RetagHeadlineWarning(props: {
               )}
             </button>
           )}
-          
+          {!isLoading && retagFailed && needsRetag && <div>Retagging failed. Please try again.</div>}
         </>
       )}
     </>
