@@ -366,6 +366,8 @@ function RetagHeadlineWarning(props: {
 }) {
   const { currentDocument, annotations, setAnnotations, retag } = props;
 
+  const [isLoading, setIsLoading] = useState(false);
+
   return (
     <>
       {currentDocument && (
@@ -373,19 +375,30 @@ function RetagHeadlineWarning(props: {
           Document is out of date!
           {retag && (
             <button
+              disabled={isLoading}
               onClick={async () => {
-                // Update the annotations after awaiting retagging promises
-                const newAnnotations = await Promise.all(
-                  annotations.map(async (annotation) => {
-                    // TODO error handling
-                    return (await retag(currentDocument, annotation)) || annotation;
-                  })
-                );
-                setAnnotations(newAnnotations);
+                setIsLoading(true);
+                try {
+                  // Update the annotations after awaiting retagging promises
+                  const newAnnotations = await Promise.all(
+                    annotations.map(async (annotation) => {
+                      // TODO error handling
+                      return (await retag(currentDocument, annotation)) || annotation;
+                    })
+                  );
+                  setAnnotations(newAnnotations);
+                } finally {
+                  setIsLoading(false);
+                }
               }}>
-              Retag
+              {isLoading ? (
+                <span className="loader"></span>
+              ) : (
+                'Retag'
+              )}
             </button>
           )}
+          
         </>
       )}
     </>
