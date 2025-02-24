@@ -395,3 +395,57 @@ export class HelloWorldPanel {
     this._panel.webview.postMessage(JSON.stringify(message));
   }
 }
+
+export class SidebarProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "codetations-annotations";
+
+  constructor(private readonly _extensionUri: vscode.Uri) {}
+
+  resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken,
+  ) {
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this._extensionUri, "out"),
+        vscode.Uri.joinPath(this._extensionUri, "webview-ui/build"),
+      ],
+    };
+
+    webviewView.webview.html = this._getWebviewContent(webviewView.webview, this._extensionUri);
+
+    // Reuse message handling logic from HelloWorldPanel
+    this._setWebviewMessageListener(webviewView.webview);
+  }
+
+  private _getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri) {
+    const stylesUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.css"]);
+    const scriptUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.js"]);
+
+    const nonce = getNonce();
+
+    return /*html*/ `
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+          <link rel="stylesheet" type="text/css" href="${stylesUri}">
+          <title>Codetations</title>
+        </head>
+        <body>
+          <div id="root"></div>
+          <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+        </body>
+      </html>
+    `;
+  }
+
+  private _setWebviewMessageListener(webview: vscode.Webview) {
+    // Implement message handling similar to HelloWorldPanel
+    
+  }
+}

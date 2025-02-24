@@ -10,6 +10,7 @@ import path from "path";
 import chokidar from "chokidar";
 
 import retagUpdate from "./server/retag";
+import { SidebarProvider } from "./panels/HelloWorldPanel";
 
 // Helper to run REST endpoints
 const runEndpointDictWithErrorHandlingOnPort = (
@@ -149,7 +150,16 @@ function runWSFileServer(port: number) {
   return wss;
 }
 
-export function activate(context: ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) {
+  // Register Sidebar Provider
+  const sidebarProvider = new SidebarProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      SidebarProvider.viewType,
+      sidebarProvider
+    )
+  );
+
   // Retag server
   const retagServerPort = 8071;
   const retagServer = runEndpointDictWithErrorHandlingOnPort(
