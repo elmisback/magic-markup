@@ -1,8 +1,5 @@
 import { AnnotationEditorProps } from "./App";
-import React, { TextareaHTMLAttributes, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import ReactMarkdown from "react-markdown";
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
@@ -442,6 +439,20 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
   );
 };
 
+const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
+  // TODO should be what LM parsed from highlighted annotation
+ const expression =  props.utils.getText(); // "sqrt(x+1) - x";
+
+ const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec="
+ const url = odysseyBase + encodeURIComponent(expression);
+
+ return (
+   <div>
+      Explore floating-point Error in parsed expression, {expression}, with <a className={"btn"} href={url}>Odyssey</a>
+   </div>
+ );
+};
+
 /* TODO: Define additional tools as React components here. */
 
 /* TODO: Add all tools to be used here. */
@@ -451,6 +462,7 @@ export const tools = {
   runCodeSegment: RunCodeSegment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
+  odyssey: Odyssey,
 };
 
 export const toolNames = {
@@ -459,4 +471,5 @@ export const toolNames = {
   runCodeSegment: "Run Code Segment",
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
+  odyssey: "Odyssey: FP Explore"
 };
