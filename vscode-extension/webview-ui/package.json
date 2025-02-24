@@ -1,5 +1,5 @@
 {
-  "name": "hello-world",
+  "name": "codetations",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@vscode/webview-ui-toolkit": "^1.2.2",
-    "hello-world": "file:",
+    "codetations": "file:",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",

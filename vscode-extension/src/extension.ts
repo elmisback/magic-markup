@@ -158,7 +158,7 @@ export function activate(context: ExtensionContext) {
       "/retag": async (req: any, res: any) => {
         console.log("Retagging document");
         const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body;
-        const apiKey = vscode.workspace.getConfiguration().get("hello-world.apiKey") as string;
+        const apiKey = vscode.workspace.getConfiguration().get("codetations.apiKey") as string;
         const out = await retagUpdate(
           codeWithSnippetDelimited,
           updatedCodeWithoutDelimiters,
@@ -177,23 +177,23 @@ export function activate(context: ExtensionContext) {
   const fileServer = runWSFileServer(8072);
 
   // Create the show hello world command
-  const showHelloWorldCommand = commands.registerCommand("hello-world.showHelloWorld", () => {
+  const showHelloWorldCommand = commands.registerCommand("codetations.showHelloWorld", () => {
     HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
   });
 
   // Create a command that allows a user to set an API key for the extension
-  const setAPIKeyCommand = commands.registerCommand("hello-world.setAPIKey", async () => {
+  const setAPIKeyCommand = commands.registerCommand("codetations.setAPIKey", async () => {
     const apiKey = await vscode.window.showInputBox({
       prompt: "Enter your OpenAI API key",
       placeHolder: "API Key",
     });
     if (apiKey) {
-      vscode.workspace.getConfiguration().update("hello-world.apiKey", apiKey);
+      vscode.workspace.getConfiguration().update("codetations.apiKey", apiKey);
     }
   });
 
   // Add another command to test messaging the webview
-  const sendMessageCommand = commands.registerCommand("hello-world.sendTestMessage", () => {
+  const sendMessageCommand = commands.registerCommand("codetations.sendTestMessage", () => {
     HelloWorldPanel.currentPanel?.sendMessageObject({
       command: "test",
       data: vscode.window.activeTextEditor?.document.fileName,
@@ -214,7 +214,7 @@ export function activate(context: ExtensionContext) {
   };
 
   // Create a command for adding annotations
-  const addAnnotationsCommand = commands.registerCommand("hello-world.addAnnotation", () => {
+  const addAnnotationsCommand = commands.registerCommand("codetations.addAnnotation", () => {
     if (HelloWorldPanel.currentPanel) {
       HelloWorldPanel.currentPanel.addAnnotation();
     } else {
@@ -223,12 +223,12 @@ export function activate(context: ExtensionContext) {
   });
 
   // Command for removing annotations
-  const removeAnnotationsCommand = commands.registerCommand("hello-world.removeAnnotation", () => {
+  const removeAnnotationsCommand = commands.registerCommand("codetations.removeAnnotation", () => {
     HelloWorldPanel.currentPanel?.removeAnnotation();
   });
 
   // Command for setting annotation color
-  const setAnnotationColorCommand = commands.registerCommand("hello-world.setAnnotationColor", () => {
+  const setAnnotationColorCommand = commands.registerCommand("codetations.setAnnotationColor", () => {
     HelloWorldPanel.currentPanel?.setAnnotationColor();
   });
 

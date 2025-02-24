@@ -12,49 +12,49 @@
   "contributes": {
     "commands": [
       {
-        "command": "hello-world.showHelloWorld",
+        "command": "codetations.showHelloWorld",
         "title": "Codetations: Show",
         "icon": "$(zap)"
       },
       {
-        "command": "hello-world.addAnnotation",
+        "command": "codetations.addAnnotation",
         "title": "Add Annotation"
       },
       {
-        "command": "hello-world.removeAnnotation",
+        "command": "codetations.removeAnnotation",
         "title": "Remove Annotation"
       },
       {
-        "command": "hello-world.setAnnotationColor",
+        "command": "codetations.setAnnotationColor",
         "title": "Set Annotation Color"
       },
       {
-        "command": "hello-world.sendTestMessage",
+        "command": "codetations.sendTestMessage",
         "title": "Codetations: Test"
       },
       {
-        "command": "hello-world.setAPIKey",
+        "command": "codetations.setAPIKey",
         "title": "Codetations: Set API Key"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "hello-world.addAnnotation",
+          "command": "codetations.addAnnotation",
           "group": "navigation"
         },
         {
-          "command": "hello-world.removeAnnotation",
+          "command": "codetations.removeAnnotation",
           "group": "navigation"
         },
         {
-          "command": "hello-world.setAnnotationColor",
+          "command": "codetations.setAnnotationColor",
           "group": "navigation"
         }
       ],
       "editor/title": [
         {
-          "command": "hello-world.showHelloWorld",
+          "command": "codetations.showHelloWorld",
           "group": "navigation"
         }
       ]
@@ -62,7 +62,7 @@
     "configuration": {
       "title": "Codetations",
       "properties": {
-        "hello-world.apiKey": {
+        "codetations.apiKey": {
           "type": "string",
           "default": "",
           "description": "API Key for OpenAI GPT-3"
