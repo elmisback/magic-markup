@@ -805,7 +805,7 @@ function App() {
                 }}>
                 {Object.keys(toolTypes).map((toolKey) => (
                   <option key={toolKey} value={toolKey}>
-                    {toolKey}
+                    {toolNames[toolKey as keyof typeof toolNames]}
                   </option>
                 ))}
               </select>
