@@ -177,7 +177,7 @@ export function activate(context: ExtensionContext) {
   const fileServer = runWSFileServer(8072);
 
   // Create the show hello world command
-  const showHelloWorldCommand = commands.registerCommand("codetations.showHelloWorld", () => {
+  const showAnnotationsCommand = commands.registerCommand("codetations.showAnnotations", () => {
     HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
   });
 
@@ -233,7 +233,7 @@ export function activate(context: ExtensionContext) {
   });
 
   context.subscriptions.push(
-    showHelloWorldCommand,
+    showAnnotationsCommand,
     sendMessageCommand,
     addAnnotationsCommand,
     removeAnnotationsCommand,

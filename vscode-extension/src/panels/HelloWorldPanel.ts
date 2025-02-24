@@ -151,7 +151,7 @@ export class HelloWorldPanel {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
         // Panel view type
-        "showHelloWorld",
+        "showAnnotations",
         // Panel title
         "Codetations",
         // The editor column the panel should be displayed in

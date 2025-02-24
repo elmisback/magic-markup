@@ -10,9 +10,23 @@
   },
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [{
+        "id": "codetations-sidebar",
+        "title": "Codetations",
+        "icon": "$(zap)"
+      }]
+    },
+    "views": {
+      "codetations-sidebar": [{
+        "id": "codetations-annotations",
+        "name": "Annotations",
+        "type": "webview"
+      }]
+    },
     "commands": [
       {
-        "command": "codetations.showHelloWorld",
+        "command": "codetations.showAnnotations",
         "title": "Codetations: Show",
         "icon": "$(zap)"
       },
@@ -54,7 +68,7 @@
       ],
       "editor/title": [
         {
-          "command": "codetations.showHelloWorld",
+          "command": "codetations.showAnnotations",
           "group": "navigation"
         }
       ]
