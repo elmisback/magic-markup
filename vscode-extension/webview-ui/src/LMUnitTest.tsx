@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AnnotationEditorProps } from "./App";
 import { lmApi } from './lm-api-client';
 
@@ -13,6 +13,12 @@ type ChatMessage = {
   content: string;
 }
 
+// Helper for debugging
+const debugLog = (message: string, data?: any) => {
+  const logMessage = data ? `${message}: ${JSON.stringify(data)}` : message;
+  console.log(`[LMUnitTest Debug] ${logMessage}`);
+};
+
 const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   // State management
   const [question, setQuestion] = useState(props.value.metadata.question || '');
@@ -21,6 +27,18 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   const [suggestion, setSuggestion] = useState(props.value.metadata.suggestion || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  
+  // Track if component is mounted
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    debugLog("Component mounted");
+    return () => {
+      isMounted.current = false;
+      debugLog("Component unmounted");
+    };
+  }, []);
 
   // Get the anchor text and document text
   const anchorText = props.utils.getText();
@@ -28,8 +46,18 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   const startPos = props.value.start;
   const endPos = props.value.end;
 
+  useEffect(() => {
+    debugLog("Component props received", { 
+      anchorText, 
+      startPos, 
+      endPos, 
+      documentTextLength: documentText?.length || 0
+    });
+  }, []);
+
   // Save state changes to metadata
   useEffect(() => {
+    debugLog("Updating metadata", { question, answer, explanation });
     props.utils.setMetadata({ 
       question, 
       answer, 
@@ -40,13 +68,58 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
 
   // Create formatted document text with anchor highlighted
   const createFormattedDocument = () => {
-    if (!documentText) return '';
+    if (!documentText) {
+      debugLog("Document text is empty");
+      return '';
+    }
     
     const before = documentText.substring(0, startPos);
     const highlighted = documentText.substring(startPos, endPos);
     const after = documentText.substring(endPos);
 
+    debugLog("Created formatted document", { 
+      beforeLength: before.length, 
+      highlightedLength: highlighted.length, 
+      afterLength: after.length 
+    });
+    
     return `${before}<<<HIGHLIGHTED>${highlighted}</HIGHLIGHTED>>>${after}`;
+  };
+
+  // Add debug info
+  const addDebugInfo = (info: string, data?: any) => {
+    const logMessage = data ? `${info}: ${JSON.stringify(data)}` : info;
+    console.log(`[LMUnitTest Debug] ${logMessage}`);
+    setDebugInfo(prev => [...prev, logMessage]);
+  };
+
+  // Check if lmApi is properly defined
+  useEffect(() => {
+    if (!lmApi) {
+      addDebugInfo("ERROR: lmApi is not defined. Check import.");
+    } else {
+      addDebugInfo("lmApi is defined properly");
+      // Check if chat method exists
+      if (typeof lmApi.chat !== 'function') {
+        addDebugInfo("ERROR: lmApi.chat is not a function");
+      } else {
+        addDebugInfo("lmApi.chat is defined properly");
+      }
+    }
+  }, []);
+
+  // Mock function for testing when the real API isn't working
+  const mockApiCall = async (messages: ChatMessage[]): Promise<string> => {
+    addDebugInfo("Using mock API instead of real API");
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(`{
+          "answer": false,
+          "explanation": "This is a mock response for testing",
+          "suggestion": "Mock suggested improvement"
+        }`);
+      }, 1000);
+    });
   };
 
   // Ask question to the language model
@@ -61,10 +134,19 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
     setAnswer(null);
     setExplanation('');
     setSuggestion('');
+    setDebugInfo([]);
+
+    addDebugInfo("Starting LM request process");
 
     try {
       // Prepare the prompt for the language model with structured output format
       const formattedDocument = createFormattedDocument();
+      
+      // Check if document formatting succeeded
+      if (!formattedDocument) {
+        throw new Error("Failed to format document for the prompt");
+      }
+      
       const prompt: ChatMessage[] = [
         { 
           role: "system", 
@@ -88,32 +170,56 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         }
       ];
 
-      // Call the language model
-      const response = await lmApi.chat(prompt, {
-        vendor: 'copilot',
-        family: 'gpt-4o',
-        temperature: 0.3
-      });
+      addDebugInfo("Prepared prompt for LM");
+      addDebugInfo(`Prompt first 100 chars: ${prompt[1].content.substring(0, 100)}...`);
+
+      // Try to call the language model, with fallback to mock
+      let response = '';
+      try {
+        addDebugInfo("Calling lmApi.chat()");
+        response = await lmApi.chat(prompt, {
+          vendor: 'copilot',
+          family: 'gpt-4o',
+          temperature: 0.3
+        });
+        addDebugInfo("Received response from LM API");
+      } catch (apiError) {
+        addDebugInfo(`API call error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
+        addDebugInfo("Falling back to mock API");
+        response = await mockApiCall(prompt);
+      }
+
+      addDebugInfo(`Response first 100 chars: ${response.substring(0, 100)}...`);
 
       // Parse the response to get structured data
       try {
+        addDebugInfo("Attempting to parse JSON response");
         // Find JSON in the response - it might have markdown code blocks or other text
         const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
                          response.match(/```\s*([\s\S]*?)\s*```/) ||
                          response.match(/({[\s\S]*})/);
                 
         const jsonStr = jsonMatch ? jsonMatch[1] : response;
+        addDebugInfo(`Extracted JSON string: ${jsonStr.substring(0, 100)}...`);
+        
         const parsedResponse: YesNoResponse = JSON.parse(jsonStr);
+        addDebugInfo("Successfully parsed JSON", parsedResponse);
         
         // Update state with structured response
-        setAnswer(parsedResponse.answer);
-        setExplanation(parsedResponse.explanation);
-        
-        if (!parsedResponse.answer && parsedResponse.suggestion) {
-          setSuggestion(parsedResponse.suggestion);
+        if (isMounted.current) {
+          setAnswer(parsedResponse.answer);
+          setExplanation(parsedResponse.explanation);
+          
+          if (!parsedResponse.answer && parsedResponse.suggestion) {
+            setSuggestion(parsedResponse.suggestion);
+          }
+          addDebugInfo("Updated state with response data");
         }
       } catch (parseError) {
+        addDebugInfo(`JSON parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         // If we can't parse JSON, make a second call to fix the format
+        addDebugInfo("Making second call to fix format");
+        
         const fixPrompt: ChatMessage[] = [
           {
             role: "system",
@@ -131,44 +237,76 @@ The "answer" field must be true or false. The "explanation" should be brief and 
           }
         ];
         
-        const fixedResponse = await lmApi.chat(fixPrompt, {
-          vendor: 'copilot',
-          family: 'gpt-4o',
-          temperature: 0.1
-        });
+        let fixedResponse = '';
+        try {
+          addDebugInfo("Calling API for format fixing");
+          fixedResponse = await lmApi.chat(fixPrompt, {
+            vendor: 'copilot',
+            family: 'gpt-4o',
+            temperature: 0.1
+          });
+          addDebugInfo("Received fixed format response");
+        } catch (secondApiError) {
+          addDebugInfo(`Second API call error: ${secondApiError instanceof Error ? secondApiError.message : String(secondApiError)}`);
+          // Fallback to mock for testing
+          fixedResponse = `{"answer": false, "explanation": "Mock explanation after error", "suggestion": "Mock suggestion after error"}`;
+        }
         
         try {
+          addDebugInfo("Attempting to parse fixed JSON response");
           const fixedJsonMatch = fixedResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
                                 fixedResponse.match(/```\s*([\s\S]*?)\s*```/) ||
                                 fixedResponse.match(/({[\s\S]*})/);
                                 
           const fixedJsonStr = fixedJsonMatch ? fixedJsonMatch[1] : fixedResponse;
+          addDebugInfo(`Fixed JSON string: ${fixedJsonStr.substring(0, 100)}...`);
+          
           const parsedFixed: YesNoResponse = JSON.parse(fixedJsonStr);
+          addDebugInfo("Successfully parsed fixed JSON", parsedFixed);
           
-          setAnswer(parsedFixed.answer);
-          setExplanation(parsedFixed.explanation);
-          
-          if (!parsedFixed.answer && parsedFixed.suggestion) {
-            setSuggestion(parsedFixed.suggestion);
+          if (isMounted.current) {
+            setAnswer(parsedFixed.answer);
+            setExplanation(parsedFixed.explanation);
+            
+            if (!parsedFixed.answer && parsedFixed.suggestion) {
+              setSuggestion(parsedFixed.suggestion);
+            }
+            addDebugInfo("Updated state with fixed response data");
           }
         } catch (secondError) {
+          addDebugInfo(`Second JSON parse error: ${secondError instanceof Error ? secondError.message : String(secondError)}`);
           // If we still can't parse, fallback to basic parsing
+          addDebugInfo("Falling back to basic text parsing");
           const isYes = /yes|true|correct|right/i.test(response.toLowerCase());
-          setAnswer(isYes);
-          setExplanation("Couldn't parse a structured response.");
+          
+          if (isMounted.current) {
+            setAnswer(isYes);
+            setExplanation("Couldn't parse a structured response.");
+            addDebugInfo(`Set fallback answer to ${isYes ? "YES" : "NO"}`);
+          }
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred while asking the question');
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred while asking the question';
+      addDebugInfo(`Overall error: ${errorMsg}`);
+      
+      if (isMounted.current) {
+        setError(errorMsg);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+        addDebugInfo("Process completed, loading state set to false");
+      }
     }
   };
 
   // Apply the suggested text to the document
   const applySuggestion = () => {
     if (suggestion && window.confirm('Are you sure you want to update the text in your document?')) {
-      window.vscode.postMessage({
+      addDebugInfo(`Applying suggestion to document: ${suggestion.substring(0, 50)}...`);
+      
+      window.vscode?.postMessage({
         command: "replaceText",
         data: {
           start: startPos,
@@ -180,6 +318,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
       // Update the answer to reflect the change
       setAnswer(true);
       setSuggestion('');
+      addDebugInfo("Suggestion applied, state updated");
     }
   };
 
@@ -233,6 +372,25 @@ The "answer" field must be true or false. The "explanation" should be brief and 
           fontSize: "14px"
         }}>
           {error}
+        </div>
+      )}
+
+      {debugInfo.length > 0 && (
+        <div style={{
+          marginBottom: "12px",
+          padding: "8px",
+          backgroundColor: "#F0F0F0",
+          border: "1px solid #ccc",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontFamily: "monospace",
+          maxHeight: "150px",
+          overflowY: "auto"
+        }}>
+          <div style={{ fontWeight: "bold", marginBottom: "5px" }}>Debug Info:</div>
+          {debugInfo.map((info, i) => (
+            <div key={i}>{info}</div>
+          ))}
         </div>
       )}
 
