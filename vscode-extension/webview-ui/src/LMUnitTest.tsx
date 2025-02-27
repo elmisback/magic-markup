@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AnnotationEditorProps } from "./App";
-import { lmApi, mockLmApi } from './lm-api-client'; // Import both real and mock API
+import { lmApi, mockLmApi, ChatMessage } from './lm-api-client'; // Import both real and mock API
 import { vscode } from "./utilities/vscode"; // Import VSCode wrapper
 
 interface YesNoResponse {
   answer: boolean;
   explanation: string;
   suggestion?: string;
-}
-
-type ChatMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
 }
 
 // Helper for debugging
