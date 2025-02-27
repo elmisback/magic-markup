@@ -1,301 +1,273 @@
-// lm-api-client.ts
-// Updated to use VSCodeAPIWrapper instead of window.vscode
+import React, { useState, useRef } from 'react';
+import { AnnotationEditorProps } from "./App";
+import { lmApi, ChatMessage } from './lm-api-client';
 
-import { vscode } from "./utilities/vscode";
-
-// Type definitions
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-export interface LMOptions {
-  vendor?: string;
-  family?: string;
-  temperature?: number;
-  maxTokens?: number;
-  stream?: boolean;
-}
-
-export interface StreamingCallbacks {
-  onChunk?: (chunk: string) => void;
-  onComplete?: (fullResponse: string) => void;
-  onError?: (error: Error) => void;
-}
-
-// Debug logging helper
-const debugLog = (message: string, data?: any) => {
-  const logMessage = data ? `${message}: ${JSON.stringify(data, null, 2)}` : message;
-  console.log(`[LM API Client] ${logMessage}`);
-};
-
-// Main API client class
-class LMApiClient {
-  private nextRequestId = 1;
-  private pendingRequests = new Map<string, {
-    resolve: (value: any) => void;
-    reject: (reason: any) => void;
-    onChunk?: (chunk: string) => void;
-    onComplete?: (fullResponse: string) => void;
-    timestamp: number;
-  }>();
-
-  constructor() {
-    debugLog("Initializing LM API Client");
-    
-    // Setup message listener
-    window.addEventListener('message', this.handleMessage.bind(this));
-    debugLog("Message listener attached");
-    
-    // Log initial status
-    debugLog("VSCode API wrapper available:", { available: !!vscode });
-  }
-
-  // Process incoming messages from extension host
-  private handleMessage(event: MessageEvent) {
-    try {
-      debugLog("Received message from extension", { 
-        type: typeof event.data,
-        data: typeof event.data === 'string' ? event.data.substring(0, 100) : event.data 
-      });
-      
-      const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-      
-      if (!message || !message.id) {
-        debugLog("Message missing id, ignoring", message);
-        return;
-      }
-      
-      const pendingRequest = this.pendingRequests.get(message.id);
-      if (!pendingRequest) {
-        debugLog(`No pending request found for id: ${message.id}`);
-        return;
-      }
-      
-      debugLog(`Found pending request for id: ${message.id}`);
-      
-      // Handle streaming chunks
-      if ('chunk' in message) {
-        debugLog(`Received chunk for request ${message.id}`, { 
-          contentLength: message.chunk.content?.length,
-          isComplete: message.chunk.isComplete
-        });
-        
-        if (message.chunk.content && pendingRequest.onChunk) {
-          pendingRequest.onChunk(message.chunk.content);
-        }
-        
-        if (message.chunk.isComplete) {
-          debugLog(`Request ${message.id} is complete (streaming)`);
-          if (pendingRequest.onComplete) {
-            pendingRequest.onComplete(message.payload?.result?.content || '');
-          }
-          pendingRequest.resolve(message.payload?.result?.content || '');
-          this.pendingRequests.delete(message.id);
-        }
-        return;
-      }
-      
-      // Handle regular (non-streaming) responses
-      if (message.isResponse) {
-        if (message.error) {
-          debugLog(`Request ${message.id} failed with error`, message.error);
-          const errorObj = typeof message.error === 'string' 
-            ? this.safeJsonParse(message.error) || { message: message.error }
-            : message.error;
-          pendingRequest.reject(new Error(errorObj.message || 'Unknown error'));
-        } else {
-          debugLog(`Request ${message.id} succeeded`, { 
-            responseLength: message.payload?.result?.content?.length 
-          });
-          pendingRequest.resolve(message.payload?.result?.content || '');
-        }
-        this.pendingRequests.delete(message.id);
-        debugLog(`Removed request ${message.id} from pending requests`);
-      }
-    } catch (error) {
-      debugLog('Error handling message', { 
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-    }
-  }
-
-  // Safely parse JSON with error handling
-  private safeJsonParse(text: string) {
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Send a chat request to the language model
-   * @param messages Array of chat messages
-   * @param options Model options
-   * @returns Promise that resolves with the model's response
-   */
-  chat(messages: ChatMessage[], options: LMOptions = {}): Promise<string> {
-    const id = `req_${this.nextRequestId++}`;
-    debugLog(`Creating new chat request with id: ${id}`, { messages, options });
-    
-    return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { 
-        resolve, 
-        reject, 
-        timestamp: Date.now() 
-      });
-      
-      const request = {
-        command: "lm.chat",
-        id,
-        data: {
-          messages,
-          options
-        }
-      };
-      
-      debugLog(`Sending request ${id} to extension`, request);
-      
-      try {
-        // Use the vscode wrapper instead of window.vscode
-        vscode.postMessage(request);
-        debugLog(`Request ${id} sent successfully`);
-      } catch (err) {
-        debugLog(`Error sending request ${id}`, { 
-          error: err instanceof Error ? err.message : String(err) 
-        });
-        this.pendingRequests.delete(id);
-        reject(err);
-      }
+const LMApiTest: React.FC<AnnotationEditorProps> = (props) => {
+  const [prompt, setPrompt] = useState(props.value.metadata.prompt || '');
+  const [response, setResponse] = useState(props.value.metadata.response || '');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [model, setModel] = useState(props.value.metadata.model || 'gpt-4o');
+  const [vendor, setVendor] = useState(props.value.metadata.vendor || 'copilot');
+  const [isStreaming, setIsStreaming] = useState(props.value.metadata.isStreaming !== false);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  
+  // Save state to metadata
+  const saveMetadata = () => {
+    props.utils.setMetadata({ 
+      prompt, 
+      response, 
+      model, 
+      vendor,
+      isStreaming
     });
-  }
+  };
 
-  /**
-   * Send a streaming chat request to the language model
-   * @param messages Array of chat messages
-   * @param options Model options
-   * @param callbacks Callbacks for streaming responses
-   * @returns Promise that resolves with the complete response
-   */
-  streamChat(
-    messages: ChatMessage[], 
-    options: LMOptions = {}, 
-    callbacks: StreamingCallbacks = {}
-  ): Promise<string> {
-    const id = `req_${this.nextRequestId++}`;
-    const streamOptions = { ...options, stream: true };
-    
-    debugLog(`Creating new streaming chat request with id: ${id}`, { 
-      messages, 
-      options: streamOptions
-    });
-    
-    return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { 
-        resolve, 
-        reject,
-        onChunk: callbacks.onChunk,
-        onComplete: callbacks.onComplete,
-        timestamp: Date.now()
-      });
-      
-      const request = {
-        command: "lm.chat",
-        id,
-        data: {
-          messages,
-          options: streamOptions
-        }
-      };
-      
-      debugLog(`Sending streaming request ${id} to extension`, request);
-      
-      try {
-        // Use the vscode wrapper instead of window.vscode
-        vscode.postMessage(request);
-        debugLog(`Streaming request ${id} sent successfully`);
-      } catch (err) {
-        debugLog(`Error sending streaming request ${id}`, { 
-          error: err instanceof Error ? err.message : String(err) 
-        });
-        this.pendingRequests.delete(id);
-        reject(err);
-      }
-    });
-  }
-
-  /**
-   * Cancel an ongoing request
-   * @param requestId The ID of the request to cancel
-   */
-  cancelRequest(requestId: string): void {
-    debugLog(`Attempting to cancel request ${requestId}`);
-    
-    if (!this.pendingRequests.has(requestId)) {
-      debugLog(`Request ${requestId} not found in pending requests`);
+  // Send request to the language model
+  const sendRequest = async () => {
+    if (!prompt.trim()) {
+      setError('Please enter a prompt');
       return;
     }
+
+    setIsLoading(true);
+    setError(null);
+    setResponse('');
     
     try {
-      vscode.postMessage({
-        command: "lm.cancelRequest",
-        id: requestId
-      });
-      debugLog(`Cancel request sent for ${requestId}`);
-    } catch (err) {
-      debugLog(`Error sending cancel request for ${requestId}`, { 
-        error: err instanceof Error ? err.message : String(err) 
-      });
-    }
-    
-    const pendingRequest = this.pendingRequests.get(requestId);
-    if (pendingRequest) {
-      pendingRequest.reject(new Error('Request was cancelled'));
-      this.pendingRequests.delete(requestId);
-      debugLog(`Request ${requestId} marked as cancelled and removed from pending`);
-    }
-  }
-
-  /**
-   * Use mock response instead of real API (for testing)
-   */
-  mockChat(messages: ChatMessage[]): Promise<string> {
-    debugLog("Using mock chat response");
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const lastUserMessage = messages.find(m => m.role === 'user')?.content || '';
-        const isYesNo = messages[0]?.content?.includes('yes/no') || false;
+      // Prepare message format
+      const messages: ChatMessage[] = [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: prompt }
+      ];
+      
+      if (isStreaming) {
+        // Use streaming API
+        const responseText = await lmApi.streamChat(
+          messages,
+          {
+            vendor,
+            family: model,
+            temperature: 0.7
+          },
+          {
+            onChunk: (chunk) => {
+              setResponse((prev: string) => prev + chunk);
+            },
+            onComplete: (fullResponse) => {
+              // This is redundant as we're building the response in onChunk,
+              // but included for completeness
+              setResponse(fullResponse);
+              saveMetadata();
+            }
+          }
+        );
+      } else {
+        // Use regular API
+        const responseText = await lmApi.chat(
+          messages,
+          {
+            vendor,
+            family: model,
+            temperature: 0.7
+          }
+        );
         
-        if (isYesNo) {
-          resolve(`{
-            "answer": false,
-            "explanation": "This is a mock response for testing the Yes/No component",
-            "suggestion": "Mock suggested improvement for the highlighted code"
-          }`);
-        } else {
-          resolve(`This is a mock response from the LM API client.\nYou asked: "${lastUserMessage}"\n\nThis is a simulated response for testing purposes.`);
-        }
-      }, 1000);
-    });
-  }
-}
+        setResponse(responseText);
+        saveMetadata();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while sending the request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-// Create a singleton instance
-export const lmApi = new LMApiClient();
+  return (
+    <div style={{ padding: "10px", fontFamily: "Poppins, sans-serif" }}>
+      <div style={{ marginBottom: "15px" }}>
+        <label style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "5px", display: "block" }}>
+          LM API Test Tool
+        </label>
+        <p style={{ fontSize: "12px", color: "#666", marginBottom: "10px" }}>
+          This tool is for testing the Language Model API integration.
+        </p>
+      </div>
+      
+      <div style={{ marginBottom: "15px", display: "flex", gap: "10px" }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: "14px", marginBottom: "5px", display: "block" }}>
+            Vendor:
+          </label>
+          <select 
+            value={vendor}
+            onChange={(e) => {
+              setVendor(e.target.value);
+              props.utils.setMetadata({ ...props.value.metadata, vendor: e.target.value });
+            }}
+            style={{
+              padding: "6px",
+              width: "100%",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              fontSize: "14px"
+            }}
+          >
+            <option value="copilot">Copilot</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: "14px", marginBottom: "5px", display: "block" }}>
+            Model:
+          </label>
+          <select 
+            value={model}
+            onChange={(e) => {
+              setModel(e.target.value);
+              props.utils.setMetadata({ ...props.value.metadata, model: e.target.value });
+            }}
+            style={{
+              padding: "6px",
+              width: "100%",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              fontSize: "14px"
+            }}
+          >
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            <option value="claude-3-opus">Claude 3 Opus</option>
+            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+          </select>
+        </div>
+      </div>
+      
+      <div style={{ marginBottom: "10px" }}>
+        <label style={{ display: "flex", alignItems: "center", fontSize: "14px", cursor: "pointer" }}>
+          <input 
+            type="checkbox" 
+            checked={isStreaming} 
+            onChange={() => {
+              setIsStreaming(!isStreaming);
+              props.utils.setMetadata({ ...props.value.metadata, isStreaming: !isStreaming });
+            }}
+            style={{ marginRight: "6px" }}
+          />
+          Enable streaming
+        </label>
+      </div>
 
-// Add a fallback mock implementation
-// This can be used if the real API isn't working
-// export const mockLmApi = {
-//   chat: (messages: ChatMessage[], options?: LMOptions) => lmApi.mockChat(messages),
-//   streamChat: (messages: ChatMessage[], options?: LMOptions, callbacks?: StreamingCallbacks) => {
-//     const { onChunk } = callbacks || {};
-//     if (onChunk) {
-//       setTimeout(() => onChunk("This is a mock streaming "), 200);
-//       setTimeout(() => onChunk("response for "), 400);
-//       setTimeout(() => onChunk("testing purposes."), 600);
-//     }
-//     return lmApi.mockChat(messages);
-//   }
-// };
+      <div style={{ marginBottom: "15px" }}>
+        <label style={{ fontSize: "14px", marginBottom: "5px", display: "block" }}>
+          Prompt:
+        </label>
+        <textarea
+          value={prompt}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            // No need to save on each keystroke
+          }}
+          placeholder="Enter your prompt here..."
+          style={{
+            width: "100%",
+            padding: "8px",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+            fontSize: "14px",
+            minHeight: "100px",
+            resize: "vertical"
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: "15px", display: "flex", gap: "10px" }}>
+        <button
+          onClick={sendRequest}
+          disabled={isLoading || !prompt.trim()}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: isLoading || !prompt.trim() ? "#cccccc" : "#0078D4",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: isLoading || !prompt.trim() ? "default" : "pointer",
+            fontSize: "14px"
+          }}
+        >
+          {isLoading ? "Sending..." : "Send Request"}
+        </button>
+        
+        <button
+          onClick={() => {
+            setPrompt('');
+            setResponse('');
+            setError(null);
+            props.utils.setMetadata({ 
+              ...props.value.metadata, 
+              prompt: '', 
+              response: '' 
+            });
+          }}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#f0f0f0",
+            color: "#333",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "14px"
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ 
+          color: "#D83B01", 
+          backgroundColor: "#FED9CC", 
+          padding: "8px", 
+          borderRadius: "4px",
+          marginBottom: "15px",
+          fontSize: "14px"
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      <div style={{ marginBottom: "10px" }}>
+        <label style={{ fontSize: "14px", marginBottom: "5px", display: "block" }}>
+          Response:
+        </label>
+        <div 
+          style={{
+            width: "100%",
+            padding: "8px",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+            backgroundColor: "#f8f8f8",
+            fontSize: "14px",
+            minHeight: "150px",
+            maxHeight: "400px",
+            overflowY: "auto",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          }}
+        >
+          {isLoading && !response ? (
+            <div style={{ color: "#666", fontStyle: "italic" }}>Waiting for response...</div>
+          ) : response ? (
+            response
+          ) : (
+            <div style={{ color: "#666", fontStyle: "italic" }}>Response will appear here</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LMApiTest;
