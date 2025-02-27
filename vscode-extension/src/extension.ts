@@ -1,5 +1,5 @@
 import { commands, ExtensionContext } from "vscode";
-import { HelloWorldPanel } from "./panels/HelloWorldPanel";
+import { AnnotationManagerPanel } from "./panels/HelloWorldPanel";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -188,7 +188,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Create the show hello world command
   const showAnnotationsCommand = commands.registerCommand("codetations.showAnnotations", () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+    AnnotationManagerPanel.render(context.extensionUri, retagServerPort, fileServerPort);
   });
 
   // Create a command that allows a user to set an API key for the extension
@@ -204,16 +204,16 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Add another command to test messaging the webview
   const sendMessageCommand = commands.registerCommand("codetations.sendTestMessage", () => {
-    HelloWorldPanel.currentPanel?.sendMessageObject({
+    AnnotationManagerPanel.currentPanel?.sendMessageObject({
       command: "test",
       data: vscode.window.activeTextEditor?.document.fileName,
     });
   });
 
   const chooseAnnotationType = () => {
-    HelloWorldPanel.render(context.extensionUri, retagServerPort, fileServerPort);
+    AnnotationManagerPanel.render(context.extensionUri, retagServerPort, fileServerPort);
     const editor = vscode.window.activeTextEditor;
-    HelloWorldPanel.currentPanel?.sendMessageObject({
+    AnnotationManagerPanel.currentPanel?.sendMessageObject({
       command: "chooseAnnotationType",
       data: {
         start: editor?.document.offsetAt(editor.selection.start),
@@ -225,8 +225,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Create a command for adding annotations
   const addAnnotationsCommand = commands.registerCommand("codetations.addAnnotation", () => {
-    if (HelloWorldPanel.currentPanel) {
-      HelloWorldPanel.currentPanel.addAnnotation();
+    if (AnnotationManagerPanel.currentPanel) {
+      AnnotationManagerPanel.currentPanel.addAnnotation();
     } else {
       chooseAnnotationType();
     }
@@ -234,12 +234,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Command for removing annotations
   const removeAnnotationsCommand = commands.registerCommand("codetations.removeAnnotation", () => {
-    HelloWorldPanel.currentPanel?.removeAnnotation();
+    AnnotationManagerPanel.currentPanel?.removeAnnotation();
   });
 
   // Command for setting annotation color
   const setAnnotationColorCommand = commands.registerCommand("codetations.setAnnotationColor", () => {
-    HelloWorldPanel.currentPanel?.setAnnotationColor();
+    AnnotationManagerPanel.currentPanel?.setAnnotationColor();
   });
 
   context.subscriptions.push(

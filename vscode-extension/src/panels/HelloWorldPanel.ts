@@ -15,8 +15,8 @@ import * as fs from "fs";
  * - Setting the HTML (and by proxy CSS/JavaScript) content of the webview panel
  * - Setting message listeners so data can be passed between the webview and extension
  */
-export class HelloWorldPanel {
-  public static currentPanel: HelloWorldPanel | undefined;
+export class AnnotationManagerPanel {
+  public static currentPanel: AnnotationManagerPanel | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
@@ -144,9 +144,9 @@ export class HelloWorldPanel {
    * @param extensionUri The URI of the directory containing the extension.
    */
   public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
-    if (HelloWorldPanel.currentPanel) {
+    if (AnnotationManagerPanel.currentPanel) {
       // If the webview panel already exists reveal it
-      HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
+      AnnotationManagerPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -169,32 +169,32 @@ export class HelloWorldPanel {
         }
       );
 
-      HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri);
+      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(panel, extensionUri);
 
       // Send the retag server url to the webview
-      HelloWorldPanel.currentPanel.sendMessageObject({
+      AnnotationManagerPanel.currentPanel.sendMessageObject({
         command: "setFileServerURL",
         data: { fileServerURL: `ws://localhost:${fileServerPort}` },
       });
 
       // Send the retag server url to the webview
-      HelloWorldPanel.currentPanel.sendMessageObject({
+      AnnotationManagerPanel.currentPanel.sendMessageObject({
         command: "setRetagServerURL",
         data: { retagServerURL: `http://localhost:${retagServerPort}/retag` },
       });
 
       if (vscode.window.activeTextEditor) {
         // Send the file server url to the webview
-        HelloWorldPanel.currentPanel.sendMessageObject({
+        AnnotationManagerPanel.currentPanel.sendMessageObject({
           command: "setDocumentURI",
           data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
         });
 
-        HelloWorldPanel.currentPanel.sendMessageObject({
+        AnnotationManagerPanel.currentPanel.sendMessageObject({
           command: "setAnnotationsURI",
           data: {
             annotationsURI: path.join(
-              HelloWorldPanel.getAnnotationsURI(vscode.window.activeTextEditor?.document.fileName)
+              AnnotationManagerPanel.getAnnotationsURI(vscode.window.activeTextEditor?.document.fileName)
             ),
           },
         });
@@ -206,9 +206,9 @@ export class HelloWorldPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    HelloWorldPanel.currentPanel?.clearDecorations();
+    AnnotationManagerPanel.currentPanel?.clearDecorations();
 
-    HelloWorldPanel.currentPanel = undefined;
+    AnnotationManagerPanel.currentPanel = undefined;
 
     // Dispose of the current webview panel
     this._panel.dispose();
@@ -311,7 +311,7 @@ export class HelloWorldPanel {
           JSON.stringify({
             command: "setAnnotationsURI",
             data: {
-              annotationsURI: HelloWorldPanel.getAnnotationsURI(
+              annotationsURI: AnnotationManagerPanel.getAnnotationsURI(
                 vscode.window.activeTextEditor?.document.fileName
               ),
             },
@@ -359,7 +359,7 @@ export class HelloWorldPanel {
     };
 
     webview.onDidReceiveMessage(
-      (message: any) => {
+      async (message: any) => {
         const command = message.command;
 
         switch (command) {
@@ -378,6 +378,34 @@ export class HelloWorldPanel {
           case "hideAnnotations":
             this.clearDecorations();
             return;
+          // Call the VSCode language model API
+          case "callVSCodeChatModel":
+            const { vendor, family, prompt } = message.data;
+            // Call the VSCode language model API
+            try {
+              const [model] = await vscode.lm.selectChatModels({ vendor, family });
+              if (!model) {
+                // Show an error
+                window.showErrorMessage('No LLM was available to run the command');
+                return;
+              }
+              console.log('Selected model:', model);
+              const response = await model.sendRequest(prompt, {}, new vscode.CancellationTokenSource().token);
+            } catch (err) {
+              if (err instanceof vscode.LanguageModelError) {
+                window.showErrorMessage(`${err.message} ${err.code} ${err.cause}`);
+              }
+            }
+            this._panel.webview.postMessage(
+              JSON.stringify({
+                command: "setAnnotationsURI",
+                data: {
+                  annotationsURI: AnnotationManagerPanel.getAnnotationsURI(
+                    vscode.window.activeTextEditor?.document.fileName
+                  ),
+                },
+              })
+            );
         }
       },
       undefined,
