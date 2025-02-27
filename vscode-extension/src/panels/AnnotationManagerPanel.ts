@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 
+import { LMApiHandler } from "./LMApiHandler";
+
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
  *
@@ -16,6 +18,7 @@ import * as fs from "fs";
  * - Setting message listeners so data can be passed between the webview and extension
  */
 export class AnnotationManagerPanel {
+  private _lmApiHandler: LMApiHandler;
   public static currentPanel: AnnotationManagerPanel | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
@@ -32,6 +35,9 @@ export class AnnotationManagerPanel {
    */
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
+
+    // Initialize the LM API Handler
+    this._lmApiHandler = new LMApiHandler(this._panel.webview);
 
     // Set an event listener to listen for when the panel is disposed (i.e. when the user closes
     // the panel or when the panel is closed programmatically)
@@ -378,6 +384,16 @@ export class AnnotationManagerPanel {
           case "hideAnnotations":
             this.clearDecorations();
             return;
+          case "lm.chat":
+            // Handle chat request
+            await this._lmApiHandler.handleLMRequest(message);
+            return;
+
+          case "lm.cancelRequest":
+            // Handle cancellation request
+            this._lmApiHandler.cancelRequest(message.id);
+            return;
+
           // Call the VSCode language model API
           case "callVSCodeChatModel":
             const { vendor, family, prompt } = message.data;
@@ -386,11 +402,15 @@ export class AnnotationManagerPanel {
               const [model] = await vscode.lm.selectChatModels({ vendor, family });
               if (!model) {
                 // Show an error
-                window.showErrorMessage('No LLM was available to run the command');
+                window.showErrorMessage("No LLM was available to run the command");
                 return;
               }
-              console.log('Selected model:', model);
-              const response = await model.sendRequest(prompt, {}, new vscode.CancellationTokenSource().token);
+              console.log("Selected model:", model);
+              const response = await model.sendRequest(
+                prompt,
+                {},
+                new vscode.CancellationTokenSource().token
+              );
             } catch (err) {
               if (err instanceof vscode.LanguageModelError) {
                 window.showErrorMessage(`${err.message} ${err.code} ${err.cause}`);
@@ -400,9 +420,11 @@ export class AnnotationManagerPanel {
               JSON.stringify({
                 command: "setAnnotationsURI",
                 data: {
-                  annotationsURI: vscode.window.activeTextEditor ? AnnotationManagerPanel.getAnnotationsURI(
-                    vscode.window.activeTextEditor.document.fileName
-                  ) : undefined,
+                  annotationsURI: vscode.window.activeTextEditor
+                    ? AnnotationManagerPanel.getAnnotationsURI(
+                        vscode.window.activeTextEditor.document.fileName
+                      )
+                    : undefined,
                 },
               })
             );

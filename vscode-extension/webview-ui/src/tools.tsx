@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
+import LMUnitTest from "./LMUnitTest";
+import LMAPITest from "./LMAPITest";
 
 type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
@@ -463,6 +465,8 @@ export const tools = {
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
+  yesNoQuestion: LMUnitTest, // Add the new component
+  lmApiTest: LMAPITest, // Add the debugging component
 };
 
 export const toolNames = {
@@ -471,5 +475,7 @@ export const toolNames = {
   runCodeSegment: "Run Code Segment",
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
-  odyssey: "Odyssey: FP Explore"
+  odyssey: "Odyssey: FP Explore",
+  yesNoQuestion: "LM Unit Test", // Add the new component name
+  lmApiTest: "LM API Test", // Add the debugging component name
 };
