@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AnnotationEditorProps } from "./App";
-import { lmApi } from './lm-api-client';
+import { lmApi, mockLmApi } from './lm-api-client'; // Import both real and mock API
+import { vscode } from "./utilities/vscode"; // Import VSCode wrapper
 
 interface YesNoResponse {
   answer: boolean;
@@ -14,10 +15,7 @@ type ChatMessage = {
 }
 
 // Helper for debugging
-const debugLog = (message: string, data?: any) => {
-  const logMessage = data ? `${message}: ${JSON.stringify(data)}` : message;
-  console.log(`[LMUnitTest Debug] ${logMessage}`);
-};
+
 
 const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   // State management
@@ -28,15 +26,31 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [useMock, setUseMock] = useState(false);
   
   // Track if component is mounted
   const isMounted = useRef(true);
 
+  // Helper to add debug info
+  const addDebugInfo = (message: string, data?: any) => {
+    const logMessage = data ? `${message}: ${JSON.stringify(data)}` : message;
+    console.log(`[LMUnitTest Debug] ${logMessage}`);
+  };
+
   useEffect(() => {
-    debugLog("Component mounted");
+    addDebugInfo("Component mounted");
+    
+    // Check if we can access the vscode API
+    if (vscode) {
+      addDebugInfo("VSCode API wrapper is available");
+    } else {
+      addDebugInfo("ERROR: VSCode API wrapper is not available");
+      setUseMock(true);
+    }
+    
     return () => {
       isMounted.current = false;
-      debugLog("Component unmounted");
+      addDebugInfo("Component unmounted");
     };
   }, []);
 
@@ -47,8 +61,8 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   const endPos = props.value.end;
 
   useEffect(() => {
-    debugLog("Component props received", { 
-      anchorText, 
+    addDebugInfo("Component props received", { 
+      anchorLength: anchorText?.length || 0, 
       startPos, 
       endPos, 
       documentTextLength: documentText?.length || 0
@@ -57,7 +71,7 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
 
   // Save state changes to metadata
   useEffect(() => {
-    debugLog("Updating metadata", { question, answer, explanation });
+    addDebugInfo("Updating metadata");
     props.utils.setMetadata({ 
       question, 
       answer, 
@@ -69,7 +83,7 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
   // Create formatted document text with anchor highlighted
   const createFormattedDocument = () => {
     if (!documentText) {
-      debugLog("Document text is empty");
+      addDebugInfo("Document text is empty");
       return '';
     }
     
@@ -77,49 +91,13 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
     const highlighted = documentText.substring(startPos, endPos);
     const after = documentText.substring(endPos);
 
-    debugLog("Created formatted document", { 
+    addDebugInfo("Created formatted document", { 
       beforeLength: before.length, 
       highlightedLength: highlighted.length, 
       afterLength: after.length 
     });
     
     return `${before}<<<HIGHLIGHTED>${highlighted}</HIGHLIGHTED>>>${after}`;
-  };
-
-  // Add debug info
-  const addDebugInfo = (info: string, data?: any) => {
-    const logMessage = data ? `${info}: ${JSON.stringify(data)}` : info;
-    console.log(`[LMUnitTest Debug] ${logMessage}`);
-    setDebugInfo(prev => [...prev, logMessage]);
-  };
-
-  // Check if lmApi is properly defined
-  useEffect(() => {
-    if (!lmApi) {
-      addDebugInfo("ERROR: lmApi is not defined. Check import.");
-    } else {
-      addDebugInfo("lmApi is defined properly");
-      // Check if chat method exists
-      if (typeof lmApi.chat !== 'function') {
-        addDebugInfo("ERROR: lmApi.chat is not a function");
-      } else {
-        addDebugInfo("lmApi.chat is defined properly");
-      }
-    }
-  }, []);
-
-  // Mock function for testing when the real API isn't working
-  const mockApiCall = async (messages: ChatMessage[]): Promise<string> => {
-    addDebugInfo("Using mock API instead of real API");
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(`{
-          "answer": false,
-          "explanation": "This is a mock response for testing",
-          "suggestion": "Mock suggested improvement"
-        }`);
-      }, 1000);
-    });
   };
 
   // Ask question to the language model
@@ -137,6 +115,7 @@ const LMUnitTest: React.FC<AnnotationEditorProps> = (props) => {
     setDebugInfo([]);
 
     addDebugInfo("Starting LM request process");
+    addDebugInfo(`Using ${useMock ? "MOCK" : "REAL"} LM API`);
 
     try {
       // Prepare the prompt for the language model with structured output format
@@ -173,11 +152,12 @@ The "answer" field must be true or false. The "explanation" should be brief and 
       addDebugInfo("Prepared prompt for LM");
       addDebugInfo(`Prompt first 100 chars: ${prompt[1].content.substring(0, 100)}...`);
 
-      // Try to call the language model, with fallback to mock
-      let response = '';
+      // Call the language model (or mock)
+      let response: string;
       try {
-        addDebugInfo("Calling lmApi.chat()");
-        response = await lmApi.chat(prompt, {
+        addDebugInfo("Sending request to language model");
+        // Use either the real API or the mock API based on useMock flag
+        response = await (useMock ? mockLmApi : lmApi).chat(prompt, {
           vendor: 'copilot',
           family: 'gpt-4o',
           temperature: 0.3
@@ -186,7 +166,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
       } catch (apiError) {
         addDebugInfo(`API call error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
         addDebugInfo("Falling back to mock API");
-        response = await mockApiCall(prompt);
+        response = await mockLmApi.chat(prompt);
       }
 
       addDebugInfo(`Response first 100 chars: ${response.substring(0, 100)}...`);
@@ -240,7 +220,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         let fixedResponse = '';
         try {
           addDebugInfo("Calling API for format fixing");
-          fixedResponse = await lmApi.chat(fixPrompt, {
+          fixedResponse = await (useMock ? mockLmApi : lmApi).chat(fixPrompt, {
             vendor: 'copilot',
             family: 'gpt-4o',
             temperature: 0.1
@@ -249,7 +229,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         } catch (secondApiError) {
           addDebugInfo(`Second API call error: ${secondApiError instanceof Error ? secondApiError.message : String(secondApiError)}`);
           // Fallback to mock for testing
-          fixedResponse = `{"answer": false, "explanation": "Mock explanation after error", "suggestion": "Mock suggestion after error"}`;
+          fixedResponse = await mockLmApi.chat(fixPrompt);
         }
         
         try {
@@ -306,7 +286,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
     if (suggestion && window.confirm('Are you sure you want to update the text in your document?')) {
       addDebugInfo(`Applying suggestion to document: ${suggestion.substring(0, 50)}...`);
       
-      window.vscode?.postMessage({
+      vscode.postMessage({
         command: "replaceText",
         data: {
           start: startPos,
@@ -344,7 +324,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         />
       </div>
 
-      <div style={{ marginBottom: "15px" }}>
+      <div style={{ marginBottom: "15px", display: "flex", gap: "10px", alignItems: "center" }}>
         <button
           onClick={askQuestion}
           disabled={isLoading || !question.trim()}
@@ -360,6 +340,22 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         >
           {isLoading ? "Asking..." : "Ask Question"}
         </button>
+        
+        <label style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          fontSize: "12px",
+          cursor: "pointer",
+          marginLeft: "10px" 
+        }}>
+          <input 
+            type="checkbox"
+            checked={useMock}
+            onChange={() => setUseMock(!useMock)}
+            style={{ marginRight: "5px" }}
+          />
+          Use mock API (for testing)
+        </label>
       </div>
 
       {error && (
@@ -454,3 +450,5 @@ The "answer" field must be true or false. The "explanation" should be brief and 
 };
 
 export default LMUnitTest;
+
+

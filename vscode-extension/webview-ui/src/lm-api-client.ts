@@ -1,5 +1,7 @@
 // lm-api-client.ts
-// Enhanced with debugging
+// Updated to use VSCodeAPIWrapper instead of window.vscode
+
+import { vscode } from "./utilities/vscode";
 
 // Type definitions
 export interface ChatMessage {
@@ -27,24 +29,6 @@ const debugLog = (message: string, data?: any) => {
   console.log(`[LM API Client] ${logMessage}`);
 };
 
-// Check if vscode API is available
-if (typeof window !== 'undefined') {
-  if (!window.vscode) {
-    debugLog("WARNING: window.vscode is not defined! This might not be running in a VSCode webview");
-  } else {
-    debugLog("window.vscode is available");
-  }
-}
-
-// Declare vscode API provided by the webview
-declare global {
-  interface Window {
-    vscode?: {
-      postMessage: (message: any) => void;
-    };
-  }
-}
-
 // Main API client class
 class LMApiClient {
   private nextRequestId = 1;
@@ -58,23 +42,13 @@ class LMApiClient {
 
   constructor() {
     debugLog("Initializing LM API Client");
+    
     // Setup message listener
     window.addEventListener('message', this.handleMessage.bind(this));
     debugLog("Message listener attached");
     
-    // Setup periodic logging of pending requests
-    setInterval(() => {
-      if (this.pendingRequests.size > 0) {
-        const now = Date.now();
-        const pendingInfo = Array.from(this.pendingRequests.entries()).map(([id, req]) => {
-          return {
-            id,
-            timeElapsed: (now - req.timestamp) / 1000
-          };
-        });
-        debugLog(`Currently ${this.pendingRequests.size} pending requests`, pendingInfo);
-      }
-    }, 5000);
+    // Log initial status
+    debugLog("VSCode API wrapper available:", { available: !!vscode });
   }
 
   // Process incoming messages from extension host
@@ -166,12 +140,6 @@ class LMApiClient {
     const id = `req_${this.nextRequestId++}`;
     debugLog(`Creating new chat request with id: ${id}`, { messages, options });
     
-    // Check if vscode is available before proceeding
-    if (!window.vscode) {
-      debugLog("ERROR: window.vscode is not available. Cannot send request.");
-      return Promise.reject(new Error("VSCode API not available"));
-    }
-    
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { 
         resolve, 
@@ -191,7 +159,8 @@ class LMApiClient {
       debugLog(`Sending request ${id} to extension`, request);
       
       try {
-        window.vscode?.postMessage(request);
+        // Use the vscode wrapper instead of window.vscode
+        vscode.postMessage(request);
         debugLog(`Request ${id} sent successfully`);
       } catch (err) {
         debugLog(`Error sending request ${id}`, { 
@@ -223,12 +192,6 @@ class LMApiClient {
       options: streamOptions
     });
     
-    // Check if vscode is available before proceeding
-    if (!window.vscode) {
-      debugLog("ERROR: window.vscode is not available. Cannot send streaming request.");
-      return Promise.reject(new Error("VSCode API not available"));
-    }
-    
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { 
         resolve, 
@@ -250,7 +213,8 @@ class LMApiClient {
       debugLog(`Sending streaming request ${id} to extension`, request);
       
       try {
-        window.vscode?.postMessage(request);
+        // Use the vscode wrapper instead of window.vscode
+        vscode.postMessage(request);
         debugLog(`Streaming request ${id} sent successfully`);
       } catch (err) {
         debugLog(`Error sending streaming request ${id}`, { 
@@ -275,7 +239,7 @@ class LMApiClient {
     }
     
     try {
-      window.vscode?.postMessage({
+      vscode.postMessage({
         command: "lm.cancelRequest",
         id: requestId
       });
@@ -295,23 +259,25 @@ class LMApiClient {
   }
 
   /**
-   * Test if the LM API is working with a simple request
-   * @returns Promise that resolves if the API is working
+   * Use mock response instead of real API (for testing)
    */
-  testConnection(): Promise<boolean> {
-    debugLog("Testing LM API connection");
-    return this.chat(
-      [{ role: "user", content: "Test connection. Respond with YES only." }],
-      { temperature: 0 }
-    ).then(response => {
-      const success = response.includes("YES");
-      debugLog(`Connection test ${success ? "passed" : "failed"}`, { response });
-      return success;
-    }).catch(err => {
-      debugLog("Connection test failed with error", { 
-        error: err instanceof Error ? err.message : String(err)
-      });
-      throw err;
+  mockChat(messages: ChatMessage[]): Promise<string> {
+    debugLog("Using mock chat response");
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const lastUserMessage = messages.find(m => m.role === 'user')?.content || '';
+        const isYesNo = messages[0]?.content?.includes('yes/no') || false;
+        
+        if (isYesNo) {
+          resolve(`{
+            "answer": false,
+            "explanation": "This is a mock response for testing the Yes/No component",
+            "suggestion": "Mock suggested improvement for the highlighted code"
+          }`);
+        } else {
+          resolve(`This is a mock response from the LM API client.\nYou asked: "${lastUserMessage}"\n\nThis is a simulated response for testing purposes.`);
+        }
+      }, 1000);
     });
   }
 }
@@ -319,16 +285,19 @@ class LMApiClient {
 // Create a singleton instance
 export const lmApi = new LMApiClient();
 
-// Run connection test on initialization
-setTimeout(() => {
-  if (window.vscode) {
-    debugLog("Running connection test after initialization");
-    lmApi.testConnection()
-      .then(result => debugLog(`Connection test completed with result: ${result}`))
-      .catch(err => debugLog("Connection test encountered an error", { 
-        error: err instanceof Error ? err.message : String(err) 
-      }));
-  } else {
-    debugLog("Skipping connection test - VSCode API not available");
+// Add a fallback mock implementation
+// This can be used if the real API isn't working
+export const mockLmApi = {
+  chat: (messages: ChatMessage[], options?: LMOptions) => lmApi.mockChat(messages),
+  streamChat: (messages: ChatMessage[], options?: LMOptions, callbacks?: StreamingCallbacks) => {
+    if (callbacks?.onChunk) {
+      const { onChunk } = callbacks;
+      if (onChunk) {
+        setTimeout(() => onChunk("This is a mock streaming "), 200);
+        setTimeout(() => onChunk("response for "), 400);
+        setTimeout(() => onChunk("testing purposes."), 600);
+      }
+    }
+    return lmApi.mockChat(messages);
   }
-}, 2000);
+};
