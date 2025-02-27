@@ -1,5 +1,5 @@
 import { commands, ExtensionContext } from "vscode";
-import { AnnotationManagerPanel } from "./panels/HelloWorldPanel";
+import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -10,7 +10,7 @@ import path from "path";
 import chokidar from "chokidar";
 
 import retagUpdate from "./server/retag";
-import { SidebarProvider } from "./panels/HelloWorldPanel";
+import { SidebarProvider } from "./panels/AnnotationManagerPanel";
 
 // Helper to run REST endpoints
 const runEndpointDictWithErrorHandlingOnPort = (
