@@ -4,7 +4,7 @@ import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
 import LMUnitTest from "./LMUnitTest";
-import { lmApi } from "./LMAPITest";
+import LMAPITest from "./LMAPITest";
 
 type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
@@ -466,7 +466,7 @@ export const tools = {
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
   yesNoQuestion: LMUnitTest, // Add the new component
-  lmApiTest: lmApi, // Add the debugging component
+  lmApiTest: LMAPITest, // Add the debugging component
 };
 
 export const toolNames = {
