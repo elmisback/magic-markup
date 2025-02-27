@@ -283,22 +283,17 @@ The "answer" field must be true or false. The "explanation" should be brief and 
 
   // Apply the suggested text to the document
   const applySuggestion = () => {
-    if (suggestion && window.confirm('Are you sure you want to update the text in your document?')) {
+    if (suggestion) {
       addDebugInfo(`Applying suggestion to document: ${suggestion.substring(0, 50)}...`);
       
-      vscode.postMessage({
-        command: "replaceText",
-        data: {
-          start: startPos,
-          end: endPos,
-          text: suggestion
-        }
-      });
+      // Use setText to update the annotation's anchor text
+      props.utils.setText(suggestion);
       
       // Update the answer to reflect the change
       setAnswer(true);
       setSuggestion('');
-      addDebugInfo("Suggestion applied, state updated");
+      setExplanation('Suggestion applied to the highlighted text.');
+      addDebugInfo("Suggestion applied using setText, state updated");
     }
   };
 
