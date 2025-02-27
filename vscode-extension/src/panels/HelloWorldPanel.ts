@@ -400,9 +400,9 @@ export class AnnotationManagerPanel {
               JSON.stringify({
                 command: "setAnnotationsURI",
                 data: {
-                  annotationsURI: AnnotationManagerPanel.getAnnotationsURI(
-                    vscode.window.activeTextEditor?.document.fileName
-                  ),
+                  annotationsURI: vscode.window.activeTextEditor ? AnnotationManagerPanel.getAnnotationsURI(
+                    vscode.window.activeTextEditor.document.fileName
+                  ) : undefined,
                 },
               })
             );
