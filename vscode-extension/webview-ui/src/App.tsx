@@ -177,7 +177,7 @@ function AnnotationSidebarView(props: {
     <>
       {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
         <div
-          key={index}
+          key={annotation.id}
           ref={(ref) => (annotationRefs.current[index] = ref)}
           className={`annotation-tile ${
             props.selectedAnnotationId === annotation.id ? "selected" : ""
