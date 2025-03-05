@@ -130,10 +130,11 @@ export class AnnotationTracker implements vscode.Disposable {
       return; // No annotations to update
     }
 
-    let updatedAnnotations = [...annotations];
+    let updatedAnnotations = [...annotations];  // TODO filter this to only valid annotations---those that already fell out of date (their ann.document field was already different from the document BEFORE the changes, which is probably not the document currently passed to updateAnnotationPositions...) shouldn't be touched
     let documentModified = false;
     
     // Process each change to update annotation positions
+    // TODO handle multiple changes correctly
     for (const change of changes) {
       const startOffset = change.rangeOffset;
       const endOffset = change.rangeOffset + change.rangeLength;
@@ -164,7 +165,6 @@ export class AnnotationTracker implements vscode.Disposable {
         
         // Case 3: Annotation overlaps with the change - needs more complex handling
         // For these cases, we update nothing, the frontend will warn the user
-        // TODO confirm that non-update is handled correctly elsewhere (e.g. for decorations)
         return annotation;
       });
     }
@@ -242,7 +242,7 @@ export class AnnotationTracker implements vscode.Disposable {
    */
   private clearDecorations(documentKey: string): void {
     const types = this.decorationTypes.get(documentKey);
-    if (!types) return;
+    if (!types) {return;}
     
     for (const type of types) {
       type.dispose();
@@ -255,7 +255,7 @@ export class AnnotationTracker implements vscode.Disposable {
    * Handler for active editor changes
    */
   private onActiveEditorChanged(editor: vscode.TextEditor | undefined): void {
-    if (!editor) return;
+    if (!editor) {return;}
     
     // Load annotations for the new editor
     this.loadAnnotationsForDocument(editor.document);
