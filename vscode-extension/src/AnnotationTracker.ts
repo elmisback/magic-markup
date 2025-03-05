@@ -28,6 +28,9 @@ export class AnnotationTracker implements vscode.Disposable {
   private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
   private skipNextDocumentChanges: boolean = false;
   
+  // Store the document content cache
+  private documentContentCache = new Map<string, string>();
+  
   constructor(private context: vscode.ExtensionContext) {
     // Setup buffer change listeners
     this.disposables.push(
@@ -111,7 +114,14 @@ export class AnnotationTracker implements vscode.Disposable {
     }
 
     this.fileChangeTimers.set(docKey, setTimeout(() => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.uri.toString() !== docKey) {
+        vscode.window.showErrorMessage("Editor not active or document not loaded");
+        console.error("Editor not active or document not loaded");
+        return;
+      }
       this.updateAnnotationPositions(event.document, event.contentChanges);
+      this.documentContentCache.set(editor.document.uri.toString(), editor.document.getText());
       this.fileChangeTimers.delete(docKey);
     }, 50)); // Small delay to batch multiple quick edits
   }
@@ -130,7 +140,7 @@ export class AnnotationTracker implements vscode.Disposable {
       return; // No annotations to update
     }
 
-    let updatedAnnotations = [...annotations];  // TODO filter this to only valid annotations---those that already fell out of date (their ann.document field was already different from the document BEFORE the changes, which is probably not the document currently passed to updateAnnotationPositions...) shouldn't be touched
+    let updatedAnnotations = [...annotations];
     let documentModified = false;
     
     // Process each change to update annotation positions
@@ -144,6 +154,10 @@ export class AnnotationTracker implements vscode.Disposable {
 
       // Update annotations based on the change
       updatedAnnotations = updatedAnnotations.map(annotation => {
+        if (annotation.document !== this.documentContentCache.get(documentKey)) {
+          // This annotation is already out of date, so don't touch it
+          return annotation;
+        }
         // Case 1: Annotation is completely before the change
         if (annotation.end <= startOffset) {
           return {
@@ -259,6 +273,7 @@ export class AnnotationTracker implements vscode.Disposable {
     
     // Load annotations for the new editor
     this.loadAnnotationsForDocument(editor.document);
+    this.documentContentCache.set(editor.document.uri.toString(), editor.document.getText());
   }
 
   /**
