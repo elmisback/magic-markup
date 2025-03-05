@@ -277,7 +277,6 @@ function App() {
   const [documentUri, setDocumentUri] = useState<string | undefined>(undefined);
   const [documentText, setDocumentText] = useState<string>("");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [retagServerURL, setRetagServerURL] = useState<string | undefined>(undefined);
 
   // UI state
   const [charNum, setCharNum] = useState<number | undefined>(undefined);
@@ -429,7 +428,6 @@ function App() {
           setDocumentUri(message.data.documentUri);
           setDocumentText(message.data.documentText);
           setAnnotations(message.data.annotations || []);
-          setRetagServerURL(message.data.retagServerURL);
           return;
           
         case "updateAnnotations":

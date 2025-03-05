@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 import fs from "fs";
 import path from "path";
 
-import retagUpdate from "./server/retag";
+// import retagUpdate from "./server/retag";
 import { SidebarProvider } from "./panels/AnnotationManagerPanel";
 import { AnnotationTracker } from "./AnnotationTracker";
 
@@ -60,31 +60,9 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Retag server
-  const retagServerPort = 8071;
-  const retagServer = runEndpointDictWithErrorHandlingOnPort(
-    8071,
-    {
-      "/retag": async (req: any, res: any) => {
-        console.log("Retagging document");
-        const { codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter } = req.body;
-        const apiKey = vscode.workspace.getConfiguration().get("codetations.apiKey") as string;
-        const out = await retagUpdate(
-          codeWithSnippetDelimited,
-          updatedCodeWithoutDelimiters,
-          delimiter,
-          apiKey
-        );
-
-        res.json(out);
-      },
-    },
-    "Retag"
-  );
-
   // Create the show annotations command
   const showAnnotationsCommand = commands.registerCommand("codetations.showAnnotations", () => {
-    AnnotationManagerPanel.render(context.extensionUri, retagServerPort);
+    AnnotationManagerPanel.render(context.extensionUri);
   });
 
   // Create a command that allows a user to set an API key for the extension
@@ -99,7 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const chooseAnnotationType = () => {
-    AnnotationManagerPanel.render(context.extensionUri, retagServerPort);
+    AnnotationManagerPanel.render(context.extensionUri);
     const editor = vscode.window.activeTextEditor;
     AnnotationManagerPanel.currentPanel?.sendMessageObject({
       command: "chooseAnnotationType",

@@ -19,8 +19,6 @@ export class AnnotationManagerPanel {
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
-  private _retagServerPort: number;
-  private _showingRetagBanner: boolean = false;
 
   /**
    * The AnnotationManagerPanel class private constructor (called only from the render method).
@@ -28,9 +26,8 @@ export class AnnotationManagerPanel {
    * @param panel A reference to the webview panel
    * @param extensionUri The URI of the directory containing the extension
    */
-  private constructor(panel: WebviewPanel, extensionUri: Uri, retagServerPort: number) {
+  private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
-    this._retagServerPort = retagServerPort;
 
     // Initialize the LM API Handler
     this._lmApiHandler = new LMApiHandler(this._panel.webview);
@@ -81,8 +78,7 @@ export class AnnotationManagerPanel {
       data: {
         documentUri: editor.document.uri.toString(),
         documentText: editor.document.getText(),
-        annotations: annotations,
-        retagServerURL: `http://localhost:${this._retagServerPort}/retag`,
+        annotations: annotations
       },
     });
   }
@@ -93,7 +89,7 @@ export class AnnotationManagerPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri, retagServerPort: number) {
+  public static render(extensionUri: Uri) {
     if (AnnotationManagerPanel.currentPanel) {
       // If the webview panel already exists reveal it
       AnnotationManagerPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
@@ -121,8 +117,7 @@ export class AnnotationManagerPanel {
 
       AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(
         panel,
-        extensionUri,
-        retagServerPort
+        extensionUri
       );
     }
   }
