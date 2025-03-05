@@ -130,7 +130,7 @@ export class AnnotationTracker implements vscode.Disposable {
     this.fileChangeTimers.set(docKey, setTimeout(() => {
       const editor = vscode.window.activeTextEditor;
       if (!editor || editor.document.uri.toString() !== docKey) {
-        console.error("Editor not active or document not loaded");
+        console.error("Editor not active or document not loaded", editor, editor?.document.uri.toString(), docKey);
         this.pendingChanges.delete(docKey);
         this.fileChangeTimers.delete(docKey);
         return;
@@ -171,102 +171,129 @@ export class AnnotationTracker implements vscode.Disposable {
     // These working copies will maintain their position references relative to startingContent
     let workingAnnotations = annotations.map(ann => ({...ann}));
     
-    // Track if any annotations were modified
-    let annotationsModified = false;
-    
     // Apply each change one by one to compute the new positions
     for (const change of changes) {
       const startOffset = change.rangeOffset;
       const endOffset = change.rangeOffset + change.rangeLength;
       const textLengthDiff = change.text.length - change.rangeLength;
       
+      // Check if the change is only whitespace
+      const isWhitespaceChange = /^\s*$/.test(change.text);
+      
       for (let i = 0; i < workingAnnotations.length; i++) {
         const annotation = workingAnnotations[i];
         
-        // Only update annotations that are synced with our starting document content
+        // Skip annotations that don't match the current document content
         if (annotation.document !== startingContent) {
           continue;
         }
         
-        // Case 1: Annotation is completely before the change - no position change
-        if (annotation.end <= startOffset) {
-          // No position change needed
-          continue;
-        }
-        
-        // Case 2: Annotation is completely after the change - shift both start and end
-        if (annotation.start >= endOffset) {
+        // CASE 1: Change is completely before the annotation
+        if (endOffset < annotation.start) {
+          // Simply shift the annotation
           annotation.start += textLengthDiff;
           annotation.end += textLengthDiff;
-          annotationsModified = true;
           continue;
         }
         
-        // Case 3: Change affects the annotation - needs special handling
-        // Various overlap scenarios are possible
+        // CASE 2: Change is completely after the annotation
+        if (startOffset > annotation.end) {
+          // No adjustment needed
+          continue;
+        }
         
-        // 3a: Change starts before annotation and completely contains it
-        if (startOffset <= annotation.start && endOffset >= annotation.end) {
-          // Annotation is completely replaced or deleted
-          // Special case: if the new text is empty or very small, the annotation might be effectively deleted
+        // CASE 3: Change is adjacent to the annotation (immediately before)
+        if (endOffset === annotation.start) {
+          // If not whitespace, include it in the annotation
+          if (!isWhitespaceChange) {
+            annotation.start = startOffset;
+            annotation.end += textLengthDiff;
+          } else {
+            // If whitespace, just shift the annotation
+            annotation.start += textLengthDiff;
+            annotation.end += textLengthDiff;
+          }
+          continue;
+        }
+        
+        // CASE 4: Change is adjacent to the annotation (immediately after)
+        if (startOffset === annotation.end) {
+          // If not whitespace, include it in the annotation
+          if (!isWhitespaceChange) {
+            annotation.end += change.text.length;
+          }
+          // If whitespace, don't expand the annotation
+          continue;
+        }
+        
+        // CASE 5: Change is completely inside the annotation
+        if (startOffset >= annotation.start && endOffset <= annotation.end) {
+          // Grow or shrink the annotation by the exact amount of the change
+          annotation.end += textLengthDiff;
+          continue;
+        }
+        
+        // CASE 6: Change partially overlaps with the start of the annotation
+        if (startOffset < annotation.start && endOffset > annotation.start && endOffset <= annotation.end) {
+          // If the change contains whitespace at the beginning or end, determine how to handle
+          if (isWhitespaceChange) {
+            // For whitespace changes, adjust start to after the whitespace
+            annotation.start = startOffset + change.text.length;
+            annotation.end += textLengthDiff;
+          } else {
+            // For non-whitespace changes, include the change
+            annotation.start = startOffset;
+            annotation.end += textLengthDiff;
+          }
+          continue;
+        }
+        
+        // CASE 7: Change partially overlaps with the end of the annotation
+        if (startOffset >= annotation.start && startOffset < annotation.end && endOffset > annotation.end) {
+          // If the change contains whitespace at the beginning or end, determine how to handle
+          if (isWhitespaceChange) {
+            // For whitespace changes, don't expand the annotation
+            annotation.end = startOffset;
+          } else {
+            // For non-whitespace changes, include the change
+            annotation.end = startOffset + change.text.length;
+          }
+          continue;
+        }
+        
+        // CASE 8: Change completely contains the annotation
+        if (startOffset < annotation.start && endOffset > annotation.end) {
           if (change.text.length === 0) {
+            // If the text is deleted, collapse the annotation
+            annotation.start = startOffset;
+            annotation.end = startOffset;
+          } else if (isWhitespaceChange) {
+            // If change is whitespace, try to maintain relative position
             annotation.start = startOffset;
             annotation.end = startOffset;
           } else {
-            // Try to preserve the annotation at the start of the new text
+            // Otherwise, try to map to some portion of the new text
             annotation.start = startOffset;
-            annotation.end = startOffset + Math.min(change.text.length, annotation.end - annotation.start);
+            annotation.end = startOffset + change.text.length;
           }
-          annotationsModified = true;
-          continue;
-        }
-        
-        // 3b: Change starts before annotation but ends within it
-        if (startOffset <= annotation.start && endOffset > annotation.start && endOffset < annotation.end) {
-          // The beginning of the annotation is affected
-          const newStart = startOffset + change.text.length;
-          const charsRemoved = annotation.start - startOffset;
-          const charsRemaining = annotation.end - endOffset;
-          
-          annotation.start = newStart;
-          annotation.end = newStart + charsRemaining;
-          annotationsModified = true;
-          continue;
-        }
-        
-        // 3c: Change is completely inside the annotation
-        if (startOffset > annotation.start && endOffset < annotation.end) {
-          // Only the length changes
-          annotation.end += textLengthDiff;
-          annotationsModified = true;
-          continue;
-        }
-        
-        // 3d: Change starts inside annotation and extends beyond it
-        if (startOffset >= annotation.start && startOffset < annotation.end && endOffset >= annotation.end) {
-          // End of annotation is affected
-          annotation.end = startOffset + change.text.length;
-          annotationsModified = true;
           continue;
         }
       }
     }
     
-    // If annotations were modified, update them all with the current document content
-    if (annotationsModified) {
-      const finalAnnotations = workingAnnotations.map(ann => ({
-        ...ann,
-        document: currentContent
-      }));
-      
-      // Update the document's annotations
-      this.documentAnnotations.set(documentKey, finalAnnotations);
-      
-      // Update decorations, save, and notify
-      this.updateDecorations(document);
-      this.saveAnnotationsForDocument(document);
-      this.notifyAnnotationsChanged(document);
-    }
+    // Update all annotations with the current document content
+    const finalAnnotations = workingAnnotations.map(ann => ({
+      ...ann,
+      document: ann.document !== startingContent ? ann.document : currentContent
+    }));
+    
+    // Update the document's annotations
+    this.documentAnnotations.set(documentKey, finalAnnotations);
+    
+    // Update decorations, save, and notify
+    this.updateDecorations(document);
+    this.saveAnnotationsForDocument(document);
+    this.notifyAnnotationsChanged(document);
   }
 
   /**
