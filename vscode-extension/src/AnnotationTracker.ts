@@ -145,7 +145,10 @@ export class AnnotationTracker implements vscode.Disposable {
       updatedAnnotations = updatedAnnotations.map(annotation => {
         // Case 1: Annotation is completely before the change
         if (annotation.end <= startOffset) {
-          return annotation; // No adjustment needed
+          return {
+            ...annotation,
+            document: document.getText(),
+          };
         }
         
         // Case 2: Annotation is completely after the change
@@ -172,6 +175,9 @@ export class AnnotationTracker implements vscode.Disposable {
       
       // Update decorations
       this.updateDecorations(document);
+      
+      // Save the updated annotations to disk
+      this.saveAnnotationsForDocument(document);
       
       // Notify the webview
       this.notifyAnnotationsChanged(document);
@@ -201,7 +207,10 @@ export class AnnotationTracker implements vscode.Disposable {
     
     // Create and apply decorations for each annotation
     for (const annotation of annotations) {
-      // TODO if the document text doesn't match the annotation's document, skip
+      // Skip if the document text doesn't match the annotation's document
+      if (annotation.document !== document.getText()) {
+        continue;
+      }
       try {
         // Create a decoration type with the annotation's style
         const decorationType = vscode.window.createTextEditorDecorationType({
