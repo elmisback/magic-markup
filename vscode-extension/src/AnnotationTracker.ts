@@ -30,6 +30,9 @@ export class AnnotationTracker implements vscode.Disposable {
   // Store the document content cache
   private documentContentCache = new Map<string, string>();
   
+  // Track accumulated changes for proper position updates
+  private pendingChanges = new Map<string, vscode.TextDocumentContentChangeEvent[]>();
+  
   constructor(private context: vscode.ExtensionContext) {
     // Setup buffer change listeners
     this.disposables.push(
@@ -98,7 +101,7 @@ export class AnnotationTracker implements vscode.Disposable {
   }
 
   /**
-   * Handler for document changes - updates annotation positions
+   * Handler for document changes - collects changes for batch processing
    */
   private onDocumentChanged(event: vscode.TextDocumentChangeEvent): void {
     // Skip if document is not loaded
@@ -106,8 +109,20 @@ export class AnnotationTracker implements vscode.Disposable {
       return;
     }
 
-    // Debounce changes to prevent excessive processing
     const docKey = event.document.uri.toString();
+    
+    // Initialize document content cache if not already set
+    if (!this.documentContentCache.has(docKey)) {
+      this.documentContentCache.set(docKey, event.document.getText());
+      return;
+    }
+    
+    // Collect changes for this document
+    let pendingChanges = this.pendingChanges.get(docKey) || [];
+    pendingChanges = [...pendingChanges, ...event.contentChanges];
+    this.pendingChanges.set(docKey, pendingChanges);
+    
+    // Debounce the processing of changes
     if (this.fileChangeTimers.has(docKey)) {
       clearTimeout(this.fileChangeTimers.get(docKey)!);
     }
@@ -115,84 +130,141 @@ export class AnnotationTracker implements vscode.Disposable {
     this.fileChangeTimers.set(docKey, setTimeout(() => {
       const editor = vscode.window.activeTextEditor;
       if (!editor || editor.document.uri.toString() !== docKey) {
-        vscode.window.showErrorMessage("Editor not active or document not loaded");
         console.error("Editor not active or document not loaded");
+        this.pendingChanges.delete(docKey);
+        this.fileChangeTimers.delete(docKey);
         return;
       }
-      this.updateAnnotationPositions(event.document, event.contentChanges);
-      this.documentContentCache.set(editor.document.uri.toString(), editor.document.getText());
+      
+      // Process all accumulated changes at once
+      this.processAccumulatedChanges(editor.document);
+      
+      // Update cache and cleanup
+      this.documentContentCache.set(docKey, editor.document.getText());
+      this.pendingChanges.delete(docKey);
       this.fileChangeTimers.delete(docKey);
-    }, 50)); // Small delay to batch multiple quick edits
+    }, 100));
   }
 
   /**
-   * Updates annotation positions based on document changes
+   * Process all accumulated changes for a document
    */
-  private updateAnnotationPositions(
-    document: vscode.TextDocument, 
-    changes: readonly vscode.TextDocumentContentChangeEvent[]
-  ): void {
+  private processAccumulatedChanges(document: vscode.TextDocument): void {
     const documentKey = document.uri.toString();
     const annotations = this.documentAnnotations.get(documentKey);
+    const changes = this.pendingChanges.get(documentKey) || [];
     
-    if (!annotations || annotations.length === 0) {
-      return; // No annotations to update
+    if (!annotations || annotations.length === 0 || changes.length === 0) {
+      return;
     }
-
-    let updatedAnnotations = [...annotations];
-    let documentModified = false;
     
-    // Process each change to update annotation positions
-    // TODO handle multiple changes correctly
+    // Get the cached document content before any changes
+    const startingContent = this.documentContentCache.get(documentKey)!;
+    const currentContent = document.getText();
+    
+    // Skip if no actual change occurred
+    if (startingContent === currentContent) {
+      return;
+    }
+    
+    // Create working copies of annotations that we can update
+    // These working copies will maintain their position references relative to startingContent
+    let workingAnnotations = annotations.map(ann => ({...ann}));
+    
+    // Track if any annotations were modified
+    let annotationsModified = false;
+    
+    // Apply each change one by one to compute the new positions
     for (const change of changes) {
       const startOffset = change.rangeOffset;
       const endOffset = change.rangeOffset + change.rangeLength;
       const textLengthDiff = change.text.length - change.rangeLength;
-
-      documentModified = true;
-
-      // Update annotations based on the change
-      updatedAnnotations = updatedAnnotations.map(annotation => {
-        if (annotation.document !== this.documentContentCache.get(documentKey)) {
-          // This annotation is already out of date, so don't touch it
-          return annotation;
+      
+      for (let i = 0; i < workingAnnotations.length; i++) {
+        const annotation = workingAnnotations[i];
+        
+        // Only update annotations that are synced with our starting document content
+        if (annotation.document !== startingContent) {
+          continue;
         }
-        // Case 1: Annotation is completely before the change
+        
+        // Case 1: Annotation is completely before the change - no position change
         if (annotation.end <= startOffset) {
-          return {
-            ...annotation,
-            document: document.getText(),
-          };
+          // No position change needed
+          continue;
         }
         
-        // Case 2: Annotation is completely after the change
+        // Case 2: Annotation is completely after the change - shift both start and end
         if (annotation.start >= endOffset) {
-          // Shift the annotation by the difference in text length
-          return {
-            ...annotation,
-            start: annotation.start + textLengthDiff,
-            end: annotation.end + textLengthDiff,
-            document: document.getText(),
-          };
+          annotation.start += textLengthDiff;
+          annotation.end += textLengthDiff;
+          annotationsModified = true;
+          continue;
         }
         
-        // Case 3: Annotation overlaps with the change - needs more complex handling
-        // For these cases, we update nothing, the frontend will warn the user
-        return annotation;
-      });
+        // Case 3: Change affects the annotation - needs special handling
+        // Various overlap scenarios are possible
+        
+        // 3a: Change starts before annotation and completely contains it
+        if (startOffset <= annotation.start && endOffset >= annotation.end) {
+          // Annotation is completely replaced or deleted
+          // Special case: if the new text is empty or very small, the annotation might be effectively deleted
+          if (change.text.length === 0) {
+            annotation.start = startOffset;
+            annotation.end = startOffset;
+          } else {
+            // Try to preserve the annotation at the start of the new text
+            annotation.start = startOffset;
+            annotation.end = startOffset + Math.min(change.text.length, annotation.end - annotation.start);
+          }
+          annotationsModified = true;
+          continue;
+        }
+        
+        // 3b: Change starts before annotation but ends within it
+        if (startOffset <= annotation.start && endOffset > annotation.start && endOffset < annotation.end) {
+          // The beginning of the annotation is affected
+          const newStart = startOffset + change.text.length;
+          const charsRemoved = annotation.start - startOffset;
+          const charsRemaining = annotation.end - endOffset;
+          
+          annotation.start = newStart;
+          annotation.end = newStart + charsRemaining;
+          annotationsModified = true;
+          continue;
+        }
+        
+        // 3c: Change is completely inside the annotation
+        if (startOffset > annotation.start && endOffset < annotation.end) {
+          // Only the length changes
+          annotation.end += textLengthDiff;
+          annotationsModified = true;
+          continue;
+        }
+        
+        // 3d: Change starts inside annotation and extends beyond it
+        if (startOffset >= annotation.start && startOffset < annotation.end && endOffset >= annotation.end) {
+          // End of annotation is affected
+          annotation.end = startOffset + change.text.length;
+          annotationsModified = true;
+          continue;
+        }
+      }
     }
-
-    if (documentModified) {
+    
+    // If annotations were modified, update them all with the current document content
+    if (annotationsModified) {
+      const finalAnnotations = workingAnnotations.map(ann => ({
+        ...ann,
+        document: currentContent
+      }));
+      
       // Update the document's annotations
-      this.documentAnnotations.set(documentKey, updatedAnnotations);
+      this.documentAnnotations.set(documentKey, finalAnnotations);
       
-      // Update decorations
+      // Update decorations, save, and notify
       this.updateDecorations(document);
-      
-      // Save the updated annotations to disk
       this.saveAnnotationsForDocument(document);
-      
-      // Notify the webview
       this.notifyAnnotationsChanged(document);
     }
   }
