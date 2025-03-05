@@ -407,8 +407,7 @@ export class AnnotationManagerPanel {
       const result = await retagUpdate(
         codeWithSnippetDelimited,
         currentDocumentText,
-        delimiter,
-        apiKey
+        delimiter
       );
       if (!result.out) {
         window.showErrorMessage("Error retagging annotation: no result returned");
@@ -460,6 +459,7 @@ export class AnnotationManagerPanel {
           // Retag all annotations
           const updatedAnnotations = await Promise.all(
             annotations.map(async (annotation) => {
+              if (annotation.document === currentDocumentText) { return annotation; }
               const retagged = await this._retagAnnotation(annotation, currentDocumentText);
               processed++;
               progress.report({

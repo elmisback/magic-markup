@@ -65,17 +65,6 @@ export function activate(context: vscode.ExtensionContext) {
     AnnotationManagerPanel.render(context.extensionUri);
   });
 
-  // Create a command that allows a user to set an API key for the extension
-  const setAPIKeyCommand = commands.registerCommand("codetations.setAPIKey", async () => {
-    const apiKey = await vscode.window.showInputBox({
-      prompt: "Enter your OpenAI API key",
-      placeHolder: "API Key",
-    });
-    if (apiKey) {
-      vscode.workspace.getConfiguration().update("codetations.apiKey", apiKey);
-    }
-  });
-
   const chooseAnnotationType = () => {
     AnnotationManagerPanel.render(context.extensionUri);
     const editor = vscode.window.activeTextEditor;
@@ -110,7 +99,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     showAnnotationsCommand,
-    setAPIKeyCommand,
     addAnnotationsCommand,
     removeAnnotationsCommand,
     setAnnotationColorCommand

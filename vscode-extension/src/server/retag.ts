@@ -161,8 +161,7 @@ async function copilotPromptGPTForJSON(t: string) {
 const retagUpdate = async (
   codeWithSnippetDelimited: string,
   updatedCodeWithoutDelimiters: string,
-  delimiter: string,
-  apiKey: string
+  delimiter: string
 ) => {
   console.log(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter);
   // const gptOut = await getFirstChoice(await getChatCompletion(
@@ -172,11 +171,6 @@ const retagUpdate = async (
   //                                 updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
   //                                 delimiter})}]))
   // console.log(gptOut)
-
-  // Initialize OpenAI object
-  const openai = new OpenAI({
-    apiKey: apiKey,
-  });
 
   let gptOut = "";
   try {
