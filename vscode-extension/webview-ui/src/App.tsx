@@ -30,8 +30,9 @@ function AnnotationEditorContainer(props: {
   setHoveredAnnotationId: (value: string | undefined) => void;
   selectedAnnotationId: string | undefined;
   setSelectedAnnotationId: (value: string | undefined) => void;
+  onDelete: (id: string) => void;
 }) {
-  const { value, setValue, setSelectedAnnotationId } = props;
+  const { value, setValue, setSelectedAnnotationId, onDelete } = props;
 
   const handleClick = () => {
     setSelectedAnnotationId(value.id);
@@ -88,8 +89,9 @@ function AnnotationSidebarView(props: {
   setSelectedAnnotationId: (id: string | undefined) => void;
   hoveredAnnotationId: string | undefined;
   setHoveredAnnotationId: (id: string | undefined) => void;
+  onDeleteAnnotation: (id: string) => void;
 }) {
-  const { annotations, setAnnotations, charNum, documentText } = props;
+  const { annotations, setAnnotations, charNum, documentText, onDeleteAnnotation } = props;
   const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const sortAnnotations = (annotations: Annotation[]): Annotation[] => {
@@ -158,6 +160,11 @@ function AnnotationSidebarView(props: {
     });
   };
 
+  const handleDeleteClick = (id: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the tile click
+    onDeleteAnnotation(id);
+  };
+
   return (
     <>
       {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
@@ -184,6 +191,7 @@ function AnnotationSidebarView(props: {
               display: "flex",
               gap: "4px",
               fontSize: "smaller",
+              alignItems: "center"
             }}>
             <div className="line-number">
               Line {documentText.slice(0, annotation.start).split("\n").length}
@@ -197,6 +205,30 @@ function AnnotationSidebarView(props: {
                 Needs Retag
               </div>
             )}
+            <button 
+              className="delete-button"
+              onClick={(e) => handleDeleteClick(annotation.id, e)}
+              style={{
+                marginLeft: "auto",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#d32f2f",
+                fontSize: "12px",
+                padding: "4px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+              title="Delete Annotation"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
           </div>
           <AnnotationEditorContainer
             key={index}
@@ -206,6 +238,7 @@ function AnnotationSidebarView(props: {
             setHoveredAnnotationId={props.setHoveredAnnotationId}
             selectedAnnotationId={props.selectedAnnotationId}
             setSelectedAnnotationId={props.setSelectedAnnotationId}
+            onDelete={onDeleteAnnotation}
           />
         </div>
       ))}
@@ -238,18 +271,7 @@ function RetagBanner(props: {
 
 // Helper to determine if an annotation needs retagging
 const isAnnotationOutOfSync = (annotation: Annotation, currentDocumentText: string): boolean => {
-  if (!annotation.original) {
-    return false; // No original state to compare against
-  }
-  
-  // Check if the text at the annotation position still matches the original content
-  const annotationText = currentDocumentText.slice(annotation.start, annotation.end);
-  const originalText = annotation.original.document.slice(
-    annotation.original.start, 
-    annotation.original.end
-  );
-  
-  return annotationText !== originalText;
+  return currentDocumentText !== annotation.document;
 };
 
 function App() {
@@ -305,6 +327,17 @@ function App() {
     setConfirmAnnotation(true);
     setStart(start);
     setEnd(end);
+  };
+
+  const handleDeleteAnnotation = (annotationId: string) => {
+    vscode.postMessage({
+      command: "removeAnnotation",
+      data: { annotationId }
+    });
+    
+    if (selectedAnnotationId === annotationId) {
+      setSelectedAnnotationId(undefined);
+    }
   };
 
   const handleRemoveAnnotation = () => {
@@ -484,6 +517,7 @@ function App() {
           setSelectedAnnotationId={setSelectedAnnotationId}
           hoveredAnnotationId={hoveredAnnotationId}
           setHoveredAnnotationId={setHoveredAnnotationId}
+          onDeleteAnnotation={handleDeleteAnnotation}
         />
 
         {confirmAnnotation && (
