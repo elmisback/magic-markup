@@ -378,7 +378,7 @@ function App() {
     setConfirmAnnotation(false);
     setChooseAnnotationType(false);
 
-    if (!start || !end) {
+    if (start === undefined || end === undefined) {
       showErrorMessage("Error adding annotations: no highlighted text");
       return;
     }
