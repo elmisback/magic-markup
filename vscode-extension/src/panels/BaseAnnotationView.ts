@@ -1,159 +1,59 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
+import { Disposable, Webview, window, Uri } from "vscode";
 import { getUri } from "../utilities/getUri";
 import { getNonce } from "../utilities/getNonce";
 import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
 
 import { LMApiHandler } from "./LMApiHandler";
 import { annotationTracker } from "../extension";
 import { Annotation } from "../AnnotationTracker";
 import retagUpdate from "../server/retag";
-import { BaseAnnotationView } from "./BaseAnnotationView";
 
 /**
- * This class manages the state and behavior of annotation manager webview panels.
- * Extends the base annotation view class.
+ * Base abstract class for annotation views
+ * Contains shared functionality between panel and sidebar views
  */
-export class AnnotationManagerPanel extends BaseAnnotationView {
-  public static currentPanel: AnnotationManagerPanel | undefined;
-  private readonly _panel: WebviewPanel;
-
-  /**
-   * The AnnotationManagerPanel class private constructor (called only from the render method).
-   *
-   * @param panel A reference to the webview panel
-   * @param extensionUri The URI of the directory containing the extension
-   */
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
-    super(panel.webview, extensionUri);
-    this._panel = panel;
-
-    // Set an event listener to listen for when the panel is disposed
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-
-    // Set the HTML content for the webview panel
-    this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri);
-  }
-
-  /**
-   * Renders the current webview panel if it exists otherwise a new webview panel
-   * will be created and displayed.
-   *
-   * @param extensionUri The URI of the directory containing the extension.
-   */
-  public static render(extensionUri: Uri) {
-    if (AnnotationManagerPanel.currentPanel) {
-      // If the webview panel already exists reveal it
-      AnnotationManagerPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
-    } else {
-      // If a webview panel does not already exist create and show a new one
-      const panel = window.createWebviewPanel(
-        "showAnnotations",
-        "Codetations",
-        { viewColumn: ViewColumn.Two, preserveFocus: true },
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            Uri.joinPath(extensionUri, "out"),
-            Uri.joinPath(extensionUri, "webview-ui/build"),
-          ],
-        }
-      );
-
-      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(
-        panel,
-        extensionUri
-      );
-    }
-  }
-
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   * Overrides the base dispose method.
-   */
-  public dispose() {
-    AnnotationManagerPanel.currentPanel = undefined;
-    
-    // Dispose of the current webview panel
-    this._panel.dispose();
-    
-    // Call the parent dispose method
-    super.dispose();
-  }
-}
-
-export class SidebarProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "codetations-annotations";
-  private _view?: vscode.WebviewView;
-  private _disposables: Disposable[] = [];
-  private _prevTextEditor: vscode.TextEditor | undefined;
-  private _lmApiHandler: LMApiHandler | undefined;
+export abstract class BaseAnnotationView {
+  protected _lmApiHandler: LMApiHandler;
+  protected _disposables: Disposable[] = [];
+  protected _prevTextEditor: vscode.TextEditor | undefined;
+  
   // Add a property to store the selected annotation ID
   public selectedAnnotationId: string | undefined;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
-
-  resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken,
-  ) {
-    this._view = webviewView;
-    
-    webviewView.webview.options = {
-      enableScripts: true,
-      // retainContextWhenHidden: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this._extensionUri, "out"),
-        vscode.Uri.joinPath(this._extensionUri, "webview-ui/build"),
-      ],
-    };
-
+  /**
+   * Constructor for the base annotation view
+   * @param webview The webview to use
+   */
+  constructor(protected readonly webview: Webview, protected readonly extensionUri: Uri) {
     // Initialize the LM API Handler
-    this._lmApiHandler = new LMApiHandler(webviewView.webview);
-
-    webviewView.webview.html = this._getWebviewContent(webviewView.webview, this._extensionUri);
-
-    // Set an event listener to listen for messages passed from the webview context
-    this._setWebviewMessageListener(webviewView.webview);
-
-    // Set an event listener to listen for changes in the active text editor
-    this._setActiveTextEditorChangeListener(webviewView.webview);
+    this._lmApiHandler = new LMApiHandler(webview);
 
     // Set previous text editor
     this._prevTextEditor = vscode.window.activeTextEditor;
+
+    // Set event listeners
+    this._setWebviewMessageListener(webview);
+    this._setActiveTextEditorChangeListener(webview);
 
     // If there's an active editor, load its annotations
     if (vscode.window.activeTextEditor) {
       this._loadAnnotationsForActiveEditor();
     }
-    
-    // Handle panel disposal
-    webviewView.onDidDispose(() => {
-      while (this._disposables.length) {
-        const disposable = this._disposables.pop();
-        if (disposable) {
-          disposable.dispose();
-        }
-      }
-    });
   }
 
   /**
    * Gets the current editor, falling back to previous editor if current is undefined
    */
-  private _getCurrentEditor(): vscode.TextEditor | undefined {
+  protected _getCurrentEditor(): vscode.TextEditor | undefined {
     return vscode.window.activeTextEditor || this._prevTextEditor;
   }
 
   /**
    * Loads annotations for the active editor and sends them to the webview
    */
-  private _loadAnnotationsForActiveEditor(): void {
+  protected _loadAnnotationsForActiveEditor(): void {
     const editor = this._getCurrentEditor();
-    if (!editor || !this._view) {
+    if (!editor) {
       return;
     }
 
@@ -171,8 +71,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private _getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri) {
+  /**
+   * Get the webview HTML content
+   */
+  protected _getWebviewContent(webview: Webview, extensionUri: Uri): string {
+    // The CSS file from the React build output
     const stylesUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.css"]);
+    // The JS file from the React build output
     const scriptUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.js"]);
 
     const nonce = getNonce();
@@ -198,7 +103,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   /**
    * Listen for changes to the active text editor and update the webview.
    */
-  private _setActiveTextEditorChangeListener(webview: vscode.Webview) {
+  protected _setActiveTextEditorChangeListener(webview: Webview) {
     vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor) {
@@ -238,7 +143,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   /**
    * Sets up an event listener to listen for messages passed from the webview context
    */
-  private _setWebviewMessageListener(webview: vscode.Webview) {
+  protected _setWebviewMessageListener(webview: Webview) {
     webview.onDidReceiveMessage(
       async (message: any) => {
         const command = message.command;
@@ -326,16 +231,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
           case "lm.chat":
             // Handle chat request via LM API
-            if (this._lmApiHandler) {
-              await this._lmApiHandler.handleLMRequest(message);
-            }
+            await this._lmApiHandler.handleLMRequest(message);
             return;
 
           case "lm.cancelRequest":
             // Handle cancellation request
-            if (this._lmApiHandler) {
-              this._lmApiHandler.cancelRequest(message.id);
-            }
+            this._lmApiHandler.cancelRequest(message.id);
             return;
 
           case "setAnnotationColor":
@@ -370,7 +271,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   /**
    * Preprocesses an annotation for retagging
    */
-  private _preprocessAnnotation(annotation: Annotation) {
+  protected _preprocessAnnotation(annotation: Annotation) {
     const oldDocumentContent = annotation.document;
     const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
     const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
@@ -388,7 +289,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   /**
    * Retags a single annotation by calculating its new position in the updated document
    */
-  private async _retagAnnotation(
+  protected async _retagAnnotation(
     annotation: Annotation,
     currentDocumentText: string
   ): Promise<Annotation> {
@@ -493,9 +394,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    * Sends a message to the webview context.
    */
   public sendMessageObject(message: any) {
-    if (this._view) {
-      this._view.webview.postMessage(JSON.stringify(message));
-    }
+    // Implement in child classes
+    this.webview.postMessage(JSON.stringify(message));
   }
   
   /**
@@ -503,12 +403,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    */
   public addAnnotation(): void {
     const editor = this._getCurrentEditor();
-    if (!editor || !this._view) {
+    if (!editor) {
       window.showErrorMessage("No active text editor found");
       return;
     }
 
-    this._view.webview.postMessage(
+    this.webview.postMessage(
       JSON.stringify({
         command: "addAnnotation",
         data: {
@@ -523,9 +423,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    * Handles the command to remove the selected annotation
    */
   public removeAnnotation(): void {
-    if (!this._view) return;
-    
-    this._view.webview.postMessage(
+    this.webview.postMessage(
       JSON.stringify({
         command: "removeAnnotation",
       })
@@ -536,12 +434,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    * Handles the command to set the color of the selected annotation
    */
   public setAnnotationColor(): void {
-    if (!this._view) return;
-    
     // Get the color from the user
     vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
-      if (color && this._view) {
-        this._view.webview.postMessage(
+      if (color) {
+        this.webview.postMessage(
           JSON.stringify({
             command: "setAnnotationColor",
             data: {
@@ -551,5 +447,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         );
       }
     });
+  }
+  
+  /**
+   * Cleans up and disposes of resources.
+   */
+  public dispose() {
+    // Dispose of all disposables
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
+    }
   }
 }
