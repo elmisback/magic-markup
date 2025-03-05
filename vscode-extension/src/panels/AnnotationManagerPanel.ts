@@ -6,16 +6,11 @@ import * as path from "path";
 import * as fs from "fs";
 
 import { LMApiHandler } from "./LMApiHandler";
+import { annotationTracker } from "../extension";
+import { Annotation } from "../AnnotationTracker";
 
 /**
- * This class manages the state and behavior of HelloWorld webview panels.
- *
- * It contains all the data and methods for:
- *
- * - Creating and rendering HelloWorld webview panels
- * - Properly cleaning up and disposing of webview resources when the panel is closed
- * - Setting the HTML (and by proxy CSS/JavaScript) content of the webview panel
- * - Setting message listeners so data can be passed between the webview and extension
+ * This class manages the state and behavior of annotation manager webview panels.
  */
 export class AnnotationManagerPanel {
   private _lmApiHandler: LMApiHandler;
@@ -23,24 +18,23 @@ export class AnnotationManagerPanel {
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
-  private _isFileEditListenerSet: boolean = false;
-  private _isCursorPositionListenerSet: boolean = false;
-  private _prevDecorationTypes: vscode.TextEditorDecorationType[] = [];
+  private _retagServerPort: number;
+  private _showingRetagBanner: boolean = false;
 
   /**
-   * The HelloWorldPanel class private constructor (called only from the render method).
+   * The AnnotationManagerPanel class private constructor (called only from the render method).
    *
    * @param panel A reference to the webview panel
    * @param extensionUri The URI of the directory containing the extension
    */
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+  private constructor(panel: WebviewPanel, extensionUri: Uri, retagServerPort: number) {
     this._panel = panel;
+    this._retagServerPort = retagServerPort;
 
     // Initialize the LM API Handler
     this._lmApiHandler = new LMApiHandler(this._panel.webview);
 
-    // Set an event listener to listen for when the panel is disposed (i.e. when the user closes
-    // the panel or when the panel is closed programmatically)
+    // Set an event listener to listen for when the panel is disposed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
     // Set the HTML content for the webview panel
@@ -52,96 +46,36 @@ export class AnnotationManagerPanel {
     // Set an event listener to listen for changes in the active text editor
     this._setActiveTextEditorChangeListener(this._panel.webview);
 
-    // Set an event listener to listen for changes in the cursor position
-    this._setCursorChangeListener(this._panel.webview);
-
-    // Set an event listener to listen for changes in the active file
-    this._setFileEditListener(this._panel.webview);
-
     // Set previous text editor
     this._prevTextEditor = vscode.window.activeTextEditor;
+
+    // If there's an active editor, load its annotations
+    if (vscode.window.activeTextEditor) {
+      this._loadAnnotationsForActiveEditor();
+    }
   }
 
   /**
-   * Returns the URI of the annotations JSON file for the current document.
-   * @param documentURI The URI of the active text editor.
+   * Loads annotations for the active editor and sends them to the webview
    */
-  private static getAnnotationsURI(documentURI: string): string {
-    let currentDir = path.dirname(documentURI);
-    const annotationsFilename = (dir: string, documentURI: string) => {
-      // Get relative path from git root/base dir to the document
-      const relPath = path.relative(dir, documentURI);
-      // Create the full annotations directory path including subdirectories
-      const annotationsDir = path.join(dir, 'codetations', path.dirname(relPath));
-      
-      // Create all intermediate directories recursively
-      fs.mkdirSync(annotationsDir, { recursive: true });
-      
-      // Return full path including filename
-      return path.join(annotationsDir, path.basename(documentURI) + ".annotations.json");
-    };
-  
-    // Look for git root or fallback to document directory
-    while (currentDir !== path.parse(currentDir).root) {
-      if (fs.existsSync(path.join(currentDir, ".git"))) {
-        return annotationsFilename(currentDir, documentURI);
+  private _loadAnnotationsForActiveEditor(): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    // Get annotations from the tracker
+    const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
+    
+    // Send information to webview
+    this.sendMessageObject({
+      command: "initialize",
+      data: {
+        documentUri: editor.document.uri.toString(),
+        documentText: editor.document.getText(),
+        annotations: annotations,
+        retagServerURL: `http://localhost:${this._retagServerPort}/retag`
       }
-      currentDir = path.dirname(currentDir);
-    }
-    return annotationsFilename(path.dirname(documentURI), documentURI);
-  }
-
-  public addAnnotation(): void {
-    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-    this._panel.webview.postMessage(
-      JSON.stringify({
-        command: "addAnnotation",
-        data: {
-          start: editor?.document.offsetAt(editor.selection.start),
-          end: editor?.document.offsetAt(editor.selection.end),
-        },
-      })
-    );
-  }
-
-  public removeAnnotation(): void {
-    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-    this._panel.webview.postMessage(
-      JSON.stringify({
-        command: "removeAnnotation",
-      })
-    );
-  }
-
-  public setAnnotationColor(): void {
-    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-    // Get the color from the user
-    vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
-      this._panel.webview.postMessage(
-        JSON.stringify({
-          command: "setAnnotationColor",
-          data: {
-            color: color,
-          },
-        })
-      );
     });
   }
-
-  // Function to clear annotations from editor
-  public clearDecorations = () => {
-    const editor = vscode.window.activeTextEditor || this._prevTextEditor;
-    if (!editor) {
-      vscode.window.showErrorMessage(
-        "Error hiding annotations: no active or previously active text editor"
-      );
-      return;
-    }
-
-    this._prevDecorationTypes.map((type) => {
-      editor.setDecorations(type, []);
-    });
-  };
 
   /**
    * Renders the current webview panel if it exists otherwise a new webview panel
@@ -149,7 +83,7 @@ export class AnnotationManagerPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri, retagServerPort: number, fileServerPort: number) {
+  public static render(extensionUri: Uri, retagServerPort: number) {
     if (AnnotationManagerPanel.currentPanel) {
       // If the webview panel already exists reveal it
       AnnotationManagerPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
@@ -175,45 +109,84 @@ export class AnnotationManagerPanel {
         }
       );
 
-      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(panel, extensionUri);
-
-      // Send the retag server url to the webview
-      AnnotationManagerPanel.currentPanel.sendMessageObject({
-        command: "setFileServerURL",
-        data: { fileServerURL: `ws://localhost:${fileServerPort}` },
-      });
-
-      // Send the retag server url to the webview
-      AnnotationManagerPanel.currentPanel.sendMessageObject({
-        command: "setRetagServerURL",
-        data: { retagServerURL: `http://localhost:${retagServerPort}/retag` },
-      });
-
-      if (vscode.window.activeTextEditor) {
-        // Send the file server url to the webview
-        AnnotationManagerPanel.currentPanel.sendMessageObject({
-          command: "setDocumentURI",
-          data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
-        });
-
-        AnnotationManagerPanel.currentPanel.sendMessageObject({
-          command: "setAnnotationsURI",
-          data: {
-            annotationsURI: path.join(
-              AnnotationManagerPanel.getAnnotationsURI(vscode.window.activeTextEditor?.document.fileName)
-            ),
-          },
-        });
-      }
+      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(panel, extensionUri, retagServerPort);
     }
+  }
+
+  /**
+   * Handles the command to add an annotation from the current selection
+   */
+  public addAnnotation(): void {
+    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    this._panel.webview.postMessage(
+      JSON.stringify({
+        command: "addAnnotation",
+        data: {
+          start: editor?.document.offsetAt(editor.selection.start),
+          end: editor?.document.offsetAt(editor.selection.end),
+        },
+      })
+    );
+  }
+
+  /**
+   * Handles the command to remove the selected annotation
+   */
+  public removeAnnotation(): void {
+    this._panel.webview.postMessage(
+      JSON.stringify({
+        command: "removeAnnotation",
+      })
+    );
+  }
+
+  /**
+   * Handles the command to set the color of the selected annotation
+   */
+  public setAnnotationColor(): void {
+    // Get the color from the user
+    vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
+      if (color) {
+        this._panel.webview.postMessage(
+          JSON.stringify({
+            command: "setAnnotationColor",
+            data: {
+              color: color,
+            },
+          })
+        );
+      }
+    });
+  }
+
+  /**
+   * Shows a banner in the webview to indicate that annotations need retagging
+   */
+  public showRetagBanner(): void {
+    if (this._showingRetagBanner) return;
+    
+    this._showingRetagBanner = true;
+    this.sendMessageObject({
+      command: "showRetagBanner",
+    });
+  }
+
+  /**
+   * Hides the retag banner in the webview
+   */
+  public hideRetagBanner(): void {
+    this._showingRetagBanner = false;
+    this.sendMessageObject({
+      command: "hideRetagBanner",
+    });
   }
 
   /**
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    AnnotationManagerPanel.currentPanel?.clearDecorations();
-
     AnnotationManagerPanel.currentPanel = undefined;
 
     // Dispose of the current webview panel
@@ -230,9 +203,6 @@ export class AnnotationManagerPanel {
 
   /**
    * Defines and returns the HTML that should be rendered within the webview panel.
-   *
-   * @remarks This is also the place where references to the React webview build files
-   * are created and inserted into the webview HTML.
    *
    * @param webview A reference to the extension webview
    * @param extensionUri The URI of the directory containing the extension
@@ -254,9 +224,9 @@ export class AnnotationManagerPanel {
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}  https://*.googleapis.com 'unsafe-eval'; script-src 'nonce-${nonce}' http://localhost:* 'unsafe-eval'; connect-src 'self' ws://localhost:8072/ http://localhost:*; font-src https://fonts.gstatic.com; ">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}  https://*.googleapis.com 'unsafe-eval'; script-src 'nonce-${nonce}' http://localhost:* 'unsafe-eval'; connect-src 'self' http://localhost:*; font-src https://fonts.gstatic.com; ">
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
-          <title>Hello World</title>
+          <title>Annotations</title>
         </head>
         <body>
           <div id="root"></div>
@@ -266,126 +236,87 @@ export class AnnotationManagerPanel {
     `;
   }
 
-  private _setFileEditListener(webview: Webview) {
-    if (!this._isFileEditListenerSet) {
-      vscode.workspace.onDidChangeTextDocument(() => {
-        const editor = vscode.window.activeTextEditor;
-        this._panel.webview.postMessage(
-          JSON.stringify({
-            command: "handleFileEdit",
-          })
-        );
-      });
-      this._isFileEditListenerSet = true;
-    }
-  }
-
-  private _setCursorChangeListener(webview: Webview) {
-    if (!this._isCursorPositionListenerSet) {
-      vscode.window.onDidChangeTextEditorSelection(() => {
-        const editor = vscode.window.activeTextEditor;
-        this._panel.webview.postMessage(
-          JSON.stringify({
-            command: "handleCursorPositionChange",
-            data: {
-              position: editor?.document.offsetAt(editor.selection.start),
-            },
-          })
-        );
-      });
-      this._isCursorPositionListenerSet = true;
-    }
-  }
-
   /**
-   * Listen for changes to the active text editor and post a message to the webview.
+   * Listen for changes to the active text editor and update the webview.
    * @param webview VSCode webview
    */
   private _setActiveTextEditorChangeListener(webview: Webview) {
-    vscode.window.onDidChangeActiveTextEditor(() => {
-      if (vscode.window.activeTextEditor) {
-        this._panel.webview.postMessage(
-          JSON.stringify({
-            command: "setDocumentURI",
-            data: { documentURI: vscode.window.activeTextEditor?.document.fileName },
-          })
-        );
-        this._prevTextEditor = vscode.window.activeTextEditor;
-        // Find parent directory of documentURI that contains a git repository
-        // If there isn't a git repository, use the same directory as the documentURI
-        this._panel.webview.postMessage(
-          JSON.stringify({
-            command: "setAnnotationsURI",
-            data: {
-              annotationsURI: AnnotationManagerPanel.getAnnotationsURI(
-                vscode.window.activeTextEditor?.document.fileName
-              ),
-            },
-          })
-        );
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) {
+        // Load annotations for the new editor
+        this._loadAnnotationsForActiveEditor();
       }
-    });
+    }, null, this._disposables);
   }
 
   /**
    * Sets up an event listener to listen for messages passed from the webview context and
-   * executes code based on the message that is recieved.
+   * executes code based on the message that is received.
    *
    * @param webview A reference to the extension webview
-   * @param context A reference to the extension context
    */
   private _setWebviewMessageListener(webview: Webview) {
-    // Function to show annotations
-    const updateDecorations = (
-      annotations: { start: number; end: number; metadata: { color: "string" } }[]
-    ) => {
-      const editor = vscode.window.activeTextEditor || this._prevTextEditor;
-      if (!editor) {
-        window.showErrorMessage(
-          "Error showing annotations: no active or previously active text editor"
-        );
-        return;
-      }
-
-      this.clearDecorations();
-
-      // editor.setDecorations(annotationDecorationType, decorations);
-      // instead, we create a new decoration type with the color specified in the annotation
-      const types: vscode.TextEditorDecorationType[] = [];
-      annotations.map((annotation) => {
-        const startPos = editor.document.positionAt(annotation.start);
-        const endPos = editor.document.positionAt(annotation.end);
-        const decorationType = vscode.window.createTextEditorDecorationType({
-          backgroundColor: annotation.metadata.color || "rgba(255,255,0,0.3)",
-        });
-        types.push(decorationType);
-        editor.setDecorations(decorationType, [new vscode.Range(startPos, endPos)]);
-      });
-      this._prevDecorationTypes = types;
-    };
-
     webview.onDidReceiveMessage(
       async (message: any) => {
         const command = message.command;
+        const editor = vscode.window.activeTextEditor;
+        
+        if (!editor) {
+          // Most commands require an active editor
+          if (command !== "hello" && command !== "lm.chat" && command !== "lm.cancelRequest") {
+            window.showErrorMessage("No active text editor found");
+            return;
+          }
+        }
 
         switch (command) {
           case "hello":
             // Code that should run in response to the hello message command
             window.showInformationMessage(message.text);
             return;
-          // Add more switch case statements here as more webview message commands
-          // are created within the webview context (i.e. inside media/main.js)
+            
+          case "addAnnotationConfirm":
+            // Add a new annotation to the active document
+            const { annotation } = message.data;
+            annotationTracker.addAnnotation(editor!.document, annotation);
+            return;
+            
+          case "removeAnnotation":
+            // Remove an annotation from the active document
+            const { annotationId } = message.data;
+            annotationTracker.removeAnnotation(editor!.document, annotationId);
+            return;
+            
+          case "updateAnnotation":
+            // Update an existing annotation
+            const { updatedAnnotation } = message.data;
+            annotationTracker.updateAnnotation(editor!.document, updatedAnnotation);
+            return;
+            
+          case "retagAnnotations":
+            // Retag all annotations that need it
+            await annotationTracker.retagAnnotations(editor!.document);
+            this.hideRetagBanner();
+            return;
+            
+          case "jumpToAnnotation":
+            // Jump cursor to annotation location
+            const { start, end } = message.data;
+            if (editor) {
+              const startPos = editor.document.positionAt(start);
+              const endPos = editor.document.positionAt(end);
+              editor.selection = new vscode.Selection(startPos, endPos);
+              editor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+            }
+            return;
+            
           case "showErrorMessage":
+            // Display error message
             window.showErrorMessage(message.data.error);
             return;
-          case "showAnnotations":
-            updateDecorations(message.data.annotations);
-            return;
-          case "hideAnnotations":
-            this.clearDecorations();
-            return;
+            
           case "lm.chat":
-            // Handle chat request
+            // Handle chat request via LM API
             await this._lmApiHandler.handleLMRequest(message);
             return;
 
@@ -393,41 +324,27 @@ export class AnnotationManagerPanel {
             // Handle cancellation request
             this._lmApiHandler.cancelRequest(message.id);
             return;
-
-          // Call the VSCode language model API
-          case "callVSCodeChatModel":
-            const { vendor, family, prompt } = message.data;
-            // Call the VSCode language model API
-            try {
-              const [model] = await vscode.lm.selectChatModels({ vendor, family });
-              if (!model) {
-                // Show an error
-                window.showErrorMessage("No LLM was available to run the command");
-                return;
-              }
-              console.log("Selected model:", model);
-              const response = await model.sendRequest(
-                prompt,
-                {},
-                new vscode.CancellationTokenSource().token
-              );
-            } catch (err) {
-              if (err instanceof vscode.LanguageModelError) {
-                window.showErrorMessage(`${err.message} ${err.code} ${err.cause}`);
+            
+          case "setAnnotationColor":
+            // Set color for the selected annotation
+            const { annotationId: id, color } = message.data;
+            if (editor) {
+              const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
+              const annotation = annotations.find((a: Annotation) => a.id === id);
+              
+              if (annotation) {
+                const updated = {
+                  ...annotation,
+                  metadata: {
+                    ...annotation.metadata,
+                    color
+                  }
+                };
+                
+                annotationTracker.updateAnnotation(editor.document, updated);
               }
             }
-            this._panel.webview.postMessage(
-              JSON.stringify({
-                command: "setAnnotationsURI",
-                data: {
-                  annotationsURI: vscode.window.activeTextEditor
-                    ? AnnotationManagerPanel.getAnnotationsURI(
-                        vscode.window.activeTextEditor.document.fileName
-                      )
-                    : undefined,
-                },
-              })
-            );
+            return;
         }
       },
       undefined,
@@ -495,7 +412,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _setWebviewMessageListener(webview: vscode.Webview) {
-    // Implement message handling similar to HelloWorldPanel
-    
+    // Implement message handling similar to AnnotationManagerPanel
+    webview.onDidReceiveMessage(
+      async (message: any) => {
+        const command = message.command;
+        
+        switch (command) {
+          case "hello":
+            window.showInformationMessage(message.text);
+            return;
+            
+          // Add sidebar-specific message handling here
+          
+          case "showErrorMessage":
+            window.showErrorMessage(message.data.error);
+            return;
+        }
+      }
+    );
   }
 }
