@@ -248,7 +248,6 @@ function AnnotationSidebarView(props: {
 
 function RetagBanner(props: {
   onRetag: () => void;
-  onHide: () => void;
 }) {
   return (
     <div className="retag-banner" style={{ 
@@ -263,7 +262,6 @@ function RetagBanner(props: {
       <span>Document has been edited and some annotations need updating</span>
       <div>
         <button onClick={props.onRetag} style={{ marginRight: "8px" }}>Update Annotations</button>
-        <button onClick={props.onHide}>Dismiss</button>
       </div>
     </div>
   );
@@ -280,7 +278,6 @@ function App() {
   const [documentText, setDocumentText] = useState<string>("");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [retagServerURL, setRetagServerURL] = useState<string | undefined>(undefined);
-  const [showRetagBanner, setShowRetagBanner] = useState<boolean>(false);
 
   // UI state
   const [charNum, setCharNum] = useState<number | undefined>(undefined);
@@ -294,6 +291,10 @@ function App() {
   const [end, setEnd] = useState<number | undefined>(undefined);
   const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
+
+  const showRetagBanner = annotations.some((annotation) =>
+    isAnnotationOutOfSync(annotation, documentText)
+  );
 
   // Utility functions
   const showErrorMessage = (error: string) => {
@@ -310,10 +311,6 @@ function App() {
     vscode.postMessage({
       command: "retagAnnotations"
     });
-  };
-
-  const handleHideRetagBanner = () => {
-    setShowRetagBanner(false);
   };
 
   const handleChooseAnnType = (start: number, end: number, documentContent: string) => {
@@ -467,16 +464,6 @@ function App() {
           // Choose annotation type
           handleChooseAnnType(message.data.start, message.data.end, message.data.documentContent);
           return;
-          
-        case "showRetagBanner":
-          // Show retag banner
-          setShowRetagBanner(true);
-          return;
-          
-        case "hideRetagBanner":
-          // Hide retag banner
-          setShowRetagBanner(false);
-          return;
       }
     };
     
@@ -504,7 +491,6 @@ function App() {
         {showRetagBanner && (
           <RetagBanner 
             onRetag={handleRetag} 
-            onHide={handleHideRetagBanner} 
           />
         )}
         

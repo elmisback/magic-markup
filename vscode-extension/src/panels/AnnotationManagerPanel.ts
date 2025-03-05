@@ -8,6 +8,7 @@ import * as fs from "fs";
 import { LMApiHandler } from "./LMApiHandler";
 import { annotationTracker } from "../extension";
 import { Annotation } from "../AnnotationTracker";
+import retagUpdate from "../server/retag";
 
 /**
  * This class manages the state and behavior of annotation manager webview panels.
@@ -67,11 +68,13 @@ export class AnnotationManagerPanel {
    */
   private _loadAnnotationsForActiveEditor(): void {
     const editor = this._getCurrentEditor();
-    if (!editor) {return;}
+    if (!editor) {
+      return;
+    }
 
     // Get annotations from the tracker
     const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
-    
+
     // Send information to webview
     this.sendMessageObject({
       command: "initialize",
@@ -79,8 +82,8 @@ export class AnnotationManagerPanel {
         documentUri: editor.document.uri.toString(),
         documentText: editor.document.getText(),
         annotations: annotations,
-        retagServerURL: `http://localhost:${this._retagServerPort}/retag`
-      }
+        retagServerURL: `http://localhost:${this._retagServerPort}/retag`,
+      },
     });
   }
 
@@ -116,7 +119,11 @@ export class AnnotationManagerPanel {
         }
       );
 
-      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(panel, extensionUri, retagServerPort);
+      AnnotationManagerPanel.currentPanel = new AnnotationManagerPanel(
+        panel,
+        extensionUri,
+        retagServerPort
+      );
     }
   }
 
@@ -229,15 +236,19 @@ export class AnnotationManagerPanel {
    * @param webview VSCode webview
    */
   private _setActiveTextEditorChangeListener(webview: Webview) {
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor) {
-        // Update the previous editor reference
-        this._prevTextEditor = editor;
-        
-        // Load annotations for the new editor
-        this._loadAnnotationsForActiveEditor();
-      }
-    }, null, this._disposables);
+    vscode.window.onDidChangeActiveTextEditor(
+      (editor) => {
+        if (editor) {
+          // Update the previous editor reference
+          this._prevTextEditor = editor;
+
+          // Load annotations for the new editor
+          this._loadAnnotationsForActiveEditor();
+        }
+      },
+      null,
+      this._disposables
+    );
   }
 
   /**
@@ -251,7 +262,7 @@ export class AnnotationManagerPanel {
       async (message: any) => {
         const command = message.command;
         const editor = this._getCurrentEditor();
-        
+
         if (!editor) {
           // Most commands require an active editor
           if (command !== "hello" && command !== "lm.chat" && command !== "lm.cancelRequest") {
@@ -265,7 +276,7 @@ export class AnnotationManagerPanel {
             // Code that should run in response to the hello message command
             window.showInformationMessage(message.text);
             return;
-            
+
           case "addAnnotationConfirm":
             // Add a new annotation to the active document
             if (!editor) {
@@ -275,7 +286,7 @@ export class AnnotationManagerPanel {
             const { annotation: newAnnotation } = message.data;
             annotationTracker.addAnnotation(editor.document, newAnnotation);
             return;
-            
+
           case "removeAnnotation":
             // Remove an annotation from the active document
             if (!editor) {
@@ -285,7 +296,7 @@ export class AnnotationManagerPanel {
             const { annotationId } = message.data;
             annotationTracker.removeAnnotation(editor.document, annotationId);
             return;
-            
+
           case "updateAnnotation":
             // Update an existing annotation
             if (!editor) {
@@ -295,12 +306,12 @@ export class AnnotationManagerPanel {
             const { updatedAnnotation } = message.data;
             annotationTracker.updateAnnotation(editor.document, updatedAnnotation);
             return;
-            
+
           case "retagAnnotations":
             // Retag annotations in the active document
-            // TODO: Implement retagging
+            this.retagAnnotations();
             return;
-            
+
           case "jumpToAnnotation":
             // Jump cursor to annotation location
             if (!editor) {
@@ -311,14 +322,17 @@ export class AnnotationManagerPanel {
             const startPos = editor.document.positionAt(start);
             const endPos = editor.document.positionAt(end);
             editor.selection = new vscode.Selection(startPos, endPos);
-            editor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+            editor.revealRange(
+              new vscode.Range(startPos, endPos),
+              vscode.TextEditorRevealType.InCenter
+            );
             return;
-            
+
           case "showErrorMessage":
             // Display error message
             window.showErrorMessage(message.data.error);
             return;
-            
+
           case "lm.chat":
             // Handle chat request via LM API
             await this._lmApiHandler.handleLMRequest(message);
@@ -328,7 +342,7 @@ export class AnnotationManagerPanel {
             // Handle cancellation request
             this._lmApiHandler.cancelRequest(message.id);
             return;
-            
+
           case "setAnnotationColor":
             // Set color for the selected annotation
             if (!editor) {
@@ -337,17 +351,17 @@ export class AnnotationManagerPanel {
             }
             const { annotationId: id, color } = message.data;
             const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
-            const annotation = annotations.find(a => a.id === id);
-            
+            const annotation = annotations.find((a) => a.id === id);
+
             if (annotation) {
               const updated = {
                 ...annotation,
                 metadata: {
                   ...annotation.metadata,
-                  color
-                }
+                  color,
+                },
               };
-              
+
               annotationTracker.updateAnnotation(editor.document, updated);
             }
             return;
@@ -355,6 +369,127 @@ export class AnnotationManagerPanel {
       },
       undefined,
       this._disposables
+    );
+  }
+
+  /**
+   * Preprocesses an annotation for retagging
+   * @param annotation The annotation to preprocess
+   * @returns An object containing the delimited code and delimiter
+   */
+  private _preprocessAnnotation(annotation: Annotation) {
+    const oldDocumentContent = annotation.document;
+    const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
+    const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
+    const annotationText = oldDocumentContent.slice(annotation.start, annotation.end);
+    const delimiter = "★";
+    const codeWithSnippetDelimited =
+      codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
+
+    return {
+      codeWithSnippetDelimited,
+      delimiter,
+    };
+  }
+
+  /**
+   * Retags a single annotation by calculating its new position in the updated document
+   * @param annotation The annotation to retag
+   * @param currentDocumentText The current document text
+   * @returns The updated annotation with new positions
+   */
+  private async _retagAnnotation(
+    annotation: Annotation,
+    currentDocumentText: string
+  ): Promise<Annotation> {
+    const { codeWithSnippetDelimited, delimiter } = this._preprocessAnnotation(annotation);
+
+    try {
+      // Get the API key from settings
+      const apiKey = vscode.workspace.getConfiguration().get("codetations.apiKey") as string;
+
+      // Use the retagUpdate function to get the new positions
+      const result = await retagUpdate(
+        codeWithSnippetDelimited,
+        currentDocumentText,
+        delimiter,
+        apiKey
+      );
+      if (!result.out) {
+        window.showErrorMessage("Error retagging annotation: no result returned");
+        console.error("Error retagging annotation: no result returned");
+        console.error(codeWithSnippetDelimited);
+        return annotation;
+      }
+
+      // Update the annotation with the new positions
+      return {
+        ...annotation,
+        document: currentDocumentText,
+        start: result.out.leftIdx,
+        end: result.out.rightIdx,
+      };
+    } catch (error) {
+      console.error("Error retagging annotation:", error);
+      window.showErrorMessage(`Error retagging annotation: ${error}`);
+      return annotation; // Return original annotation on error
+    }
+  }
+
+  /**
+   * Handles the command to retag annotations (update their positions after document changes)
+   */
+  public async retagAnnotations(): Promise<void> {
+    const editor = this._getCurrentEditor();
+    if (!editor) {
+      window.showErrorMessage("No active text editor found");
+      return;
+    }
+
+    const currentDocumentText = editor.document.getText();
+    const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
+
+    // Show progress notification
+    window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Retagging annotations...",
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          // Update progress as we process each annotation
+          const total = annotations.length;
+          let processed = 0;
+
+          // Retag all annotations
+          const updatedAnnotations = await Promise.all(
+            annotations.map(async (annotation) => {
+              const retagged = await this._retagAnnotation(annotation, currentDocumentText);
+              processed++;
+              progress.report({
+                message: `Processed ${processed}/${total} annotations`,
+                increment: (1 / total) * 100,
+              });
+              return retagged;
+            })
+          );
+
+          // Update all annotations at once
+          annotations.forEach((oldAnnotation, index) => {
+            annotationTracker.updateAnnotation(editor.document, updatedAnnotations[index]);
+          });
+
+          // Notify webview of the updated annotations
+          this._loadAnnotationsForActiveEditor();
+
+          return true;
+        } catch (error) {
+          console.error("Error retagging annotations:", error);
+          window.showErrorMessage(`Error retagging annotations: ${error}`);
+          return false;
+        }
+      }
     );
   }
 
