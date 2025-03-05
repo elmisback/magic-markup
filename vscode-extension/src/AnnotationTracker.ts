@@ -26,7 +26,6 @@ export class AnnotationTracker implements vscode.Disposable {
   private documentAnnotations: Map<string, Annotation[]> = new Map();
   private decorationTypes: Map<string, vscode.TextEditorDecorationType[]> = new Map();
   private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
-  private skipNextDocumentChanges: boolean = false;
   
   // Store the document content cache
   private documentContentCache = new Map<string, string>();
@@ -102,8 +101,8 @@ export class AnnotationTracker implements vscode.Disposable {
    * Handler for document changes - updates annotation positions
    */
   private onDocumentChanged(event: vscode.TextDocumentChangeEvent): void {
-    // Skip if we're in the middle of a programmatic edit or if document is not loaded
-    if (this.skipNextDocumentChanges || !this.documentAnnotations.has(event.document.uri.toString())) {
+    // Skip if document is not loaded
+    if (!this.documentAnnotations.has(event.document.uri.toString())) {
       return;
     }
 
