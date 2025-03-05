@@ -521,9 +521,7 @@ function App() {
               </select>
             </div>
             <div>
-              Add annotation?
-              <br></br>
-              <button onClick={handleAddAnnotationConfirm}>Confirm</button>
+              <button onClick={handleAddAnnotationConfirm}>Add Note</button>
             </div>
           </>
         )}

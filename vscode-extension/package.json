@@ -32,15 +32,15 @@
       },
       {
         "command": "codetations.addAnnotation",
-        "title": "Add Annotation"
+        "title": "Add Note"
       },
       {
         "command": "codetations.removeAnnotation",
-        "title": "Remove Annotation"
+        "title": "Remove Note"
       },
       {
         "command": "codetations.setAnnotationColor",
-        "title": "Set Annotation Color"
+        "title": "Set Note Color"
       },
       {
         "command": "codetations.sendTestMessage",
