@@ -98,18 +98,12 @@ export class AnnotationManagerPanel {
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
-        // Panel view type
         "showAnnotations",
-        // Panel title
         "Codetations",
-        // The editor column the panel should be displayed in
         { viewColumn: ViewColumn.Two, preserveFocus: true },
-        // Extra panel configurations
         {
-          // Enable JavaScript in the webview
           enableScripts: true,
           retainContextWhenHidden: true,
-          // Restrict the webview to only load resources from the `out` and `webview-ui/build` directories
           localResourceRoots: [
             Uri.joinPath(extensionUri, "out"),
             Uri.joinPath(extensionUri, "webview-ui/build"),
@@ -329,6 +323,15 @@ export class AnnotationManagerPanel {
             // Retag annotations in the active document
             this.retagAnnotations();
             return;
+          case "setSelectedAnnotationId":
+            // Set the selected annotation ID
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
+            }
+            this.selectedAnnotationId = message.data.annotationId;
+            annotationTracker.updateDecorations(editor.document);
+            return;
 
           case "jumpToAnnotation":
             // Jump cursor to annotation location
@@ -337,12 +340,6 @@ export class AnnotationManagerPanel {
               return;
             }
             const { start, end } = message.data;
-            // Update the selected annotation ID
-            if (message.data.annotationId) {
-              this.selectedAnnotationId = message.data.annotationId;
-              // Update decorations to highlight the selected annotation
-              annotationTracker.updateDecorations(editor.document);
-            }
             const startPos = editor.document.positionAt(start);
             const endPos = editor.document.positionAt(end);
             editor.selection = new vscode.Selection(startPos, endPos);

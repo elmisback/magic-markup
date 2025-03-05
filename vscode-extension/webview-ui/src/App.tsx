@@ -34,28 +34,8 @@ function AnnotationEditorContainer(props: {
 }) {
   const { value, setValue, setSelectedAnnotationId, onDelete } = props;
 
-  const handleClick = () => {
-    setSelectedAnnotationId(value.id);
-
-    // Find the element by ID and scroll into view
-    const startElement = document.getElementById(`annotation-${value.start}`);
-    if (startElement) {
-      startElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    
-    // Send message to jump to annotation in editor
-    vscode.postMessage({
-      command: "jumpToAnnotation",
-      data: {
-        start: value.start,
-        end: value.end,
-        annotationId: value.id  // Add the annotation ID
-      }
-    });
-  };
-
   return (
-    <div className="annotation-container" onClick={handleClick}>
+    <div className="annotation-container">
       {toolTypes[value.tool]?.({
         value,
         setValue: (v: AnnotationUpdate) =>
@@ -138,6 +118,33 @@ function AnnotationSidebarView(props: {
 
   const handleClick = (id: string) => () => {
     props.setSelectedAnnotationId(id);
+
+    const value = annotations.find((a) => a.id === id);
+    if (!value) return;
+
+    // Find the element by ID and scroll into view
+    const startElement = document.getElementById(`annotation-${value.start}`);
+    if (startElement) {
+      startElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    
+    // Send message to jump to annotation in editor
+    vscode.postMessage({
+      command: "jumpToAnnotation",
+      data: {
+        start: value.start,
+        end: value.end,
+        annotationId: value.id  // Add the annotation ID
+      }
+    });
+
+    // Set the selected annotation id
+    vscode.postMessage({
+      command: "setSelectedAnnotationId",
+      data: {
+        annotationId: id
+      }
+    });
   };
 
   const handleAnnotationUpdate = (id: string, value: AnnotationUpdate) => {
@@ -496,6 +503,13 @@ function App() {
         (annotation) => annotation.start <= charNum && annotation.end >= charNum
       );
       if (annotation) {
+        // Set the selected annotation id
+        vscode.postMessage({
+          command: "setSelectedAnnotationId",
+          data: {
+            annotationId: annotation.id
+          }
+        });
         setSelectedAnnotationId(annotation.id);
       }
     }

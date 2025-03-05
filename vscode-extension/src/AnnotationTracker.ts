@@ -143,7 +143,7 @@ export class AnnotationTracker implements vscode.Disposable {
       this.documentContentCache.set(docKey, editor.document.getText());
       this.pendingChanges.delete(docKey);
       this.fileChangeTimers.delete(docKey);
-    }, 100));
+    }, 50));
   }
 
   /**
@@ -342,44 +342,76 @@ export class AnnotationTracker implements vscode.Disposable {
             if (rgbaMatch) {
               const [_, r, g, b] = rgbaMatch;
               // Use a fixed higher opacity value for selected annotations
-              decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+              decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
             }
           } else if (baseColor.startsWith("rgb")) {
             // For rgb format, add alpha
-            const rgbMatch = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            const rgbMatch = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);            
             if (rgbMatch) {
               const [_, r, g, b] = rgbMatch;
-              decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+              decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
             }
           } else if (baseColor.startsWith("#")) {
             // For hex format, convert to rgba
-            const hex = baseColor.slice(1);
+            const hex = baseColor.slice(1);            
             const r = parseInt(hex.substring(0, 2), 16);
             const g = parseInt(hex.substring(2, 4), 16);
             const b = parseInt(hex.substring(4, 6), 16);
-            decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+            decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
           }
         }
         
-        // Create a decoration type with the annotation's style
-        const decorationType = vscode.window.createTextEditorDecorationType({
-          backgroundColor: decorationColor,
-          // Add a border for selected annotations
-          border: isSelected ? '2px solid #007fd4' : undefined,
-          borderRadius: isSelected ? '3px' : undefined,
-        });
+        // Extract solid color for gutter without transparency
+        let gutterColor = baseColor;
+        if (gutterColor.startsWith("rgba")) {
+          // Convert rgba to rgb for the gutter
+          const rgbaMatch = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+          if (rgbaMatch) {
+            const [_, r, g, b] = rgbaMatch;
+            gutterColor = `rgb(${r}, ${g}, ${b})`;
+          }
+        } else if (baseColor.startsWith("#")) {
+          // Keep hex color as is for gutter
+          gutterColor = baseColor;
+        }
         
         // Create the decoration range
         const startPos = document.positionAt(annotation.start);
         const endPos = document.positionAt(annotation.end);
         const range = new vscode.Range(startPos, endPos);
         
-        // Apply to all editors
+        // 1. Create text decoration type with highlighting and potential underline
+        const textDecorationType = vscode.window.createTextEditorDecorationType({
+          // backgroundColor: decorationColor,
+          borderColor: decorationColor,
+          borderStyle: true ? 'none none solid none' : 'none',
+          // Add underline for selected annotations
+          // textDecoration: isSelected ? 'underline' : undefined,
+          
+          // Add entries to the overview ruler
+          // overviewRulerColor: gutterColor,
+          // overviewRulerLane: vscode.OverviewRulerLane.Left
+        });
+        
+        // 2. Create gutter decoration type with vertical line
+        const gutterDecorationType = vscode.window.createTextEditorDecorationType({
+          isWholeLine: true,
+          // Left margin decoration - the vertical line
+          borderColor: gutterColor,
+          borderWidth: '3px',
+          borderStyle: 'none solid none none'
+        });
+        
+        // Apply both decorations to all editors
         for (const editor of editors) {
-          editor.setDecorations(decorationType, [range]);
+          editor.setDecorations(textDecorationType, [range]);
+          editor.setDecorations(gutterDecorationType, [range]);
         }
         
-        decorations.push(decorationType);
+        // Store both decoration types
+        decorations.push(textDecorationType);
+        decorations.push(gutterDecorationType);
+        
       } catch (error) {
         console.error("Error creating decoration:", error);
       }
