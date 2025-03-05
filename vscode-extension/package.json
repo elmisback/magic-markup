@@ -56,10 +56,6 @@
         {
           "command": "codetations.removeAnnotation",
           "group": "navigation"
-        },
-        {
-          "command": "codetations.setAnnotationColor",
-          "group": "navigation"
         }
       ],
       "editor/title": [
