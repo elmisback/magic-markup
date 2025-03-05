@@ -27,20 +27,16 @@
     "commands": [
       {
         "command": "codetations.showAnnotations",
-        "title": "Codetations: Show",
+        "title": "Codetations: Show Notes",
         "icon": "$(zap)"
       },
       {
         "command": "codetations.addAnnotation",
-        "title": "Add Note"
+        "title": "Codetations: Add Note"
       },
       {
         "command": "codetations.removeAnnotation",
-        "title": "Remove Note"
-      },
-      {
-        "command": "codetations.setAnnotationColor",
-        "title": "Set Note Color"
+        "title": "Codetations: Remove Note"
       },
       {
         "command": "codetations.sendTestMessage",
@@ -49,6 +45,10 @@
     ],
     "menus": {
       "editor/context": [
+        {
+          "command": "codetations.showAnnotations",
+          "group": "navigation"
+        },
         {
           "command": "codetations.addAnnotation",
           "group": "navigation"
@@ -70,6 +70,9 @@
       ]
     }
   },
+  "activationEvents": [
+    "*"
+  ],
   "scripts": {
     "install:all": "npm install && cd webview-ui && npm install",
     "start:webview": "cd webview-ui && npm run start",
