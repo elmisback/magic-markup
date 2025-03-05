@@ -393,6 +393,21 @@ function App() {
       }
     }
 
+    // Pick a colorblind-friendly annotation color, rotating through a list
+    const colorblindFriendlyColors = [
+      "#bcbd2222", // yellow
+      "#1f77b422", // blue
+      "#ff7f0e22", // orange
+      "#2ca02c22", // green
+      "#d6272822", // red
+      "#9467bd22", // purple
+      "#8c564b22", // brown
+      "#e377c222", // pink
+      "#7f7f7f22", // gray
+    ];
+    const colorIndex = annotations.length % colorblindFriendlyColors.length;
+    const annotationColor = colorblindFriendlyColors[colorIndex];
+
     // Create new annotation and send to extension
     const newAnnotation: Annotation = {
       id: Date.now().toString(), // Use timestamp for unique ID
@@ -400,7 +415,9 @@ function App() {
       end,
       document: documentText,
       tool: newTool,
-      metadata: {},
+      metadata: {
+        color: annotationColor
+      },
       original: {
         document: documentText,
         start,
