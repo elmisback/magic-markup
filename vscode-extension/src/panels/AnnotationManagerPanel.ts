@@ -60,7 +60,7 @@ export class AnnotationManagerPanel {
    */
   private _loadAnnotationsForActiveEditor(): void {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
+    if (!editor) {return;}
 
     // Get annotations from the tracker
     const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
@@ -118,7 +118,7 @@ export class AnnotationManagerPanel {
    */
   public addAnnotation(): void {
     const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-    if (!editor) return;
+    if (!editor) {return;}
 
     this._panel.webview.postMessage(
       JSON.stringify({
@@ -158,28 +158,6 @@ export class AnnotationManagerPanel {
           })
         );
       }
-    });
-  }
-
-  /**
-   * Shows a banner in the webview to indicate that annotations need retagging
-   */
-  public showRetagBanner(): void {
-    if (this._showingRetagBanner) return;
-    
-    this._showingRetagBanner = true;
-    this.sendMessageObject({
-      command: "showRetagBanner",
-    });
-  }
-
-  /**
-   * Hides the retag banner in the webview
-   */
-  public hideRetagBanner(): void {
-    this._showingRetagBanner = false;
-    this.sendMessageObject({
-      command: "hideRetagBanner",
     });
   }
 
@@ -294,9 +272,8 @@ export class AnnotationManagerPanel {
             return;
             
           case "retagAnnotations":
-            // Retag all annotations that need it
-            await annotationTracker.retagAnnotations(editor!.document);
-            this.hideRetagBanner();
+            // Retag annotations in the active document
+            // TODO: Implement retagging
             return;
             
           case "jumpToAnnotation":
@@ -330,7 +307,7 @@ export class AnnotationManagerPanel {
             const { annotationId: id, color } = message.data;
             if (editor) {
               const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
-              const annotation = annotations.find((a: Annotation) => a.id === id);
+              const annotation = annotations.find(a => a.id === id);
               
               if (annotation) {
                 const updated = {
