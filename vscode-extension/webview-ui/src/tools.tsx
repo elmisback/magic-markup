@@ -466,7 +466,7 @@ export const tools = {
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
   yesNoQuestion: LMUnitTest, // Add the new component
-  lmApiTest: LMAPITest, // Add the debugging component
+  // lmApiTest: LMAPITest, // Add the debugging component
 };
 
 export const toolNames = {
@@ -475,7 +475,7 @@ export const toolNames = {
   runCodeSegment: "Run Code Segment",
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
-  odyssey: "Odyssey: FP Explore",
+  odyssey: "Analyze Floating-point Expression",
   yesNoQuestion: "LM Unit Test", // Add the new component name
-  lmApiTest: "LM API Test", // Add the debugging component name
+  // lmApiTest: "LM API Test", // Add the debugging component name
 };
