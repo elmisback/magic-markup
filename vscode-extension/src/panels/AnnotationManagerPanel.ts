@@ -19,6 +19,8 @@ export class AnnotationManagerPanel {
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private _prevTextEditor: vscode.TextEditor | undefined;
+  // Add a property to store the selected annotation ID
+  public selectedAnnotationId: string | undefined;
 
   /**
    * The AnnotationManagerPanel class private constructor (called only from the render method).
@@ -244,6 +246,27 @@ export class AnnotationManagerPanel {
       null,
       this._disposables
     );
+    
+    // Add selection change listener to track cursor position
+    vscode.window.onDidChangeTextEditorSelection(
+      (event) => {
+        const editor = event.textEditor;
+        if (editor) {
+          // Get the cursor position as character offset
+          const position = editor.document.offsetAt(editor.selection.active);
+          
+          // Send the cursor position to the webview
+          this.sendMessageObject({
+            command: "handleCursorPositionChange",
+            data: {
+              position: position
+            }
+          });
+        }
+      },
+      null,
+      this._disposables
+    );
   }
 
   /**
@@ -314,6 +337,12 @@ export class AnnotationManagerPanel {
               return;
             }
             const { start, end } = message.data;
+            // Update the selected annotation ID
+            if (message.data.annotationId) {
+              this.selectedAnnotationId = message.data.annotationId;
+              // Update decorations to highlight the selected annotation
+              annotationTracker.updateDecorations(editor.document);
+            }
             const startPos = editor.document.positionAt(start);
             const endPos = editor.document.positionAt(end);
             editor.selection = new vscode.Selection(startPos, endPos);

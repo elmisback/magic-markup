@@ -299,7 +299,7 @@ export class AnnotationTracker implements vscode.Disposable {
   /**
    * Updates the decorations in the editor
    */
-  private updateDecorations(document: vscode.TextDocument): void {
+  public updateDecorations(document: vscode.TextDocument): void {
     const documentKey = document.uri.toString();
     const annotations = this.documentAnnotations.get(documentKey) || [];
     
@@ -315,6 +315,9 @@ export class AnnotationTracker implements vscode.Disposable {
       return; // No visible editor for this document
     }
     
+    // Get selected annotation ID from the panel if available
+    const selectedAnnotationId = AnnotationManagerPanel.currentPanel?.selectedAnnotationId;
+    
     const decorations: vscode.TextEditorDecorationType[] = [];
     
     // Create and apply decorations for each annotation
@@ -324,9 +327,46 @@ export class AnnotationTracker implements vscode.Disposable {
         continue;
       }
       try {
+        // Check if this is the selected annotation
+        const isSelected = selectedAnnotationId === annotation.id;
+        
+        // Extract base color from metadata or use default
+        const baseColor = annotation.metadata?.color || "rgba(255,255,0,0.3)";
+        
+        // Increase opacity for selected annotation
+        let decorationColor = baseColor;
+        if (isSelected) {
+          if (baseColor.startsWith("rgba")) {
+            // Parse the rgba color values
+            const rgbaMatch = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+            if (rgbaMatch) {
+              const [_, r, g, b] = rgbaMatch;
+              // Use a fixed higher opacity value for selected annotations
+              decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+            }
+          } else if (baseColor.startsWith("rgb")) {
+            // For rgb format, add alpha
+            const rgbMatch = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (rgbMatch) {
+              const [_, r, g, b] = rgbMatch;
+              decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+            }
+          } else if (baseColor.startsWith("#")) {
+            // For hex format, convert to rgba
+            const hex = baseColor.slice(1);
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            decorationColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+          }
+        }
+        
         // Create a decoration type with the annotation's style
         const decorationType = vscode.window.createTextEditorDecorationType({
-          backgroundColor: annotation.metadata?.color || "rgba(255,255,0,0.3)",
+          backgroundColor: decorationColor,
+          // Add a border for selected annotations
+          border: isSelected ? '2px solid #007fd4' : undefined,
+          borderRadius: isSelected ? '3px' : undefined,
         });
         
         // Create the decoration range

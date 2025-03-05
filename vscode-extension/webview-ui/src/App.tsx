@@ -48,7 +48,8 @@ function AnnotationEditorContainer(props: {
       command: "jumpToAnnotation",
       data: {
         start: value.start,
-        end: value.end
+        end: value.end,
+        annotationId: value.id  // Add the annotation ID
       }
     });
   };
@@ -395,15 +396,15 @@ function App() {
 
     // Pick a colorblind-friendly annotation color, rotating through a list
     const colorblindFriendlyColors = [
-      "#bcbd2222", // yellow
-      "#1f77b422", // blue
-      "#ff7f0e22", // orange
-      "#2ca02c22", // green
-      "#d6272822", // red
-      "#9467bd22", // purple
-      "#8c564b22", // brown
-      "#e377c222", // pink
-      "#7f7f7f22", // gray
+      "rgba(188, 189, 34, 0.3)", // yellow
+      "rgba(31, 119, 180, 0.3)", // blue
+      "rgba(255, 127, 14, 0.3)", // orange
+      "rgba(44, 160, 44, 0.3)",  // green
+      "rgba(214, 39, 40, 0.3)",  // red
+      "rgba(148, 103, 189, 0.3)", // purple
+      "rgba(140, 86, 75, 0.3)",  // brown
+      "rgba(227, 119, 194, 0.3)", // pink
+      "rgba(127, 127, 127, 0.3)", // gray
     ];
     const colorIndex = annotations.length % colorblindFriendlyColors.length;
     const annotationColor = colorblindFriendlyColors[colorIndex];
