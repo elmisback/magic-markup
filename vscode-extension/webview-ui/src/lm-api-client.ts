@@ -54,17 +54,17 @@ class LMApiClient {
   // Process incoming messages from extension host
   private handleMessage(event: MessageEvent) {
     try {
+      const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      
+      if (!message || !message.id) {
+        // debugLog("Message missing id, ignoring", message);
+        return;
+      }
+
       debugLog("Received message from extension", { 
         type: typeof event.data,
         data: typeof event.data === 'string' ? event.data.substring(0, 100) : event.data 
       });
-      
-      const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-      
-      if (!message || !message.id) {
-        debugLog("Message missing id, ignoring", message);
-        return;
-      }
       
       const pendingRequest = this.pendingRequests.get(message.id);
       if (!pendingRequest) {
