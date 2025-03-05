@@ -459,6 +459,12 @@ export class AnnotationManagerPanel {
           // Retag all annotations
           const updatedAnnotations = await Promise.all(
             annotations.map(async (annotation) => {
+              // HACK -- if the annotation is empty, use the original positions
+              if (annotation.start === annotation.end) {
+                annotation.document = annotation.original.document;
+                annotation.start = annotation.original.start;
+                annotation.end = annotation.original.end;
+              }
               if (annotation.document === currentDocumentText) { return annotation; }
               const retagged = await this._retagAnnotation(annotation, currentDocumentText);
               processed++;
