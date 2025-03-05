@@ -2,15 +2,15 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
-
 export interface Annotation {
+  // HACK this just duplicates "../webview-ui/src/Annotation.tsx"
   id: string;
   start: number;
   end: number;
   document: string;
   tool: string;
   metadata: { [key: string]: any };
-  original?: {
+  original: {
     document: string;
     start: number;
     end: number;
@@ -131,13 +131,15 @@ export class AnnotationTracker implements vscode.Disposable {
     }
 
     let updatedAnnotations = [...annotations];
-    let needsRetag = false;
-
+    let documentModified = false;
+    
     // Process each change to update annotation positions
     for (const change of changes) {
       const startOffset = change.rangeOffset;
       const endOffset = change.rangeOffset + change.rangeLength;
       const textLengthDiff = change.text.length - change.rangeLength;
+
+      documentModified = true;
 
       // Update annotations based on the change
       updatedAnnotations = updatedAnnotations.map(annotation => {
@@ -158,27 +160,21 @@ export class AnnotationTracker implements vscode.Disposable {
         }
         
         // Case 3: Annotation overlaps with the change - needs more complex handling
-        needsRetag = true;
-        return {
-          ...annotation,
-          needsRetag: true,
-          document: document.getText(),
-        };
+        // For these cases, we update nothing, the frontend will warn the user
+        // TODO confirm that non-update is handled correctly elsewhere (e.g. for decorations)
+        return annotation;
       });
     }
 
-    // Update the document's annotations
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
-    
-    // Update decorations
-    this.updateDecorations(document);
-    
-    // Notify the webview
-    this.notifyAnnotationsChanged(document);
-    
-    // Show retag banner if needed
-    if (needsRetag && AnnotationManagerPanel.currentPanel) {
-      AnnotationManagerPanel.currentPanel.showRetagBanner();
+    if (documentModified) {
+      // Update the document's annotations
+      this.documentAnnotations.set(documentKey, updatedAnnotations);
+      
+      // Update decorations
+      this.updateDecorations(document);
+      
+      // Notify the webview
+      this.notifyAnnotationsChanged(document);
     }
   }
 
@@ -205,11 +201,7 @@ export class AnnotationTracker implements vscode.Disposable {
     
     // Create and apply decorations for each annotation
     for (const annotation of annotations) {
-      // Skip annotations that need retag for now
-      if (this.doesAnnotationNeedRetag(annotation, document.getText())) {
-        continue;
-      }
-      
+      // TODO if the document text doesn't match the annotation's document, skip
       try {
         // Create a decoration type with the annotation's style
         const decorationType = vscode.window.createTextEditorDecorationType({
@@ -366,95 +358,6 @@ export class AnnotationTracker implements vscode.Disposable {
   public getAnnotationsForDocument(document: vscode.TextDocument): Annotation[] {
     const documentKey = document.uri.toString();
     return this.documentAnnotations.get(documentKey) || [];
-  }
-
-  /**
-   * Performs retagging for all annotations in a document that need it
-   */
-  public async retagAnnotations(document: vscode.TextDocument): Promise<void> {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Find annotations that need retagging
-    const needsRetag = annotations.filter(a => a.needsRetag);
-    if (needsRetag.length === 0) {
-      return; // Nothing to retag
-    }
-    
-    // Temporarily disable change tracking to avoid recursive updates
-    this.skipNextDocumentChanges = true;
-    
-    try {
-      // Call the retag API for each annotation
-      const updatedAnnotations = await Promise.all(
-        annotations.map(async (annotation) => {
-          if (annotation.needsRetag) {
-            // Create parameters for retagging
-            const { codeWithSnippetDelimited, delimiter } = this.preprocessAnnotationForRetag(annotation);
-            
-            // Call the retag API (would need to be implemented)
-            // For now, just mark as needing manual fix
-            return {
-              ...annotation,
-              needsRetag: true
-            };
-          }
-          return annotation;
-        })
-      );
-      
-      // Update annotations
-      this.documentAnnotations.set(documentKey, updatedAnnotations);
-      
-      // Update decorations and save
-      this.updateDecorations(document);
-      this.saveAnnotationsForDocument(document);
-      this.notifyAnnotationsChanged(document);
-    } catch (error) {
-      console.error("Error during retagging:", error);
-      vscode.window.showErrorMessage("Error retagging annotations. Some annotations may be out of sync.");
-    } finally {
-      this.skipNextDocumentChanges = false;
-    }
-  }
-
-  /**
-   * Checks if an annotation needs retagging by comparing document state
-   */
-  private doesAnnotationNeedRetag(annotation: Annotation, currentDocumentText: string): boolean {
-    if (!annotation.original) {
-      return false; // No original state to compare against
-    }
-    
-    // Check if the text at the annotation position still matches the original content
-    const annotationText = currentDocumentText.slice(annotation.start, annotation.end);
-    const originalText = annotation.original.document.slice(
-      annotation.original.start, 
-      annotation.original.end
-    );
-    
-    return annotationText !== originalText;
-  }
-
-  /**
-   * Helper to prepare an annotation for retagging
-   */
-  private preprocessAnnotationForRetag(annotation: Annotation) {
-    const oldDocumentContent = annotation.original?.document || annotation.document;
-    const codeUpToSnippet = oldDocumentContent.slice(0, annotation.original?.start || annotation.start);
-    const codeAfterSnippet = oldDocumentContent.slice(annotation.original?.end || annotation.end);
-    const snippetText = oldDocumentContent.slice(
-      annotation.original?.start || annotation.start, 
-      annotation.original?.end || annotation.end
-    );
-    
-    const delimiter = "★";
-    const codeWithSnippetDelimited = codeUpToSnippet + delimiter + snippetText + delimiter + codeAfterSnippet;
-    
-    return {
-      codeWithSnippetDelimited,
-      delimiter
-    };
   }
 
   public dispose(): void {
