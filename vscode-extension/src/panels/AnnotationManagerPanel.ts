@@ -56,10 +56,17 @@ export class AnnotationManagerPanel {
   }
 
   /**
+   * Gets the current editor, falling back to previous editor if current is undefined
+   */
+  private _getCurrentEditor(): vscode.TextEditor | undefined {
+    return vscode.window.activeTextEditor || this._prevTextEditor;
+  }
+
+  /**
    * Loads annotations for the active editor and sends them to the webview
    */
   private _loadAnnotationsForActiveEditor(): void {
-    const editor = vscode.window.activeTextEditor;
+    const editor = this._getCurrentEditor();
     if (!editor) {return;}
 
     // Get annotations from the tracker
@@ -117,15 +124,18 @@ export class AnnotationManagerPanel {
    * Handles the command to add an annotation from the current selection
    */
   public addAnnotation(): void {
-    const editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
-    if (!editor) {return;}
+    const editor = this._getCurrentEditor();
+    if (!editor) {
+      window.showErrorMessage("No active text editor found");
+      return;
+    }
 
     this._panel.webview.postMessage(
       JSON.stringify({
         command: "addAnnotation",
         data: {
-          start: editor?.document.offsetAt(editor.selection.start),
-          end: editor?.document.offsetAt(editor.selection.end),
+          start: editor.document.offsetAt(editor.selection.start),
+          end: editor.document.offsetAt(editor.selection.end),
         },
       })
     );
@@ -221,6 +231,9 @@ export class AnnotationManagerPanel {
   private _setActiveTextEditorChangeListener(webview: Webview) {
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {
+        // Update the previous editor reference
+        this._prevTextEditor = editor;
+        
         // Load annotations for the new editor
         this._loadAnnotationsForActiveEditor();
       }
@@ -237,7 +250,7 @@ export class AnnotationManagerPanel {
     webview.onDidReceiveMessage(
       async (message: any) => {
         const command = message.command;
-        const editor = vscode.window.activeTextEditor;
+        const editor = this._getCurrentEditor();
         
         if (!editor) {
           // Most commands require an active editor
@@ -255,20 +268,32 @@ export class AnnotationManagerPanel {
             
           case "addAnnotationConfirm":
             // Add a new annotation to the active document
-            const { annotation } = message.data;
-            annotationTracker.addAnnotation(editor!.document, annotation);
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
+            }
+            const { annotation: newAnnotation } = message.data;
+            annotationTracker.addAnnotation(editor.document, newAnnotation);
             return;
             
           case "removeAnnotation":
             // Remove an annotation from the active document
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
+            }
             const { annotationId } = message.data;
-            annotationTracker.removeAnnotation(editor!.document, annotationId);
+            annotationTracker.removeAnnotation(editor.document, annotationId);
             return;
             
           case "updateAnnotation":
             // Update an existing annotation
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
+            }
             const { updatedAnnotation } = message.data;
-            annotationTracker.updateAnnotation(editor!.document, updatedAnnotation);
+            annotationTracker.updateAnnotation(editor.document, updatedAnnotation);
             return;
             
           case "retagAnnotations":
@@ -278,13 +303,15 @@ export class AnnotationManagerPanel {
             
           case "jumpToAnnotation":
             // Jump cursor to annotation location
-            const { start, end } = message.data;
-            if (editor) {
-              const startPos = editor.document.positionAt(start);
-              const endPos = editor.document.positionAt(end);
-              editor.selection = new vscode.Selection(startPos, endPos);
-              editor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
             }
+            const { start, end } = message.data;
+            const startPos = editor.document.positionAt(start);
+            const endPos = editor.document.positionAt(end);
+            editor.selection = new vscode.Selection(startPos, endPos);
+            editor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
             return;
             
           case "showErrorMessage":
@@ -304,22 +331,24 @@ export class AnnotationManagerPanel {
             
           case "setAnnotationColor":
             // Set color for the selected annotation
+            if (!editor) {
+              window.showErrorMessage("No active text editor found");
+              return;
+            }
             const { annotationId: id, color } = message.data;
-            if (editor) {
-              const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
-              const annotation = annotations.find(a => a.id === id);
+            const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
+            const annotation = annotations.find(a => a.id === id);
+            
+            if (annotation) {
+              const updated = {
+                ...annotation,
+                metadata: {
+                  ...annotation.metadata,
+                  color
+                }
+              };
               
-              if (annotation) {
-                const updated = {
-                  ...annotation,
-                  metadata: {
-                    ...annotation.metadata,
-                    color
-                  }
-                };
-                
-                annotationTracker.updateAnnotation(editor.document, updated);
-              }
+              annotationTracker.updateAnnotation(editor.document, updated);
             }
             return;
         }
