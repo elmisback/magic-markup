@@ -1,10 +1,11 @@
 import { AnnotationEditorProps } from "./App";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
 import LMUnitTest from "./LMUnitTest";
 import LMAPITest from "./LMAPITest";
+import { ChatMessage, lmApi } from "./lm-api-client";
 
 type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
@@ -442,16 +443,47 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
-  // TODO should be what LM parsed from highlighted annotation
- const expression =  props.utils.getText(); // "sqrt(x+1) - x";
+  const [expression, setExpression] = useState("");
+
+  useEffect(() => {
+    const parseText = async (text: string) => {
+      const prompt: ChatMessage[] = [
+        {
+          role: "system",
+          content: `Can you parse this piece of text or code to find an expression 
+            and convert it to mathjs parsable syntax? All math.h operators are allowed. 
+            Do not give any other text in your output besides the mathjs parasable string, 
+            with no quotation marks.
+            
+            The text to parse is as follows:
+            ${text}
+          `
+        }
+       ]
+      const parsed = await lmApi.chat(prompt, {
+        vendor: 'copilot',
+        family: 'gpt-4o',
+        temperature: 0.3
+      })
+  
+      console.log(parsed);
+      setExpression(parsed);
+    }
+
+    parseText(props.utils.getText());
+  }, [])
 
  const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec="
  const url = odysseyBase + encodeURIComponent(expression);
 
  return (
-   <div>
+    // Following expression was parsed from highlighted text. Edit if needed, then hit explore!
+    // <input area with initial, editable, contents as expression>
+    // <button Explore!!>
+
+    <div>
       Explore floating-point Error in parsed expression, {expression}, with <a className={"btn"} href={url}>Odyssey</a>
-   </div>
+    </div>
  );
 };
 
