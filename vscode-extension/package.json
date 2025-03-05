@@ -45,10 +45,6 @@
       {
         "command": "codetations.sendTestMessage",
         "title": "Codetations: Test"
-      },
-      {
-        "command": "codetations.setAPIKey",
-        "title": "Codetations: Set API Key"
       }
     ],
     "menus": {
@@ -72,16 +68,6 @@
           "group": "navigation"
         }
       ]
-    },
-    "configuration": {
-      "title": "Codetations",
-      "properties": {
-        "codetations.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API Key for OpenAI GPT-3"
-        }
-      }
     }
   },
   "scripts": {
