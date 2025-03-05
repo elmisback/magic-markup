@@ -41,6 +41,15 @@ function AnnotationEditorContainer(props: {
     if (startElement) {
       startElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    
+    // Send message to jump to annotation in editor
+    vscode.postMessage({
+      command: "jumpToAnnotation",
+      data: {
+        start: value.start,
+        end: value.end
+      }
+    });
   };
 
   return (
@@ -70,22 +79,17 @@ function AnnotationEditorContainer(props: {
   );
 }
 
-type RetagFunction = (
-  currentDocument: string,
-  annotation: Annotation
-) => Promise<Annotation | undefined>;
-
 function AnnotationSidebarView(props: {
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
-  setCurrentDocument: ((document: string) => void) | undefined;
+  documentText: string;
   charNum: number | undefined;
   selectedAnnotationId: string | undefined;
   setSelectedAnnotationId: (id: string | undefined) => void;
   hoveredAnnotationId: string | undefined;
   setHoveredAnnotationId: (id: string | undefined) => void;
 }) {
-  const { annotations, setAnnotations, charNum } = props;
+  const { annotations, setAnnotations, charNum, documentText } = props;
   const annotationRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const sortAnnotations = (annotations: Annotation[]): Annotation[] => {
@@ -111,7 +115,7 @@ function AnnotationSidebarView(props: {
   };
 
   useEffect(() => {
-    if (charNum) {
+    if (charNum !== undefined) {
       const closestAnnotationIndex = findClosestAnnotationIndex(
         sortAnnotations(annotations),
         charNum
@@ -129,31 +133,30 @@ function AnnotationSidebarView(props: {
   const key = (fn: (a: any) => number) => (a: Annotation, b: Annotation) =>
     fn(a) < fn(b) ? -1 : fn(a) > fn(b) ? 1 : 0;
 
-  // HACK to add IDs to annotations
-  annotations.map((a, i) => {
-    a.id = i.toString();
-  });
-
   const handleClick = (id: string) => () => {
     props.setSelectedAnnotationId(id);
   };
 
-  // <svg
-  //       width="30"
-  //       height="30"
-  //       viewBox="0 0 30 30"
-  //       xmlns="http://www.w3.org/2000/svg"
-  //       xmlnsXlink="http://www.w3.org/1999/xlink">
-  //       <title>ic_fluent_comment_24_regular</title>
-  //       <desc>Created with Sketch.</desc>
-  //       <g id="🔍-Product-Icons" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
-  //         <g id="ic_fluent_comment_24_regular" fill="#212121" fillRule="nonzero">
-  //           <path
-  //             d="M5.25,18 C3.45507456,18 2,16.5449254 2,14.75 L2,6.25 C2,4.45507456 3.45507456,3 5.25,3 L18.75,3 C20.5449254,3 22,4.45507456 22,6.25 L22,14.75 C22,16.5449254 20.5449254,18 18.75,18 L13.0124851,18 L7.99868152,21.7506795 C7.44585139,22.1641649 6.66249789,22.0512036 6.2490125,21.4983735 C6.08735764,21.2822409 6,21.0195912 6,20.7499063 L5.99921427,18 L5.25,18 Z M12.5135149,16.5 L18.75,16.5 C19.7164983,16.5 20.5,15.7164983 20.5,14.75 L20.5,6.25 C20.5,5.28350169 19.7164983,4.5 18.75,4.5 L5.25,4.5 C4.28350169,4.5 3.5,5.28350169 3.5,6.25 L3.5,14.75 C3.5,15.7164983 4.28350169,16.5 5.25,16.5 L7.49878573,16.5 L7.49899997,17.2497857 L7.49985739,20.2505702 L12.5135149,16.5 Z"
-  //             id="🎨-Color"></path>
-  //         </g>
-  //       </g>
-  //     </svg>
+  const handleAnnotationUpdate = (id: string, value: AnnotationUpdate) => {
+    console.log("Updating annotation:", id, value);
+    
+    const annotation = annotations.find(a => a.id === id);
+    if (!annotation) return;
+    
+    const updatedAnnotation = {
+      ...annotation,
+      ...(value.document ? { document: value.document } : {}),
+      ...(value.metadata ? { metadata: { ...annotation.metadata, ...value.metadata } } : {})
+    };
+    
+    // Send update to extension
+    vscode.postMessage({
+      command: "updateAnnotation",
+      data: {
+        updatedAnnotation
+      }
+    });
+  };
 
   return (
     <>
@@ -183,27 +186,22 @@ function AnnotationSidebarView(props: {
               fontSize: "smaller",
             }}>
             <div className="line-number">
-              Line {annotation.document.slice(0, annotation.start).split("\n").length}
+              Line {documentText.slice(0, annotation.start).split("\n").length}
             </div>
             -
             <div className="annotation-type" style={{ fontWeight: "bold" }}>
               {toolNames[annotation.tool as keyof typeof toolNames]}
             </div>
+            {isAnnotationOutOfSync(annotation, documentText) && (
+              <div className="needs-retag-indicator" style={{ color: "red", marginLeft: "auto" }}>
+                Needs Retag
+              </div>
+            )}
           </div>
           <AnnotationEditorContainer
             key={index}
             value={annotation}
-            setValue={(value) => {
-              console.log("Setting annotation:", value);
-              const newAnnotations = annotations.map((a) =>
-                a.id === annotation.id ? { ...a, ...value } : a
-              );
-              console.log("New annotations:", newAnnotations);
-              setAnnotations(newAnnotations);
-              if (value.document) {
-                props.setCurrentDocument && props.setCurrentDocument(value.document);
-              }
-            }}
+            setValue={(value) => handleAnnotationUpdate(annotation.id, value)}
             hoveredAnnotationId={props.hoveredAnnotationId}
             setHoveredAnnotationId={props.setHoveredAnnotationId}
             selectedAnnotationId={props.selectedAnnotationId}
@@ -215,264 +213,67 @@ function AnnotationSidebarView(props: {
   );
 }
 
-/* Generic function to use a document from a WebSocket server,
-   with a read and write callback to convert between the document and an object type if needed
-*/
-function _useDocumentFromWSFileServer<T>(
-  serverUrl: string | undefined,
-  documentURI: string | undefined,
-  readCallback: (document: string) => T | undefined,
-  serializeCallback: (object: T) => string
-): [T | undefined, ((object: T) => void) | undefined] {
-  const [document, setDocument] = useState(undefined as T | undefined);
-  // Uses refs to do websockets with React properly (open single socket connection)
-  // TODO may need to handle closing etc. properly
-  // see https://stackoverflow.com/questions/60152922/proper-way-of-using-react-hooks-websockets
-  const wsRef = useRef<WebSocket | undefined>(undefined);
-
-  useEffect(() => {
-    console.log("Opening WebSocket connection for document:", documentURI);
-    if (!serverUrl || !documentURI) {
-      return;
-    }
-    const ws = new WebSocket(serverUrl);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const document = event.data;
-      setDocument(readCallback(document));
-    };
-
-    ws.onopen = () => {
-      // Send message to server to start listening to document updates
-      ws.send(
-        JSON.stringify({
-          type: "listen",
-          documentURI,
-        })
-      );
-    };
-
-    return () => {
-      console.log("Closing WebSocket connection");
-      wsRef.current && ws.close();
-    };
-  }, [serverUrl, documentURI]);
-
-  if (!serverUrl || !documentURI) {
-    return [undefined, undefined];
-  }
-
-  const updateDocumentState = (object: T) => {
-    if (!wsRef.current) {
-      console.error("No WebSocket connection");
-      return;
-    }
-    console.debug("Sending update to server:", object, documentURI, serializeCallback(object));
-    wsRef.current.send(
-      JSON.stringify({
-        type: "write",
-        documentURI,
-        state: serializeCallback(object),
-      })
-    );
-  };
-
-  return [document, updateDocumentState];
-}
-
-function useDocumentFromWSFileServer(
-  serverUrl: string | undefined,
-  documentURI: string | undefined
-) {
-  return _useDocumentFromWSFileServer(
-    serverUrl,
-    documentURI,
-    (document) => document,
-    (document) => document
-  );
-}
-
-function useObjectFromWSFileServer<T>(
-  serverUrl: string | undefined,
-  documentURI: string | undefined
-) {
-  // Handles JSON parsing/stringify and errors
-  return _useDocumentFromWSFileServer<T>(
-    serverUrl,
-    documentURI,
-    (document) => {
-      console.debug("Parsing document:", documentURI);
-      try {
-        return JSON.parse(document) as T | undefined;
-      } catch (error) {
-        console.error("Error parsing JSON: ", error);
-      }
-    },
-    (object: T) => {
-      console.log("Serializing object:", object);
-      return JSON.stringify(object);
-    }
-  );
-}
-
-const preprocessAnnotation = (annotation: Annotation) => {
-  const oldDocumentContent = annotation.document;
-  const codeUpToSnippet = oldDocumentContent.slice(0, annotation.start);
-  const codeAfterSnippet = oldDocumentContent.slice(annotation.end);
-  const annotationText = oldDocumentContent.slice(annotation.start, annotation.end);
-  const delimiter = "★";
-  const codeWithSnippetDelimited =
-    codeUpToSnippet + delimiter + annotationText + delimiter + codeAfterSnippet;
-  return {
-    codeWithSnippetDelimited,
-    delimiter,
-  };
-};
-
-// TODO refactor to not use a wrapper function
-const useRetagFromAPI =
-  (retagServerUrl: string) => async (currentDocument: string, annotation: Annotation) => {
-    console.debug("Retagging annotation:", annotation);
-    const { codeWithSnippetDelimited, delimiter } = preprocessAnnotation(annotation);
-
-    const output = await fetch(retagServerUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        codeWithSnippetDelimited,
-        updatedCodeWithoutDelimiters: currentDocument,
-        delimiter,
-      }),
-    }).then((res) => res.json());
-
-    // update the annotation
-    console.log("Output:", output);
-    return {
-      ...annotation,
-      document: currentDocument,
-      start: output.out.leftIdx,
-      end: output.out.rightIdx,
-    };
-  };
-
-function RetagHeadlineWarning(props: {
-  currentDocument: string | undefined;
-  annotations: Annotation[];
-  setAnnotations: (annotations: Annotation[]) => void;
-  retag: RetagFunction | undefined;
+function RetagBanner(props: {
+  onRetag: () => void;
+  onHide: () => void;
 }) {
-  const { currentDocument, annotations, setAnnotations, retag } = props;
-
   return (
-    <>
-      {currentDocument && (
-        <>
-          Document is out of date!
-          {retag && (
-            <button
-              onClick={async () => {
-                // Update the annotations after awaiting retagging promises
-                const newAnnotations = await Promise.all(
-                  annotations.map(async (annotation) => {
-                    // TODO error handling
-                    return (await retag(currentDocument, annotation)) || annotation;
-                  })
-                );
-                setAnnotations(newAnnotations);
-              }}>
-              Retag
-            </button>
-          )}
-        </>
-      )}
-    </>
+    <div className="retag-banner" style={{ 
+      padding: "10px", 
+      marginBottom: "10px", 
+      backgroundColor: "#ffe0e0", 
+      borderRadius: "4px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }}>
+      <span>Document has been edited and some annotations need updating</span>
+      <div>
+        <button onClick={props.onRetag} style={{ marginRight: "8px" }}>Update Annotations</button>
+        <button onClick={props.onHide}>Dismiss</button>
+      </div>
+    </div>
   );
 }
 
-function listenForEditorMessages(
-  setDocumentURI: (documentURI: string) => void,
-  setAnnotationURI: (annotationURI: string) => void,
-  setFileServerURL: (serverUrl: string) => void,
-  setCharNum: (charNum: number) => void,
-  setRetagServerURL: (retagServerURL: string) => void,
-  handleAddAnnotation: (start: number, end: number) => void,
-  handleRemoveAnnotation: () => void,
-  handleSetAnnotationColor: (color: string) => void,
-  handleChooseAnnType: (start: number, end: number, documentContent: string) => void,
-  updateAnnotationDecorations: () => void
-) {
-  const handleMessage = (event: any) => {
-    console.debug("Codetations: webview received message:", event);
-    const message = JSON.parse(event.data);
-    console.debug("Codetations: webview message command:", message.command);
-    console.debug("Codetations: webview message data:", message.data);
-    const data = message.data;
-    switch (message.command) {
-      case "setDocumentURI":
-        setDocumentURI(data.documentURI);
-        return;
-      case "setAnnotationsURI":
-        setAnnotationURI(data.annotationsURI);
-        return;
-      case "setFileServerURL":
-        setFileServerURL(data.fileServerURL);
-        return;
-      case "handleCursorPositionChange":
-        setCharNum(data.position);
-        return;
-      case "setRetagServerURL":
-        setRetagServerURL(data.retagServerURL);
-        return;
-      case "addAnnotation":
-        handleAddAnnotation(data.start, data.end);
-        return;
-      case "removeAnnotation":
-        handleRemoveAnnotation();
-        return;
-      case "setAnnotationColor":
-        handleSetAnnotationColor(data.color);
-        return;
-      case "chooseAnnotationType":
-        handleChooseAnnType(data.start, data.end, data.documentContent);
-        return;
-      case "handleFileEdit":
-        updateAnnotationDecorations();
-        return;
-      default:
-        return;
-    }
-  };
-  useEffect(() => {
-    window.addEventListener("message", handleMessage);
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  });
-}
-
-type State = {
-  annotations: Annotation[];
+// Helper to determine if an annotation needs retagging
+const isAnnotationOutOfSync = (annotation: Annotation, currentDocumentText: string): boolean => {
+  if (!annotation.original) {
+    return false; // No original state to compare against
+  }
+  
+  // Check if the text at the annotation position still matches the original content
+  const annotationText = currentDocumentText.slice(annotation.start, annotation.end);
+  const originalText = annotation.original.document.slice(
+    annotation.original.start, 
+    annotation.original.end
+  );
+  
+  return annotationText !== originalText;
 };
 
 function App() {
-  // Data source configuration
-  const [fileServerURL, setFileServerUrl] = useState(undefined as string | undefined);
-  const [annotationURI, setAnnotationURI] = useState(undefined as string | undefined);
-  const [documentURI, setDocumentURI] = useState(undefined as string | undefined);
+  // State for document and annotations
+  const [documentUri, setDocumentUri] = useState<string | undefined>(undefined);
+  const [documentText, setDocumentText] = useState<string>("");
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [retagServerURL, setRetagServerURL] = useState<string | undefined>(undefined);
+  const [showRetagBanner, setShowRetagBanner] = useState<boolean>(false);
 
-  // Data
-  const [annotationState, setAnnotationState] = useObjectFromWSFileServer<State>(
-    fileServerURL,
-    annotationURI
-  ); // useState(annotationsDefault.annotations); //
-  const [currentDocument, setCurrentDocument] = useDocumentFromWSFileServer(
-    fileServerURL,
-    documentURI
-  );
+  // UI state
+  const [charNum, setCharNum] = useState<number | undefined>(undefined);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | undefined>(undefined);
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | undefined>(undefined);
+  const [chooseAnnotationType, setChooseAnnotationType] = useState<boolean>(false);
+  const [confirmAnnotation, setConfirmAnnotation] = useState<boolean>(false);
+  
+  // Annotation creation state
+  const [start, setStart] = useState<number | undefined>(undefined);
+  const [end, setEnd] = useState<number | undefined>(undefined);
+  const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
+  const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
 
+  // Utility functions
   const showErrorMessage = (error: string) => {
     console.log("Show error called, error: " + error);
     vscode.postMessage({
@@ -483,14 +284,59 @@ function App() {
     });
   };
 
+  const handleRetag = () => {
+    vscode.postMessage({
+      command: "retagAnnotations"
+    });
+  };
+
+  const handleHideRetagBanner = () => {
+    setShowRetagBanner(false);
+  };
+
   const handleChooseAnnType = (start: number, end: number, documentContent: string) => {
     setChooseAnnotationType(true);
     setStart(start);
     setEnd(end);
-    setTempDocumentContent(documentContent);
+    setDocumentText(documentContent);
   };
 
-  const handleAddAnnotationConf = () => {
+  const handleAddAnnotation = (start: number, end: number) => {
+    setConfirmAnnotation(true);
+    setStart(start);
+    setEnd(end);
+  };
+
+  const handleRemoveAnnotation = () => {
+    if (!selectedAnnotationId) {
+      showErrorMessage("Error removing annotations: no selected annotation");
+      return;
+    }
+    
+    vscode.postMessage({
+      command: "removeAnnotation",
+      data: { annotationId: selectedAnnotationId }
+    });
+    
+    setSelectedAnnotationId(undefined);
+  };
+
+  const handleSetAnnotationColor = (color: string) => {
+    if (!selectedAnnotationId) {
+      showErrorMessage("Error setting annotation color: no selected annotation");
+      return;
+    }
+    
+    vscode.postMessage({
+      command: "setAnnotationColor",
+      data: {
+        annotationId: selectedAnnotationId,
+        color
+      }
+    });
+  };
+
+  const handleAddAnnotationConfirm = () => {
     // Update state once confirm is clicked
     setConfirmAnnotation(false);
     setChooseAnnotationType(false);
@@ -500,12 +346,17 @@ function App() {
       return;
     }
 
-    if (currentDocument !== tempDocumentContent) {
-      // Ensure file hasn't been changed since annotation was added
-      showErrorMessage("Document content has changed since annotation was added");
+    if (start === end) {
+      showErrorMessage("Error adding annotations: selection must not be empty");
       return;
     }
 
+    if (!newTool) {
+      showErrorMessage("Error adding annotations: no tool selected");
+      return;
+    }
+
+    // Check for overlapping annotations
     for (let i = 0; i < annotations.length; i++) {
       if (annotations[i].start === start && annotations[i].end === end) {
         showErrorMessage("Error adding annotations: annotation already exists in selected area");
@@ -513,241 +364,98 @@ function App() {
       }
     }
 
-    // Ensure all required variables for annotation are defined
-    if (start === end) {
-      showErrorMessage("Error adding annotations: selection must not be empty");
-      return;
-    } else if (!tempDocumentContent) {
-      showErrorMessage("Error adding annotations: no document content");
-      return;
-    } else if (!newTool) {
-      showErrorMessage("Error adding annotations: no tool selected");
-      return;
-    }
-
-    // Create new annotation based on message
+    // Create new annotation and send to extension
     const newAnnotation: Annotation = {
-      id: annotations.length.toString(),
+      id: Date.now().toString(), // Use timestamp for unique ID
       start,
       end,
-      document: tempDocumentContent,
+      document: documentText,
       tool: newTool,
       metadata: {},
       original: {
-        document: tempDocumentContent,
+        document: documentText,
         start,
         end,
       },
     };
-    setAnnotations([...annotations, newAnnotation]);
-    setTempDocumentContent(undefined);
-  };
-
-  const annotations = annotationState?.annotations || [];
-  const setAnnotations = (annotations: Annotation[]) => {
-    if (!setAnnotationState) {
-      console.error("No setAnnotationState function yet");
-      return;
-    }
-    setAnnotationState({ annotations });
-  };
-
-  const handleAddAnnotation = (start: number, end: number) => {
-    setConfirmAnnotation(true);
-    setStart(start);
-    setEnd(end);
-    setTempDocumentContent(currentDocument);
-  };
-
-  const handleRemoveAnnotation = () => {
-    if (!selectedAnnotationId) {
-      showErrorMessage("Error removing annotations: no selected annotation");
-    }
-    const newAnnotations = annotations.filter(
-      (annotation) => annotation.id !== selectedAnnotationId
-    );
-    console.log("Annotation removed successfully");
-    setAnnotations(newAnnotations);
-  };
-
-  const handleSetAnnotationColor = (color: string) => {
-    const selectedAnnotation = annotations.find(
-      (annotation) => annotation.id === selectedAnnotationId
-    );
-
-    if (!selectedAnnotation) {
-      showErrorMessage("Error setting annotation color: no selected annotation");
-      return;
-    }
-
-    const updatedAnnotations = annotations.map((annotation) =>
-      annotation.id === selectedAnnotationId
-        ? { ...annotation, metadata: { ...annotation.metadata, color } }
-        : annotation
-    );
-
-    setAnnotations(updatedAnnotations);
-  };
-
-  const hideAnnotations = () => {
+    
     vscode.postMessage({
-      command: "hideAnnotations",
+      command: "addAnnotationConfirm",
+      data: {
+        annotation: newAnnotation
+      }
     });
   };
 
-  const showAnnotations = () => {
-    vscode.postMessage({
-      command: "showAnnotations",
-      data: { annotations },
-    });
-  };
-
-  // Check if document content in annotations lines up with current document
-  /**
-   *
-   * @param position the position of the cursor
-   * @returns true if the annotations are up to date, false otherwise
-   */
-  const updateAnnotationDecorations = (): void => {
-    const sortedAnnotations = annotations.sort((a, b) => a.start - b.start);
-
-    if (sortedAnnotations.length === 0) {
-      showAnnotations();
-    } else if (sortedAnnotations[0].document === currentDocument) {
-      showAnnotations();
-    } else if (
-      currentDocument &&
-      sortedAnnotations[0].start + currentDocument.length - sortedAnnotations[0].document.length >=
-        0 &&
-      currentDocument.substring(
-        sortedAnnotations[0].start + currentDocument.length - sortedAnnotations[0].document.length
-      ) === sortedAnnotations[0].document.substring(sortedAnnotations[0].start)
-    ) {
-      // case 1: all changes are before the first annotation
-      const newAnnotations: Annotation[] = sortedAnnotations.map((annotation) => {
-        return (annotation = {
-          ...annotation,
-          original: {
-            document: annotation.document,
-            start: annotation.start,
-            end: annotation.end,
-          },
-          start: annotation.start + currentDocument.length - annotation.document.length,
-          end: annotation.end + currentDocument.length - annotation.document.length,
-          document: currentDocument,
-        });
-      });
-      setAnnotations(newAnnotations);
-      showAnnotations();
-    } else if (
-      currentDocument &&
-      sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end < currentDocument.length &&
-      currentDocument.substring(
-        0,
-        sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end
-      ) ===
-        sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].document.substring(
-          0,
-          sortedAnnotations[Math.max(sortedAnnotations.length - 1, 0)].end
-        )
-    ) {
-      // case 2: all changes are after the last annotation
-      // no need to update indices
-      const newAnnotations: Annotation[] = sortedAnnotations.map((annotation) => {
-        return (annotation = {
-          ...annotation,
-          document: currentDocument,
-        });
-      });
-      setAnnotations(newAnnotations);
-      showAnnotations();
-    } else if (sortedAnnotations.length >= 2 && currentDocument) {
-      // case 3: changes are in the middle of the annotations
-      let firstAnnInd: number = -1;
-      for (let i: number = 0; i < sortedAnnotations.length - 1; i++) {
-        const leftAnn = sortedAnnotations[i];
-        const rightAnn = sortedAnnotations[i + 1];
-        if (leftAnn.document !== rightAnn.document) {
-          console.log(
-            `Mismatch in annotation documents: couldn't move annotations ${i} and ${i + 1}`
-          );
-          continue;
-        }
-
-        // Difference in length between new and old documents
-        const lenDiff: number = currentDocument.length - leftAnn.document.length;
-
-        if (
-          rightAnn.start + lenDiff < currentDocument.length &&
-          leftAnn.end <= currentDocument.length &&
-          leftAnn.document.substring(0, leftAnn.end) ===
-            currentDocument.substring(0, leftAnn.end) &&
-          rightAnn.document.substring(rightAnn.start) ===
-            currentDocument.substring(rightAnn.start + lenDiff)
-        ) {
-          firstAnnInd = i;
-          break;
-        }
-      }
-      if (firstAnnInd === -1) {
-        hideAnnotations();
-      } else {
-        const newAnnotations: Annotation[] = sortedAnnotations.map((annotation, index) => {
-          if (index <= firstAnnInd) {
-            return {
-              ...annotation,
-              document: currentDocument,
-            };
-          } else {
-            return {
-              ...annotation,
-              start: annotation.start + currentDocument.length - annotation.document.length,
-              end: annotation.end + currentDocument.length - annotation.document.length,
-              document: currentDocument,
-            };
-          }
-        });
-        setAnnotations(newAnnotations);
-        showAnnotations;
-      }
-    } else {
-      // case 4: retag
-      hideAnnotations();
-    }
-  };
-
-  // Transient editor + UI state
-  const [charNum, setCharNum] = useState(undefined as number | undefined);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState(undefined as string | undefined);
-  const [hoveredAnnotationId, setHoveredAnnotationId] = useState(undefined as string | undefined);
-  const [chooseAnnotationType, setChooseAnnotationType] = useState(false);
-  const [start, setStart] = useState(undefined as number | undefined);
-  const [end, setEnd] = useState(undefined as number | undefined);
-  const [tempDocumentContent, setTempDocumentContent] = useState(undefined as string | undefined);
-  const defaultTool: string | undefined =
-    Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
-  const [newTool, setNewTool] = useState(defaultTool as string | undefined);
-  // Other configuration
-  const [retagServerURL, setRetagServerURL] = useState(undefined as string | undefined);
-  const [confirmAnnotation, setConfirmAnnotation] = useState(false);
-
-  // Listen for configuration updates from editor
-  listenForEditorMessages(
-    setDocumentURI,
-    setAnnotationURI,
-    setFileServerUrl,
-    setCharNum,
-    setRetagServerURL,
-    handleAddAnnotation,
-    handleRemoveAnnotation,
-    handleSetAnnotationColor,
-    handleChooseAnnType,
-    updateAnnotationDecorations
-  );
-
-  // find the selected annotation based on the character position
   useEffect(() => {
-    if (charNum) {
+    // Message handler for communication with extension
+    const handleMessage = (event: MessageEvent) => {
+      const message = JSON.parse(event.data);
+      console.debug("Received message:", message);
+      
+      switch (message.command) {
+        case "initialize":
+          // Initialize the UI with document data and annotations
+          setDocumentUri(message.data.documentUri);
+          setDocumentText(message.data.documentText);
+          setAnnotations(message.data.annotations || []);
+          setRetagServerURL(message.data.retagServerURL);
+          return;
+          
+        case "updateAnnotations":
+          // Update annotations from extension
+          if (message.data.documentUri === documentUri) {
+            setAnnotations(message.data.annotations || []);
+            setDocumentText(message.data.documentText);
+          }
+          return;
+          
+        case "handleCursorPositionChange":
+          // Handle cursor position change
+          setCharNum(message.data.position);
+          return;
+          
+        case "addAnnotation":
+          // Start annotation creation flow
+          handleAddAnnotation(message.data.start, message.data.end);
+          return;
+          
+        case "removeAnnotation":
+          // Remove selected annotation
+          handleRemoveAnnotation();
+          return;
+          
+        case "setAnnotationColor":
+          // Set color for selected annotation
+          handleSetAnnotationColor(message.data.color);
+          return;
+          
+        case "chooseAnnotationType":
+          // Choose annotation type
+          handleChooseAnnType(message.data.start, message.data.end, message.data.documentContent);
+          return;
+          
+        case "showRetagBanner":
+          // Show retag banner
+          setShowRetagBanner(true);
+          return;
+          
+        case "hideRetagBanner":
+          // Hide retag banner
+          setShowRetagBanner(false);
+          return;
+      }
+    };
+    
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [documentUri]);
+
+  // Find the selected annotation based on the character position
+  useEffect(() => {
+    if (charNum !== undefined) {
       const annotation = annotations.find(
         (annotation) => annotation.start <= charNum && annotation.end >= charNum
       );
@@ -757,34 +465,20 @@ function App() {
     }
   }, [charNum, annotations]);
 
-  useEffect(() => {
-    updateAnnotationDecorations();
-  }, [annotations, currentDocument]);
-
-  const documentOutOfDate =
-    annotations &&
-    annotations.some((annotation: Annotation) => {
-      return annotation.document !== currentDocument;
-    });
-
-  // Set up retagging function
-  const retag = retagServerURL ? useRetagFromAPI(retagServerURL) : undefined;
-
   if (!chooseAnnotationType) {
     return (
       <main>
-        {documentOutOfDate && (
-          <RetagHeadlineWarning
-            currentDocument={currentDocument}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            retag={retag}
+        {showRetagBanner && (
+          <RetagBanner 
+            onRetag={handleRetag} 
+            onHide={handleHideRetagBanner} 
           />
         )}
+        
         <AnnotationSidebarView
           annotations={annotations}
           setAnnotations={setAnnotations}
-          setCurrentDocument={setCurrentDocument}
+          documentText={documentText}
           charNum={charNum}
           selectedAnnotationId={selectedAnnotationId}
           setSelectedAnnotationId={setSelectedAnnotationId}
@@ -796,8 +490,6 @@ function App() {
           <>
             <div>
               Tool: &nbsp;
-              {/* select with dropdown */}
-              {/* <input type="text" value={addTool} onChange={e => setAddTool(e.target.value)} /> */}
               <select
                 value={newTool}
                 onChange={(e) => {
@@ -813,19 +505,12 @@ function App() {
             <div>
               Add annotation?
               <br></br>
-              <button onClick={handleAddAnnotationConf}>Confirm</button>
+              <button onClick={handleAddAnnotationConfirm}>Confirm</button>
             </div>
           </>
         )}
 
-        {/* <br />
-        <> */}
         <p>To add more annotations, highlight and use the right-click context menu.</p>
-        {/* <p>
-            To open the annotation panel, click on the lightning bolt icon in the top right corner
-            of the editor.
-          </p> */}
-        {/* </> */}
       </main>
     );
   } else {
@@ -843,7 +528,7 @@ function App() {
             </option>
           ))}
         </select>
-        <button onClick={handleAddAnnotationConf}>Submit</button>
+        <button onClick={handleAddAnnotationConfirm}>Submit</button>
       </main>
     );
   }
