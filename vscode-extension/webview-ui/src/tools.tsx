@@ -4,8 +4,8 @@ import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
 import LMUnitTest from "./LMUnitTest";
-import LMAPITest from "./LMAPITest";
 import { ChatMessage, lmApi } from "./lm-api-client";
+import { vscode } from "./utilities/vscode";
 
 type AnnotationType = React.FC<AnnotationEditorProps>
 interface ImageData {
@@ -443,7 +443,8 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
-  const [expression, setExpression] = useState("");
+  const [expression, setExpression] = useState("loading...");
+  const [retryParse, setRetryParse] = useState(false);
 
   useEffect(() => {
     const parseText = async (text: string) => {
@@ -452,7 +453,11 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
           role: "system",
           content: `Can you parse this piece of text or code to find an expression 
             and convert it to mathjs parsable syntax? All math.h operators are allowed. 
-            Do not give any other text in your output besides the mathjs parasable string, 
+            If a term of the expression can be written with simple mathematical operators,
+            use those instead of 'function' like operators, for example, use 'x^y' instead of
+            pow(x,y).
+
+            Do not output any other text besides the mathjs parasable string, 
             with no quotation marks.
             
             The text to parse is as follows:
@@ -466,24 +471,33 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
         temperature: 0.3
       })
   
-      console.log(parsed);
       setExpression(parsed);
+      setRetryParse(false)
     }
 
     parseText(props.utils.getText());
-  }, [])
+  }, [, retryParse])
 
  const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec="
  const url = odysseyBase + encodeURIComponent(expression);
 
  return (
-    // Following expression was parsed from highlighted text. Edit if needed, then hit explore!
-    // <input area with initial, editable, contents as expression>
-    // <button Explore!!>
-
-    <div>
-      Explore floating-point Error in parsed expression, {expression}, with <a className={"btn"} href={url}>Odyssey</a>
+    <div className="odyssey">
+      <p>Parsed the following expression from highlighted text:</p>
+      <input type="text" className="odyssey-text"
+        onChange={(evt) => setExpression(evt.target.value)} value={expression}/>
+      <button onClick={() => setRetryParse(true)}>Retry</button>
+      <p>
+        Explore floating-point Error in expression, with
+        {/* <a className={"btn"} href={url}>Odyssey</a> */}
+        <button className="open-external" onClick={() => vscode.postMessage({command: "open-external", url})}>
+          Odyssey 
+          <svg className="open-external-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z"></path></svg>
+        </button>
+      </p>
     </div>
+
+    // TODO: make it contact llm immediately when text changes
  );
 };
 

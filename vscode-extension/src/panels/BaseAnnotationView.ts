@@ -261,6 +261,11 @@ export abstract class BaseAnnotationView {
               annotationTracker.updateAnnotation(editor.document, updated);
             }
             return;
+
+          case "open-external":
+            // Open link in external window
+            vscode.env.openExternal(vscode.Uri.parse(message.url))
+            return;
         }
       },
       undefined,
