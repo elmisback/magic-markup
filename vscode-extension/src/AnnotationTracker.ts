@@ -87,7 +87,13 @@ export class AnnotationTracker implements vscode.Disposable {
   public async saveAnnotationsForDocument(document: vscode.TextDocument): Promise<void> {
     const documentKey = document.uri.toString();
     const annotations = this.documentAnnotations.get(documentKey) || [];
-    const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath);
+    
+    // Only save if there are annotations
+    if (annotations.length === 0) {
+      return;
+    }
+    
+    const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath, true);
 
     // Ensure directory exists
     const dir = path.dirname(annotationsUri);
@@ -468,7 +474,7 @@ export class AnnotationTracker implements vscode.Disposable {
   /**
    * Gets the path to the annotations file for a document
    */
-  private getAnnotationsFilePath(documentPath: string): string {
+  private getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
     let currentDir = path.dirname(documentPath);
     
     // Look for git root or fall back to document directory
@@ -483,8 +489,9 @@ export class AnnotationTracker implements vscode.Disposable {
     const relPath = path.relative(currentDir, documentPath);
     const annotationsDir = path.join(currentDir, 'codetations', path.dirname(relPath));
     
-    // Ensure directory exists
-    if (!fs.existsSync(annotationsDir)) {
+    // Only ensure directory exists when createDir is true
+    // (Don't create directories when just building paths for reading)
+    if (createDir && !fs.existsSync(annotationsDir)) {
       fs.mkdirSync(annotationsDir, { recursive: true });
     }
     
