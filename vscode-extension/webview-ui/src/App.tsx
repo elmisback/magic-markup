@@ -280,6 +280,67 @@ const isAnnotationOutOfSync = (annotation: Annotation, currentDocumentText: stri
   return currentDocumentText !== annotation.document || annotation.start === annotation.end;
 };
 
+function AddNoteBanner(props: {
+  onConfirm: () => void;
+  selectedTool: string | undefined;
+  setSelectedTool: (tool: string) => void;
+  onCancel: () => void;
+  toolTypes: ToolTypes;
+}) {
+  const { onConfirm, selectedTool, setSelectedTool, toolTypes } = props;
+
+  return (
+    <div className="add-note-banner" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      backgroundColor: '#f8f9fa',
+      borderBottom: '1px solid #dee2e6',
+      padding: '12px 16px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontWeight: 'bold' }}>Add Note:</span>
+        <select
+          value={selectedTool || ''}
+          onChange={(e) => setSelectedTool(e.target.value)}
+          style={{ 
+            padding: '6px 10px',
+            borderRadius: '4px',
+            border: '1px solid #ced4da'
+          }}
+        >
+          {Object.keys(toolTypes).map((toolKey) => (
+            <option key={toolKey} value={toolKey}>
+              {toolNames[toolKey as keyof typeof toolNames]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <button 
+          onClick={onConfirm}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: '#0d6efd',
+            border: 'none',
+            borderRadius: '4px',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          Add Note
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   // State for document and annotations
   const [documentUri, setDocumentUri] = useState<string | undefined>(undefined);
@@ -298,6 +359,10 @@ function App() {
   const [end, setEnd] = useState<number | undefined>(undefined);
   const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
+  
+  // Track current selection in editor
+  const [currentSelection, setCurrentSelection] = useState<{start: number, end: number} | null>(null);
+  const hasSelection = currentSelection && currentSelection.start !== currentSelection.end;
 
   const showRetagBanner = annotations.some((annotation) =>
     isAnnotationOutOfSync(annotation, documentText)
@@ -328,55 +393,17 @@ function App() {
   };
 
   const handleAddAnnotation = (start: number, end: number) => {
-    setConfirmAnnotation(true);
     setStart(start);
     setEnd(end);
+    // Instead of showing confirmation dialog, just set hasSelection to enable the banner
   };
 
-  const handleDeleteAnnotation = (annotationId: string) => {
-    vscode.postMessage({
-      command: "removeAnnotation",
-      data: { annotationId }
-    });
-    
-    if (selectedAnnotationId === annotationId) {
-      setSelectedAnnotationId(undefined);
-    }
-  };
-
-  const handleRemoveAnnotation = () => {
-    if (!selectedAnnotationId) {
-      showErrorMessage("Error removing annotations: no selected annotation");
-      return;
-    }
-    
-    vscode.postMessage({
-      command: "removeAnnotation",
-      data: { annotationId: selectedAnnotationId }
-    });
-    
-    setSelectedAnnotationId(undefined);
-  };
-
-  const handleSetAnnotationColor = (color: string) => {
-    if (!selectedAnnotationId) {
-      showErrorMessage("Error setting annotation color: no selected annotation");
-      return;
-    }
-    
-    vscode.postMessage({
-      command: "setAnnotationColor",
-      data: {
-        annotationId: selectedAnnotationId,
-        color
-      }
-    });
-  };
-
-  const handleAddAnnotationConfirm = () => {
-    // Update state once confirm is clicked
+  // Rename this function to be clearer since it now directly adds the annotation
+  const handleCreateAnnotation = () => {
+    // Update state once the add note button is clicked
     setConfirmAnnotation(false);
     setChooseAnnotationType(false);
+    setCurrentSelection(null);
 
     if (start === undefined || end === undefined) {
       showErrorMessage("Error adding annotations: no highlighted text");
@@ -441,6 +468,52 @@ function App() {
     });
   };
 
+  const handleDeleteAnnotation = (annotationId: string) => {
+    vscode.postMessage({
+      command: "removeAnnotation",
+      data: { annotationId }
+    });
+    
+    if (selectedAnnotationId === annotationId) {
+      setSelectedAnnotationId(undefined);
+    }
+  };
+
+  const handleRemoveAnnotation = () => {
+    if (!selectedAnnotationId) {
+      showErrorMessage("Error removing annotations: no selected annotation");
+      return;
+    }
+    
+    vscode.postMessage({
+      command: "removeAnnotation",
+      data: { annotationId: selectedAnnotationId }
+    });
+    
+    setSelectedAnnotationId(undefined);
+  };
+
+  const handleSetAnnotationColor = (color: string) => {
+    if (!selectedAnnotationId) {
+      showErrorMessage("Error setting annotation color: no selected annotation");
+      return;
+    }
+    
+    vscode.postMessage({
+      command: "setAnnotationColor",
+      data: {
+        annotationId: selectedAnnotationId,
+        color
+      }
+    });
+  };
+
+  const handleCancelAddAnnotation = () => {
+    setConfirmAnnotation(false);
+    setStart(undefined);
+    setEnd(undefined);
+  };
+
   useEffect(() => {
     // Message handler for communication with extension
     const handleMessage = (event: MessageEvent) => {
@@ -466,6 +539,20 @@ function App() {
         case "handleCursorPositionChange":
           // Handle cursor position change
           setCharNum(message.data.position);
+          // Track selection state
+          if (message.data.selection) {
+            const selection = message.data.selection;
+            if (selection.start === selection.end) {
+              setCurrentSelection(null);
+            } else {
+              setCurrentSelection({
+                start: selection.start,
+                end: selection.end
+              });
+              setStart(selection.start);
+              setEnd(selection.end);
+            }
+          }
           return;
           
         case "addAnnotation":
@@ -518,6 +605,16 @@ function App() {
   if (!chooseAnnotationType) {
     return (
       <main>
+        {hasSelection && (
+          <AddNoteBanner
+            onConfirm={handleCreateAnnotation}
+            selectedTool={newTool}
+            setSelectedTool={setNewTool}
+            onCancel={handleCancelAddAnnotation}
+            toolTypes={toolTypes}
+          />
+        )}
+        
         {showRetagBanner && (
           <RetagBanner 
             onRetag={handleRetag} 
@@ -536,47 +633,84 @@ function App() {
           onDeleteAnnotation={handleDeleteAnnotation}
         />
 
-        {confirmAnnotation && (
-          <>
-            <div>
-              Tool: &nbsp;
-              <select
-                value={newTool}
-                onChange={(e) => {
-                  setNewTool(e.target.value);
-                }}>
-                {Object.keys(toolTypes).map((toolKey) => (
-                  <option key={toolKey} value={toolKey}>
-                    {toolNames[toolKey as keyof typeof toolNames]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <button onClick={handleAddAnnotationConfirm}>Add Note</button>
-            </div>
-          </>
+        {!hasSelection && (
+          <p>To add more annotations, highlight text in the editor and choose a note type.</p>
         )}
-
-        <p>To add more annotations, highlight and use the right-click context menu.</p>
       </main>
     );
   } else {
     return (
       <main>
-        <div>Choose Annotation Type</div>
-        <select
-          value={newTool}
-          onChange={(e) => {
-            setNewTool(e.target.value);
-          }}>
-          {Object.keys(toolTypes).map((toolKey) => (
-            <option key={toolKey} value={toolKey}>
-              {toolNames[toolKey as keyof typeof toolNames]}
-            </option>
-          ))}
-        </select>
-        <button onClick={handleAddAnnotationConfirm}>Submit</button>
+        <div className="choose-annotation-type" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          backgroundColor: '#f8f9fa',
+          borderBottom: '1px solid #dee2e6',
+          padding: '12px 16px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>Choose Annotation Type</div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select
+              value={newTool || ''}
+              onChange={(e) => {
+                setNewTool(e.target.value);
+              }}
+              style={{ 
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ced4da',
+                flexGrow: 1
+              }}
+            >
+              {Object.keys(toolTypes).map((toolKey) => (
+                <option key={toolKey} value={toolKey}>
+                  {toolNames[toolKey as keyof typeof toolNames]}
+                </option>
+              ))}
+            </select>
+            <button 
+              onClick={handleCreateAnnotation}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#0d6efd',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              Submit
+            </button>
+            <button 
+              onClick={handleCancelAddAnnotation}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #ced4da',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+        
+        <AnnotationSidebarView
+          annotations={annotations}
+          setAnnotations={setAnnotations}
+          documentText={documentText}
+          charNum={charNum}
+          selectedAnnotationId={selectedAnnotationId}
+          setSelectedAnnotationId={setSelectedAnnotationId}
+          hoveredAnnotationId={hoveredAnnotationId}
+          setHoveredAnnotationId={setHoveredAnnotationId}
+          onDeleteAnnotation={handleDeleteAnnotation}
+        />
       </main>
     );
   }

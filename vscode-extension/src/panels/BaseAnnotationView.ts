@@ -130,7 +130,11 @@ export abstract class BaseAnnotationView {
           this.sendMessageObject({
             command: "handleCursorPositionChange",
             data: {
-              position: position
+              position: position,
+              selection: {
+                start: editor.document.offsetAt(editor.selection.start),
+                end: editor.document.offsetAt(editor.selection.end),
+              }
             }
           });
         }

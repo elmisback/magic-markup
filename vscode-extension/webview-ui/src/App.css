@@ -7,6 +7,7 @@ main {
   align-items: flex-start;
   height: 100%;
   padding: 10px;
+  position: relative;
 }
 
 .center-vertical {
@@ -32,6 +33,15 @@ main {
 
 .annotation-tile.selected {
   background-color: #e0e0e0; /* Slightly darker background when selected */
+}
+
+.add-note-banner, .confirm-annotation-dialog, .choose-annotation-type {
+  backdrop-filter: blur(2px);
+}
+
+/* This ensures the annotations remain visible under the banner */
+.annotation-container {
+  z-index: 1;
 }
 
 /* textarea {
