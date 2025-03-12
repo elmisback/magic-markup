@@ -292,14 +292,14 @@ function AddNoteBanner(props: {
   return (
     <div className="add-note-banner" style={{
       position: 'fixed',
-      top: 0,
+      bottom: 0,     // Changed from top: 0 to bottom: 0
       left: 0,
       right: 0,
       zIndex: 100,
       backgroundColor: '#f8f9fa',
-      borderBottom: '1px solid #dee2e6',
+      borderTop: '1px solid #dee2e6',  // Changed from borderBottom to borderTop
       padding: '12px 16px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',  // Inverted shadow direction
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between'
