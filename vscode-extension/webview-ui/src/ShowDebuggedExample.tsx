@@ -92,6 +92,9 @@ const ShowDebuggedExample: React.FC<AnnotationEditorProps> = (props) => {
         throw new Error("Failed to format document for the prompt");
       }
       
+      // Include existing code if it exists
+      const hasExistingCode = debugCode && debugCode.trim() !== '';
+      
       const prompt: ChatMessage[] = [
         { 
           role: "system", 
@@ -108,6 +111,12 @@ Your task is to create a runnable example that demonstrates how the highlighted 
 7. Structure your response as valid, executable JavaScript code only
 8. Add comments to explain what the debugging code is doing
 
+${hasExistingCode ? `IMPORTANT: The user already has a debugging example. When modifying it:
+- Preserve existing variable names and function names where possible
+- Keep any existing test data and example values that work
+- Maintain existing debugging instrumentation (console.log statements, etc.)
+- Focus on improving or adding to the existing code rather than replacing it entirely` : ''}
+
 YOUR RESPONSE MUST BE IN THE FOLLOWING JSON FORMAT:
 {
   "code": "// Your complete, executable debugging example here as a string with all necessary setup and logging",
@@ -120,7 +129,8 @@ Focus on making the code runnable in a browser JavaScript environment without an
           role: "user", 
           content: `Here is the document with the highlighted section:\n\n${formattedDocument}\n\n` +
                    `Please create a runnable debugging example for the highlighted code.` +
-                   (debugPrompt ? `\n\nAdditional instructions: ${debugPrompt}` : '')
+                   (debugPrompt ? `\n\nAdditional instructions: ${debugPrompt}` : '') +
+                   (hasExistingCode ? `\n\nHere is my existing debugging code which should be preserved where possible:\n\n\`\`\`javascript\n${debugCode}\n\`\`\`` : '')
         }
       ];
 
