@@ -4,6 +4,7 @@ import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
 import LMUnitTest from "./LMUnitTest";
+import ShowDebuggedExample from "./ShowDebuggedExample";
 import { ChatMessage, lmApi } from "./lm-api-client";
 import { vscode } from "./utilities/vscode";
 
@@ -522,6 +523,7 @@ export const tools = {
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
   yesNoQuestion: LMUnitTest, // Add the new component
+  debugExample: ShowDebuggedExample, // Add the debugging example component
   // lmApiTest: LMAPITest, // Add the debugging component
 };
 
@@ -533,5 +535,6 @@ export const toolNames = {
   displayHTML: "HTML Preview",
   odyssey: "Analyze Floating-point Expression",
   yesNoQuestion: "LM Unit Test", // Add the new component name
+  debugExample: "Show Debugged Example", // Add the debugging example component name
   // lmApiTest: "LM API Test", // Add the debugging component name
 };
