@@ -264,7 +264,7 @@ export abstract class BaseAnnotationView {
 
           case "open-external":
             // Open link in external window
-            vscode.env.openExternal(vscode.Uri.parse(message.url))
+            vscode.env.openExternal(message.url);
             return;
         }
       },
