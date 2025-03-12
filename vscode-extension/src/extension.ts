@@ -97,10 +97,16 @@ export function activate(context: vscode.ExtensionContext) {
     AnnotationManagerPanel.currentPanel?.setAnnotationColor();
   });
 
+  // Command for moving selected annotation
+  const moveSelectedCommand = commands.registerCommand("codetations.moveSelected", () => {
+    AnnotationManagerPanel.currentPanel?.moveSelectedAnnotation();
+  });
+
   context.subscriptions.push(
     showAnnotationsCommand,
     addAnnotationsCommand,
     removeAnnotationsCommand,
-    setAnnotationColorCommand
+    setAnnotationColorCommand,
+    moveSelectedCommand
   );
 }

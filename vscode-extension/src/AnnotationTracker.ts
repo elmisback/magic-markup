@@ -570,6 +570,40 @@ export class AnnotationTracker implements vscode.Disposable {
   }
 
   /**
+   * Moves an annotation to a new position in the document
+   */
+  public moveAnnotation(document: vscode.TextDocument, annotationId: string, newStart: number, newEnd: number): void {
+    const documentKey = document.uri.toString();
+    const annotations = this.documentAnnotations.get(documentKey) || [];
+    
+    // Find the annotation to move
+    const annotationIndex = annotations.findIndex(a => a.id === annotationId);
+    
+    if (annotationIndex === -1) {
+      vscode.window.showErrorMessage(`Annotation with ID ${annotationId} not found.`);
+      return;
+    }
+    
+    // Create a copy of the annotation with updated positions
+    const updatedAnnotation = {
+      ...annotations[annotationIndex],
+      start: newStart,
+      end: newEnd,
+      document: document.getText() // Update document text reference
+    };
+    
+    // Update the annotation in the collection
+    const updatedAnnotations = [...annotations];
+    updatedAnnotations[annotationIndex] = updatedAnnotation;
+    this.documentAnnotations.set(documentKey, updatedAnnotations);
+    
+    // Update decorations and save
+    this.updateDecorations(document);
+    this.saveAnnotationsForDocument(document);
+    this.notifyAnnotationsChanged(document);
+  }
+
+  /**
    * Returns annotations for a document
    */
   public getAnnotationsForDocument(document: vscode.TextDocument): Annotation[] {

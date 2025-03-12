@@ -18,6 +18,8 @@ import { BaseAnnotationView } from "./BaseAnnotationView";
 export class AnnotationManagerPanel extends BaseAnnotationView {
   public static currentPanel: AnnotationManagerPanel | undefined;
   private readonly _panel: WebviewPanel;
+  // Add property to track selected annotation ID
+  public selectedAnnotationId: string | undefined;
 
   /**
    * The AnnotationManagerPanel class private constructor (called only from the render method).
@@ -81,6 +83,42 @@ export class AnnotationManagerPanel extends BaseAnnotationView {
     
     // Call the parent dispose method
     super.dispose();
+  }
+
+  /**
+   * Moves the currently selected annotation to the currently selected text range in the editor
+   */
+  public moveSelectedAnnotation(): void {
+    // Check if there's a selected annotation
+    if (!this.selectedAnnotationId) {
+      vscode.window.showErrorMessage("No annotation is selected to move.");
+      return;
+    }
+
+    const editor = vscode.window.activeTextEditor;
+    // Check if there's an active editor
+    if (!editor) {
+      vscode.window.showErrorMessage("No active editor found.");
+      return;
+    }
+
+    // Check if there's any text selected
+    if (editor.selection.isEmpty) {
+      vscode.window.showErrorMessage("Please select some text as the new target location.");
+      return;
+    }
+
+    // Get start and end offsets
+    const startOffset = editor.document.offsetAt(editor.selection.start);
+    const endOffset = editor.document.offsetAt(editor.selection.end);
+
+    // Use the annotation tracker to move the annotation
+    annotationTracker.moveAnnotation(
+      editor.document,
+      this.selectedAnnotationId,
+      startOffset,
+      endOffset
+    );
   }
 }
 

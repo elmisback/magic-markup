@@ -35,12 +35,12 @@
         "title": "Codetations: Add Note"
       },
       {
-        "command": "codetations.removeAnnotation",
-        "title": "Codetations: Remove Note"
-      },
-      {
         "command": "codetations.sendTestMessage",
         "title": "Codetations: Test"
+      },
+      {
+        "command": "codetations.moveSelected",
+        "title": "Codetations: Move Selected"
       }
     ],
     "menus": {
@@ -54,7 +54,7 @@
           "group": "navigation"
         },
         {
-          "command": "codetations.removeAnnotation",
+          "command": "codetations.moveSelected",
           "group": "navigation"
         }
       ],
