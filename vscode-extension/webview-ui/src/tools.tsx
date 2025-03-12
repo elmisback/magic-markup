@@ -518,7 +518,7 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
 export const tools = {
   comment: Comment,
   colorPicker: ColorPicker,
-  runCodeSegment: RunCodeSegment,
+  // runCodeSegment: RunCodeSegment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
@@ -530,7 +530,7 @@ export const tools = {
 export const toolNames = {
   comment: "Comment",
   colorPicker: "Color Picker",
-  runCodeSegment: "Run Code Segment",
+  // runCodeSegment: "Run Code Segment",
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
   odyssey: "Analyze Floating-point Expression",
