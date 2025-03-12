@@ -527,9 +527,25 @@ export class AnnotationTracker implements vscode.Disposable {
     const updatedAnnotations = annotations.filter(a => a.id !== annotationId);
     this.documentAnnotations.set(documentKey, updatedAnnotations);
     
-    // Update decorations and save
+    // Update decorations
     this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
+    
+    if (updatedAnnotations.length === 0) {
+      // If no annotations left, remove the file
+      try {
+        const annotationsFilePath = this.getAnnotationsFilePath(document.uri.fsPath);
+        if (fs.existsSync(annotationsFilePath)) {
+          fs.unlinkSync(annotationsFilePath);
+        }
+      } catch (error) {
+        console.error("Failed to remove annotations file:", error);
+      }
+    } else {
+      // Otherwise save updated annotations
+      this.saveAnnotationsForDocument(document);
+    }
+    
+    // Notify the webview panel of the change
     this.notifyAnnotationsChanged(document);
   }
 
