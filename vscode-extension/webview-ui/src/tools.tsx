@@ -443,62 +443,72 @@ const RunCodeSegment: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
-  const [expression, setExpression] = useState("loading...");
+  const [expression, setExpression] = useState(props.value.metadata.expression || "loading...");
   const [retryParse, setRetryParse] = useState(false);
 
   useEffect(() => {
-    const parseText = async (text: string) => {
-      const prompt: ChatMessage[] = [
-        {
-          role: "system",
-          content: `Can you parse this piece of text or code to find an expression 
-            and convert it to mathjs parsable syntax? All math.h operators are allowed. 
-            If a term of the expression can be written with simple mathematical operators,
-            use those instead of 'function' like operators, for example, use 'x^y' instead of
-            pow(x,y).
+    // Only make API call if expression is "loading..." or retry was clicked
+    if (expression === "loading..." || retryParse) {
+      const parseText = async (text: string) => {
+        const prompt: ChatMessage[] = [
+          {
+            role: "system",
+            content: `Can you parse this piece of text or code to find an expression 
+              and convert it to mathjs parsable syntax? All math.h operators are allowed. 
+              If a term of the expression can be written with simple mathematical operators,
+              use those instead of 'function' like operators, for example, use 'x^y' instead of
+              pow(x,y).
 
-            Do not output any other text besides the mathjs parasable string, 
-            with no quotation marks.
-            
-            The text to parse is as follows:
-            ${text}
-          `
-        }
-       ]
-      const parsed = await lmApi.chat(prompt, {
-        vendor: 'copilot',
-        family: 'gpt-4o',
-        temperature: 0.3
-      })
-  
-      setExpression(parsed);
-      setRetryParse(false)
+              Do not output any other text besides the mathjs parasable string, 
+              with no quotation marks.
+              
+              The text to parse is as follows:
+              ${text}
+            `
+          }
+        ]
+        const parsed = await lmApi.chat(prompt, {
+          vendor: 'copilot',
+          family: 'gpt-4o',
+          temperature: 0.3
+        })
+    
+        const newExpression = parsed;
+        setExpression(newExpression);
+        // Store in metadata for persistence
+        props.utils.setMetadata({ expression: newExpression });
+        setRetryParse(false);
+      }
+
+      parseText(props.utils.getText());
     }
+  }, [props.utils, retryParse]);
 
-    parseText(props.utils.getText());
-  }, [, retryParse])
+  // Update metadata when user manually edits the expression
+  const handleExpressionChange = (evt: React.ChangeEvent<HTMLInputElement>) => {
+    const newExpression = evt.target.value;
+    setExpression(newExpression);
+    props.utils.setMetadata({ expression: newExpression });
+  };
 
- const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec="
- const url = odysseyBase + encodeURIComponent(expression);
+  const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec="
+  const url = odysseyBase + encodeURIComponent(expression);
 
- return (
+  return (
     <div className="odyssey">
       <p>Parsed the following expression from highlighted text:</p>
       <input type="text" className="odyssey-text"
-        onChange={(evt) => setExpression(evt.target.value)} value={expression}/>
+        onChange={handleExpressionChange} value={expression}/>
       <button onClick={() => setRetryParse(true)}>Retry</button>
       <p>
         Explore floating-point Error in expression, with
-        {/* <a className={"btn"} href={url}>Odyssey</a> */}
         <button className="open-external" onClick={() => vscode.postMessage({command: "open-external", url})}>
           Odyssey 
           <svg className="open-external-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z"></path></svg>
         </button>
       </p>
     </div>
-
-    // TODO: make it contact llm immediately when text changes
- );
+  );
 };
 
 /* TODO: Define additional tools as React components here. */
