@@ -277,6 +277,11 @@ function RetagBanner(props: {
 
 // Helper to determine if an annotation needs retagging
 const isAnnotationOutOfSync = (annotation: Annotation, currentDocumentText: string): boolean => {
+  // console.log('currentDocumentText', currentDocumentText)
+  // console.log('annotation.document', annotation.document);
+  if (currentDocumentText !== annotation.document) {
+    console.debug('Annotation out of sync');
+  }
   return currentDocumentText !== annotation.document || annotation.start === annotation.end;
 };
 

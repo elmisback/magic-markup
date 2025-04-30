@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import { createPatch, applyPatch } from "diff";
 import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
 export interface Annotation {
   // HACK this just duplicates "../webview-ui/src/Annotation.tsx"
@@ -8,10 +9,12 @@ export interface Annotation {
   start: number;
   end: number;
   document: string;
+  documentDiff?: string; // only exists when loaded from disk; used to resolve document
   tool: string;
   metadata: { [key: string]: any };
   original: {
     document: string;
+    documentDiff?: string; // only exists when loaded from disk; used to resolve document
     start: number;
     end: number;
   };
@@ -52,15 +55,40 @@ export class AnnotationTracker implements vscode.Disposable {
   public async loadAnnotationsForDocument(document: vscode.TextDocument): Promise<Annotation[]> {
     const documentKey = document.uri.toString();
     const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath);
-    
+    console.debug(`Loading annotations for ${documentKey} from ${annotationsUri}`);
+    // TODO we have only sort-of validated that diff loading works correctly.
+    if (this.documentAnnotations.has(documentKey)) {
+      // Already loaded
+      return this.documentAnnotations.get(documentKey) as Annotation[];
+    }
     try {
       // Check if file exists
       if (fs.existsSync(annotationsUri)) {
         const content = fs.readFileSync(annotationsUri, "utf8");
-        const state = JSON.parse(content) as AnnotationState;
+        const state = JSON.parse(content) as { document: string; annotations: (Annotation & { documentDiff?: string })[] };
+        
+        // Reconstruct each annotation's document field using applyPatch
+        const reconstructedAnnotations = state.annotations.map(ann => {
+          const reconstructedDoc = 
+            ann.documentDiff ?
+              applyPatch(state.document, ann.documentDiff) || state.document
+            : ann.document || state.document;
+          const originalDoc =
+            ann.original.documentDiff ?
+              applyPatch(state.document, ann.original.documentDiff) || reconstructedDoc
+            : ann.original.document;
+          return {
+            ...ann,
+            document: reconstructedDoc,
+            original: {
+              ...ann.original,
+              document: originalDoc
+            }
+          };
+        });
         
         // Store annotations for this document
-        this.documentAnnotations.set(documentKey, state.annotations);
+        this.documentAnnotations.set(documentKey, reconstructedAnnotations as Annotation[]);
         
         // Update decorations
         this.updateDecorations(document);
@@ -68,7 +96,7 @@ export class AnnotationTracker implements vscode.Disposable {
         // Notify the webview if it's open
         this.notifyAnnotationsChanged(document);
         
-        return state.annotations;
+        return reconstructedAnnotations as Annotation[];
       } else {
         // No annotations file yet
         this.documentAnnotations.set(documentKey, []);
@@ -100,9 +128,50 @@ export class AnnotationTracker implements vscode.Disposable {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+    console.debug(`Saving annotations for ${documentKey} to ${annotationsUri}`);
 
-    // Write annotations to file
-    const state: AnnotationState = { annotations };
+    // Save the global document string
+    const globalDocument = annotations.length > 0 ? annotations[0].document : document.getText();
+
+    // Write annotations to file with documentDiffs
+    const state = {
+      document: globalDocument,
+      annotations: annotations.map(ann => {
+        // Remove local document field, replace with documentDiff
+        const { document: annDoc, ...rest } = ann;
+        // Compute diff from global document to annotation's document
+        let documentDiff = undefined;
+        if (annDoc !== globalDocument) {
+          try {
+            documentDiff = createPatch(document.fileName, globalDocument, annDoc);
+          } catch (e) {
+            documentDiff = undefined;
+            console.error("Error creating document diff:", e);
+          }
+        }
+        const { original: {
+          document: originalDocument,
+          ...restOriginal
+        } } = ann;
+        let originalDocumentDiff = undefined;
+        if (originalDocument !== globalDocument) {
+          try {
+            originalDocumentDiff = createPatch(document.fileName, globalDocument, originalDocument);
+          } catch (e) {
+            originalDocumentDiff = undefined;
+            console.error("Error creating original document diff:", e);
+          }
+        }
+        return {
+          ...rest,
+          documentDiff,
+          original: {
+            ...restOriginal,
+            documentDiff: originalDocumentDiff
+          }
+        };
+      })
+    };
     fs.writeFileSync(annotationsUri, JSON.stringify(state, null, 2), "utf8");
   }
 

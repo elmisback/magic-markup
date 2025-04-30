@@ -11,18 +11,22 @@
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activitybar": [{
-        "id": "codetations-sidebar",
-        "title": "Codetations",
-        "icon": "$(zap)"
-      }]
+      "activitybar": [
+        {
+          "id": "codetations-sidebar",
+          "title": "Codetations",
+          "icon": "$(zap)"
+        }
+      ]
     },
     "views": {
-      "codetations-sidebar": [{
-        "id": "codetations-annotations",
-        "name": "Annotations",
-        "type": "webview"
-      }]
+      "codetations-sidebar": [
+        {
+          "id": "codetations-annotations",
+          "name": "Annotations",
+          "type": "webview"
+        }
+      ]
     },
     "commands": [
       {
@@ -98,6 +102,7 @@
   "dependencies": {
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
+    "diff": "^8.0.0-beta",
     "express": "^4.19.2",
     "openai": "^4.53.2",
     "ws": "^8.18.0"
