@@ -315,7 +315,7 @@ export abstract class BaseAnnotationView {
         delimiter
       );
       if (!result.out) {
-        window.showErrorMessage("Error retagging annotation: no result returned");
+        window.showErrorMessage("Error retagging annotation: no result returned (maybe all annotation anchor text was deleted?)");
         console.error("Error retagging annotation: no result returned");
         console.error(codeWithSnippetDelimited);
         return annotation;

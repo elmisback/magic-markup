@@ -499,7 +499,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       // Handle missing output
       if (!result.out) {
         console.error(`Retagging returned no result for annotation ${annotation.id}`);
-        window.showErrorMessage("Error retagging annotation: no result returned");
+        window.showErrorMessage("Error retagging annotation: no result returned (maybe all annotation anchor text was deleted?)");
         return annotation;
       }
 
@@ -575,7 +575,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
           // Process annotations one by one instead of all at once
           // This provides better progressive feedback and allows for early cancellation
-          const updatedAnnotations = [];
+          const updatedAnnotations: Annotation[] = [];
 
           for (const annotation of annotations) {
             // Check for cancellation
