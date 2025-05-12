@@ -1,5 +1,49 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 
+:root {
+  /* Light mode variables */
+  --background-color: #ffffff;
+  --text-color: #333333;
+  --tile-bg-color: #f5f5f5;
+  --tile-border-color: #dddddd;
+  --tile-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --tile-selected-bg: #e0e0e0;
+  --banner-bg-color: #f8f9fa;
+  --banner-border-color: #dee2e6;
+  --button-color: #0d6efd;
+  --button-text-color: white;
+  --cancel-button-bg: #f8f9fa;
+  --cancel-button-border: #ced4da;
+  --error-banner-bg: #ffe0e0;
+  --input-border-color: #ced4da;
+  --input-bg-color: white;
+}
+
+body.dark-mode {
+  /* Dark mode variables */
+  --background-color: #1e1e1e;
+  --text-color: #e0e0e0;
+  --tile-bg-color: #2d2d2d;
+  --tile-border-color: #444444;
+  --tile-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --tile-selected-bg: #3d3d3d;
+  --banner-bg-color: #252526;
+  --banner-border-color: #444444;
+  --button-color: #0e63c4;
+  --button-text-color: white;
+  --cancel-button-bg: #3a3a3a;
+  --cancel-button-border: #555555;
+  --error-banner-bg: #5a3232;
+  --input-border-color: #555555;
+  --input-bg-color: #2d2d2d;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 main {
   display: flex;
   flex-direction: column;
@@ -8,6 +52,7 @@ main {
   height: 100%;
   padding: 10px;
   position: relative;
+  color: var(--text-color);
 }
 
 .center-vertical {
@@ -15,16 +60,36 @@ main {
   align-items: center;
 }
 
+.dark-mode-toggle {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background-color: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dark-mode-toggle:hover {
+  background-color: var(--tile-selected-bg);
+}
+
 .annotation-tile {
-  background-color: #f5f5f5; /* Light grey background */
-  border: 1px solid #ddd; /* Light border */
-  padding: 5px 7px; /* Padding inside the tile */
-  margin-bottom: 10px; /* Space between tiles */
-  border-radius: 5px; /* Rounded corners */
-  transition: background-color 0.3s; /* Smooth transition for background color */
-  /* drop shadow */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--tile-bg-color);
+  border: 1px solid var(--tile-border-color);
+  padding: 5px 7px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+  box-shadow: var(--tile-shadow);
   width: -webkit-fill-available;
+  color: var(--text-color);
 }
 
 .annotation-tile * {
@@ -32,11 +97,41 @@ main {
 }
 
 .annotation-tile.selected {
-  background-color: #e0e0e0; /* Slightly darker background when selected */
+  background-color: var(--tile-selected-bg);
 }
 
 .add-note-banner, .confirm-annotation-dialog, .choose-annotation-type {
   backdrop-filter: blur(2px);
+  background-color: var(--banner-bg-color);
+  border-color: var(--banner-border-color);
+  color: var(--text-color);
+}
+
+.add-note-banner select, .choose-annotation-type select,
+.add-note-banner input, .choose-annotation-type input {
+  background-color: var(--input-bg-color);
+  color: var(--text-color);
+  border-color: var(--input-border-color);
+}
+
+.retag-banner {
+  background-color: var(--error-banner-bg) !important;
+  color: var(--text-color);
+}
+
+/* Button styling */
+button {
+  background-color: var(--button-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 4px;
+}
+
+button.secondary,
+.choose-annotation-type button[style*="background-color: #f8f9fa"] {
+  background-color: var(--cancel-button-bg) !important;
+  border: 1px solid var(--cancel-button-border) !important;
+  color: var(--text-color) !important;
 }
 
 /* This ensures the annotations remain visible under the banner */
@@ -44,14 +139,8 @@ main {
   z-index: 1;
 }
 
-/* textarea {
-  resize: vertical;
-  width: 280px;
-  height: 80px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-family: "Poppins", sans-serif;
-  font-size: 14px;
-  color: black;
-} */
+textarea, select, input {
+  background-color: var(--input-bg-color);
+  color: var(--text-color);
+  border-color: var(--input-border-color);
+}

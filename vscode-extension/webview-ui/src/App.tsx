@@ -3,6 +3,7 @@ import "./App.css";
 import Annotation from "./Annotation";
 import { tools, toolNames } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
+import DarkModeToggle from "./DarkModeToggle";
 
 interface AnnotationUpdate {
   document?: string;
@@ -358,13 +359,14 @@ function App() {
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | undefined>(undefined);
   const [chooseAnnotationType, setChooseAnnotationType] = useState<boolean>(false);
   const [confirmAnnotation, setConfirmAnnotation] = useState<boolean>(false);
-  
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
   // Annotation creation state
   const [start, setStart] = useState<number | undefined>(undefined);
   const [end, setEnd] = useState<number | undefined>(undefined);
   const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
-  
+
   // Track current selection in editor
   const [currentSelection, setCurrentSelection] = useState<{start: number, end: number} | null>(null);
   const hasSelection = currentSelection && currentSelection.start !== currentSelection.end;
@@ -519,20 +521,103 @@ function App() {
     setEnd(undefined);
   };
 
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newDarkModeState = !isDarkMode;
+    setIsDarkMode(newDarkModeState);
+
+    // Update body class for CSS
+    if (newDarkModeState) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+
+    // Save preference to localStorage
+    try {
+      localStorage.setItem('codetations-dark-mode', newDarkModeState ? 'true' : 'false');
+    } catch (e) {
+      console.error("Error saving dark mode preference:", e);
+    }
+
+    // Send dark mode change to extension
+    vscode.postMessage({
+      command: "setDarkMode",
+      data: {
+        isDarkMode: newDarkModeState
+      }
+    });
+  };
+
+  // Load dark mode preference on startup
+  useEffect(() => {
+    try {
+      // Try to get from localStorage
+      const savedDarkMode = localStorage.getItem('codetations-dark-mode');
+      const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      // First check localStorage, then check system preference
+      const shouldUseDarkMode = savedDarkMode
+        ? savedDarkMode === 'true'
+        : prefersDarkMode;
+
+      if (shouldUseDarkMode) {
+        setIsDarkMode(true);
+        document.body.classList.add('dark-mode');
+      }
+    } catch (e) {
+      console.error("Error loading dark mode preference:", e);
+    }
+
+    // Listen for system color scheme changes
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleColorSchemeChange = (e: MediaQueryListEvent) => {
+      // Only change if user hasn't set a preference
+      if (!localStorage.getItem('codetations-dark-mode')) {
+        setIsDarkMode(e.matches);
+        if (e.matches) {
+          document.body.classList.add('dark-mode');
+        } else {
+          document.body.classList.remove('dark-mode');
+        }
+      }
+    };
+
+    try {
+      // Add listener for system preference changes
+      darkModeMediaQuery.addEventListener('change', handleColorSchemeChange);
+      // Remove listener on cleanup
+      return () => darkModeMediaQuery.removeEventListener('change', handleColorSchemeChange);
+    } catch (e) {
+      // Fallback for older browsers that don't support addEventListener on MediaQueryList
+      console.warn("Browser doesn't support MediaQueryList.addEventListener", e);
+    }
+  }, []);
+
   useEffect(() => {
     // Message handler for communication with extension
     const handleMessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data);
       console.debug("Received message:", message);
-      
+
       switch (message.command) {
         case "initialize":
           // Initialize the UI with document data and annotations
           setDocumentUri(message.data.documentUri);
           setDocumentText(message.data.documentText);
           setAnnotations(message.data.annotations || []);
+
+          // Check if dark mode preference is present in initialization data
+          if (message.data.isDarkMode !== undefined) {
+            setIsDarkMode(message.data.isDarkMode);
+            if (message.data.isDarkMode) {
+              document.body.classList.add('dark-mode');
+            } else {
+              document.body.classList.remove('dark-mode');
+            }
+          }
           return;
-          
+
         case "updateAnnotations":
           // Update annotations from extension
           if (message.data.documentUri === documentUri) {
@@ -540,7 +625,7 @@ function App() {
             setDocumentText(message.data.documentText);
           }
           return;
-          
+
         case "handleCursorPositionChange":
           // Handle cursor position change
           setCharNum(message.data.position);
@@ -559,29 +644,29 @@ function App() {
             }
           }
           return;
-          
+
         case "addAnnotation":
           // Start annotation creation flow
           handleAddAnnotation(message.data.start, message.data.end);
           return;
-          
+
         case "removeAnnotation":
           // Remove selected annotation
           handleRemoveAnnotation();
           return;
-          
+
         case "setAnnotationColor":
           // Set color for selected annotation
           handleSetAnnotationColor(message.data.color);
           return;
-          
+
         case "chooseAnnotationType":
           // Choose annotation type
           handleChooseAnnType(message.data.start, message.data.end, message.data.documentContent);
           return;
       }
     };
-    
+
     window.addEventListener("message", handleMessage);
     return () => {
       window.removeEventListener("message", handleMessage);
@@ -610,6 +695,8 @@ function App() {
   if (!chooseAnnotationType) {
     return (
       <main>
+        <DarkModeToggle isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
+
         {hasSelection && (
           <AddNoteBanner
             onConfirm={handleCreateAnnotation}
@@ -619,13 +706,13 @@ function App() {
             toolTypes={toolTypes}
           />
         )}
-        
+
         {showRetagBanner && (
-          <RetagBanner 
-            onRetag={handleRetag} 
+          <RetagBanner
+            onRetag={handleRetag}
           />
         )}
-        
+
         <AnnotationSidebarView
           annotations={annotations}
           setAnnotations={setAnnotations}
@@ -638,22 +725,22 @@ function App() {
           onDeleteAnnotation={handleDeleteAnnotation}
         />
 
-        {!hasSelection && (
-          <p>To add more annotations, highlight text in the editor and choose a note type.</p>
+        {!hasSelection && annotations.length === 0 && (
+          <p>To add annotations, highlight text in the editor and choose a note type.</p>
         )}
       </main>
     );
   } else {
     return (
       <main>
+        <DarkModeToggle isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
+
         <div className="choose-annotation-type" style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           zIndex: 100,
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #dee2e6',
           padding: '12px 16px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
         }}>
@@ -664,10 +751,9 @@ function App() {
               onChange={(e) => {
                 setNewTool(e.target.value);
               }}
-              style={{ 
+              style={{
                 padding: '6px 10px',
                 borderRadius: '4px',
-                border: '1px solid #ced4da',
                 flexGrow: 1
               }}
             >
@@ -677,25 +763,21 @@ function App() {
                 </option>
               ))}
             </select>
-            <button 
+            <button
               onClick={handleCreateAnnotation}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#0d6efd',
-                border: 'none',
                 borderRadius: '4px',
-                color: 'white',
                 cursor: 'pointer'
               }}
             >
               Submit
             </button>
-            <button 
+            <button
               onClick={handleCancelAddAnnotation}
+              className="secondary"
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #ced4da',
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
@@ -704,7 +786,7 @@ function App() {
             </button>
           </div>
         </div>
-        
+
         <AnnotationSidebarView
           annotations={annotations}
           setAnnotations={setAnnotations}
