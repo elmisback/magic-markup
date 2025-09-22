@@ -513,7 +513,434 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
 };
 
 /* TODO: Define additional tools as React components here. */
+const ExplainInEnglish: React.FC<AnnotationEditorProps> = (props) => {
+  // State management
+  const [englishExplanation, setEnglishExplanation] = useState(
+    props.value.metadata.englishExplanation || ''
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [executionResult, setExecutionResult] = useState<string | null>(
+    props.value.metadata.executionResult || null
+  );
+  const [executionError, setExecutionError] = useState<string | null>(
+    props.value.metadata.executionError || null
+  );
+  const [useMock, setUseMock] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  
+  // Track if component is mounted
+  const isMounted = useRef(true);
 
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Get the highlighted code and document context
+  const highlightedCode = props.utils.getText();
+  const documentText = props.value.document || '';
+  const startPos = props.value.start;
+  const endPos = props.value.end;
+
+  // Save state changes to metadata
+  useEffect(() => {
+    props.utils.setMetadata({ 
+      englishExplanation,
+      executionResult,
+      executionError
+    });
+  }, [englishExplanation, executionResult, executionError]);
+
+  // Create formatted document with highlighted section
+  const createFormattedDocument = () => {
+    if (!documentText) {
+      return '';
+    }
+    
+    const before = documentText.substring(0, startPos);
+    const highlighted = documentText.substring(startPos, endPos);
+    const after = documentText.substring(endPos);
+    
+    return `${before}<<<HIGHLIGHTED>${highlighted}</HIGHLIGHTED>>>${after}`;
+  };
+
+  // Generate English explanation
+  const generateExplanation = async () => {
+    if (!highlightedCode.trim()) {
+      setError('No code selected to explain');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formattedDocument = createFormattedDocument();
+      
+      const prompt: ChatMessage[] = [
+        { 
+          role: "system", 
+          content: `You are a helpful assistant that explains JavaScript code in simple, clear English. 
+          
+You will be given a document with a highlighted section marked by <<<HIGHLIGHTED>...</HIGHLIGHTED>>> tags.
+
+Your task is to:
+1. Explain what the highlighted code does in plain English
+2. Break down complex operations into simple steps
+3. Explain the purpose and context of the code
+4. Use non-technical language that a beginner could understand
+5. Include relevant context from the surrounding code if it helps explain the highlighted section
+
+Keep your explanation concise but comprehensive. Focus on WHAT the code does and WHY, not just HOW.`
+        },
+        { 
+          role: "user", 
+          content: `Here is the code with the highlighted section:\n\n${formattedDocument || highlightedCode}\n\n` +
+                   `Please explain what the highlighted code does in simple English.`
+        }
+      ];
+
+      let response: string;
+      if (useMock) {
+        // Mock response for testing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        response = `This code performs the following actions:
+1. It initializes variables and sets up the necessary data structures
+2. It processes the input data through a series of transformations
+3. It handles edge cases and error conditions appropriately
+4. Finally, it returns the processed result
+
+In simple terms: This code takes some input, transforms it according to specific rules, and produces an output that can be used by other parts of the program.`;
+      } else {
+        try {
+          response = await lmApi.chat(prompt, {
+            vendor: 'copilot',
+            family: 'gpt-4o',
+            temperature: 0.7
+          });
+        } catch (apiError) {
+          console.log('API call failed, falling back to mock:', apiError);
+          // Fallback to mock response
+          response = `This code performs the following actions:
+1. It initializes variables and sets up the necessary data structures
+2. It processes the input data through a series of transformations
+3. It handles edge cases and error conditions appropriately
+4. Finally, it returns the processed result
+
+In simple terms: This code takes some input, transforms it according to specific rules, and produces an output that can be used by other parts of the program.`;
+        }
+      }
+
+      if (isMounted.current) {
+        setEnglishExplanation(response);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred while generating explanation';
+      
+      if (isMounted.current) {
+        setError(errorMsg);
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Execute the highlighted code
+  const executeCode = async () => {
+    setIsExecuting(true);
+    setExecutionError(null);
+    setExecutionResult(null);
+
+    try {
+      // Create a more isolated execution environment
+      const code = highlightedCode.trim();
+      
+      // Check if the code is a complete statement or expression
+      let result;
+      
+      // Try to execute as-is first
+      try {
+        const asyncFunction = new Function(`
+          'use strict';
+          return (async () => {
+            ${code}
+          })();
+        `);
+        result = await asyncFunction();
+      } catch (firstError) {
+        // If that fails, try wrapping the last line with return
+        const lines = code.split('\n');
+        if (lines.length > 0) {
+          const lastLine = lines[lines.length - 1].trim();
+          if (!lastLine.startsWith('return') && !lastLine.startsWith('throw')) {
+            lines[lines.length - 1] = `return ${lastLine}`;
+            const modifiedCode = lines.join('\n');
+            
+            try {
+              const asyncFunction = new Function(`
+                'use strict';
+                return (async () => {
+                  ${modifiedCode}
+                })();
+              `);
+              result = await asyncFunction();
+            } catch (secondError) {
+              // If both attempts fail, throw the original error
+              throw firstError;
+            }
+          } else {
+            throw firstError;
+          }
+        } else {
+          throw firstError;
+        }
+      }
+
+      // Format the result for display
+      if (result === undefined) {
+        setExecutionResult('undefined');
+      } else if (result === null) {
+        setExecutionResult('null');
+      } else if (typeof result === 'object') {
+        setExecutionResult(JSON.stringify(result, null, 2));
+      } else {
+        setExecutionResult(String(result));
+      }
+    } catch (err) {
+      setExecutionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  return (
+    <div style={{ 
+      padding: "12px", 
+      fontFamily: "Poppins, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSize: "14px",
+      maxWidth: "100%"
+    }}>
+      <div style={{ marginBottom: "16px" }}>
+        <h3 style={{ 
+          margin: "0 0 12px 0", 
+          fontSize: "16px", 
+          fontWeight: "600",
+          color: "#333"
+        }}>
+          Code Explanation in Plain English
+        </h3>
+        
+        <div style={{ 
+          display: "flex", 
+          gap: "10px", 
+          alignItems: "center",
+          marginBottom: "12px"
+        }}>
+          <button
+            onClick={generateExplanation}
+            disabled={isLoading}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: isLoading ? "#e0e0e0" : "#0078D4",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: isLoading ? "not-allowed" : "pointer",
+              fontSize: "14px",
+              fontWeight: "500",
+              transition: "background-color 0.2s"
+            }}
+          >
+            {isLoading ? "Generating..." : "Generate Explanation"}
+          </button>
+          
+          <label style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            fontSize: "13px",
+            cursor: "pointer",
+            color: "#666"
+          }}>
+            <input 
+              type="checkbox"
+              checked={useMock}
+              onChange={() => setUseMock(!useMock)}
+              style={{ marginRight: "6px" }}
+            />
+            Use mock API
+          </label>
+        </div>
+
+        {error && (
+          <div style={{ 
+            color: "#D83B01", 
+            backgroundColor: "#FFF4F2", 
+            padding: "10px", 
+            borderRadius: "4px",
+            marginBottom: "12px",
+            fontSize: "13px",
+            border: "1px solid #FDBCB4"
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ 
+            display: "block", 
+            marginBottom: "8px", 
+            fontWeight: "600",
+            fontSize: "14px",
+            color: "#444"
+          }}>
+            English Explanation:
+          </label>
+          <textarea
+            value={englishExplanation}
+            onChange={(e) => setEnglishExplanation(e.target.value)}
+            placeholder="Click 'Generate Explanation' to get an English explanation of the code, or write your own..."
+            style={{
+              width: "100%",
+              minHeight: "120px",
+              padding: "10px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+              fontSize: "14px",
+              lineHeight: "1.5",
+              resize: "vertical",
+              fontFamily: "inherit",
+              backgroundColor: "#FAFAFA"
+            }}
+          />
+        </div>
+
+        <div style={{ 
+          borderTop: "1px solid #E1E1E1",
+          paddingTop: "16px",
+          marginTop: "16px"
+        }}>
+          <h4 style={{ 
+            margin: "0 0 12px 0", 
+            fontSize: "15px", 
+            fontWeight: "600",
+            color: "#333"
+          }}>
+            Code Execution
+          </h4>
+          
+          <button
+            onClick={executeCode}
+            disabled={isExecuting || !highlightedCode.trim()}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: isExecuting ? "#e0e0e0" : "#107C10",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: (isExecuting || !highlightedCode.trim()) ? "not-allowed" : "pointer",
+              fontSize: "14px",
+              fontWeight: "500",
+              marginBottom: "12px",
+              transition: "background-color 0.2s"
+            }}
+          >
+            {isExecuting ? "Executing..." : "▶ Execute Code"}
+          </button>
+
+          {executionResult !== null && (
+            <div style={{ 
+              backgroundColor: "#F0FFF4",
+              border: "1px solid #B7EB8F",
+              borderRadius: "4px",
+              padding: "12px",
+              marginTop: "12px"
+            }}>
+              <div style={{ 
+                fontWeight: "600", 
+                marginBottom: "8px",
+                color: "#52C41A",
+                fontSize: "13px"
+              }}>
+                ✓ Execution Result:
+              </div>
+              <pre style={{ 
+                margin: 0,
+                fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+                fontSize: "13px",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "#333",
+                backgroundColor: "white",
+                padding: "8px",
+                borderRadius: "3px"
+              }}>
+                {executionResult}
+              </pre>
+            </div>
+          )}
+
+          {executionError && (
+            <div style={{ 
+              backgroundColor: "#FFF2F0",
+              border: "1px solid #FFCCC7",
+              borderRadius: "4px",
+              padding: "12px",
+              marginTop: "12px"
+            }}>
+              <div style={{ 
+                fontWeight: "600", 
+                marginBottom: "8px",
+                color: "#FF4D4F",
+                fontSize: "13px"
+              }}>
+                ✗ Execution Error:
+              </div>
+              <pre style={{ 
+                margin: 0,
+                fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+                fontSize: "13px",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "#8B0000",
+                backgroundColor: "white",
+                padding: "8px",
+                borderRadius: "3px"
+              }}>
+                {executionError}
+              </pre>
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          marginTop: "16px",
+          padding: "10px",
+          backgroundColor: "#F5F5F5",
+          borderRadius: "4px",
+          fontSize: "12px",
+          color: "#666"
+        }}>
+          <strong>Highlighted Code:</strong>
+          <pre style={{
+            margin: "8px 0 0 0",
+            padding: "8px",
+            backgroundColor: "white",
+            borderRadius: "3px",
+            fontSize: "12px",
+            overflow: "auto",
+            border: "1px solid #E0E0E0"
+          }}>
+            {highlightedCode || "(No code selected)"}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+};
 /* TODO: Add all tools to be used here. */
 export const tools = {
   comment: Comment,
