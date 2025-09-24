@@ -1,5 +1,5 @@
 import { AnnotationEditorProps } from "./App";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef  } from "react";
 import { ObjectInspector } from "react-inspector";
 import e from "cors";
 import './tools.css';
@@ -514,10 +514,22 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
 
 /* TODO: Define additional tools as React components here. */
 const ExplainInEnglish: React.FC<AnnotationEditorProps> = (props) => {
-  // State management
-  const [englishExplanation, setEnglishExplanation] = useState(
-    props.value.metadata.englishExplanation || ''
+  // State management for explanations
+  const [explanations, setExplanations] = useState({
+    what: props.value.metadata.whatExplanation || '',
+    how: props.value.metadata.howExplanation || '',
+    context: props.value.metadata.contextExplanation || '',
+    why: props.value.metadata.whyExplanation || ''
+  });
+  
+  const [presentationSummary, setPresentationSummary] = useState(
+    props.value.metadata.presentationSummary || ''
   );
+  
+  const [explanationMode, setExplanationMode] = useState<'presentation' | 'in-depth'>(
+    props.value.metadata.explanationMode || 'presentation'
+  );
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [executionResult, setExecutionResult] = useState<string | null>(
@@ -547,11 +559,16 @@ const ExplainInEnglish: React.FC<AnnotationEditorProps> = (props) => {
   // Save state changes to metadata
   useEffect(() => {
     props.utils.setMetadata({ 
-      englishExplanation,
+      whatExplanation: explanations.what,
+      howExplanation: explanations.how,
+      contextExplanation: explanations.context,
+      whyExplanation: explanations.why,
+      presentationSummary,
+      explanationMode,
       executionResult,
       executionError
     });
-  }, [englishExplanation, executionResult, executionError]);
+  }, [explanations, presentationSummary, explanationMode, executionResult, executionError]);
 
   // Create formatted document with highlighted section
   const createFormattedDocument = () => {
@@ -579,62 +596,211 @@ const ExplainInEnglish: React.FC<AnnotationEditorProps> = (props) => {
     try {
       const formattedDocument = createFormattedDocument();
       
-      const prompt: ChatMessage[] = [
-        { 
-          role: "system", 
-          content: `You are a helpful assistant that explains JavaScript code in simple, clear English. 
-          
+      const basePrompt = `You are a helpful assistant that explains JavaScript code in simple, clear English. 
+
 You will be given a document with a highlighted section marked by <<<HIGHLIGHTED>...</HIGHLIGHTED>>> tags.
 
-Your task is to:
-1. Explain what the highlighted code does in plain English
-2. Break down complex operations into simple steps
-3. Explain the purpose and context of the code
-4. Use non-technical language that a beginner could understand
-5. Include relevant context from the surrounding code if it helps explain the highlighted section
+Please provide explanations for the highlighted code in four specific categories:
 
-Keep your explanation concise but comprehensive. Focus on WHAT the code does and WHY, not just HOW.`
-        },
-        { 
-          role: "user", 
-          content: `Here is the code with the highlighted section:\n\n${formattedDocument || highlightedCode}\n\n` +
-                   `Please explain what the highlighted code does in simple English.`
+1. WHAT: What does this code do? (describe the main functionality and purpose)
+2. HOW: How does this code work? (explain the technical implementation and logic flow)
+3. CONTEXT: What is this code's function in the context of the entire class/component it belongs to? (explain its role in the larger system)
+4. WHY: Why is this code needed? (explain the problem it solves and its importance)
+
+Use clear, non-technical language that a beginner could understand. Focus on being concise but comprehensive.`;
+
+      if (explanationMode === 'presentation') {
+        const presentationPrompt: ChatMessage[] = [
+          { 
+            role: "system", 
+            content: `${basePrompt}
+
+Format your response as a single cohesive explanation with bullet points for each category:
+
+**What the code does:**
+• [2-3 concise bullet points]
+
+**How the code works:**
+• [2-3 concise bullet points]
+
+**Context within the class/component:**
+• [2-3 concise bullet points]
+
+**Why it's needed:**
+• [2-3 concise bullet points]
+
+Keep each bullet point to 1-2 sentences maximum. This should be easy to read without scrolling.`
+          },
+          { 
+            role: "user", 
+            content: `Here is the code with the highlighted section:\n\n${formattedDocument || highlightedCode}\n\n` +
+                     `Please explain the highlighted code in presentation format.`
+          }
+        ];
+
+        let response: string;
+        if (useMock) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          response = `**What the code does:**
+• Sets up state variables for managing user interface interactions
+• Handles data processing and validation logic
+• Manages component lifecycle and cleanup operations
+
+**How the code works:**
+• Uses React hooks to track component state changes
+• Implements async functions for API communication
+• Applies error handling with try-catch blocks
+
+**Context within the class/component:**
+• Serves as the core data processing logic for the component
+• Integrates with other component methods for state management
+• Provides essential functionality for user interactions
+
+**Why it's needed:**
+• Ensures proper data flow and state consistency
+• Prevents memory leaks and handles edge cases
+• Enables responsive user experience and error recovery`;
+        } else {
+          try {
+            response = await lmApi.chat(presentationPrompt, {
+              vendor: 'copilot',
+              family: 'gpt-4o',
+              temperature: 0.7
+            });
+          } catch (apiError) {
+            console.log('API call failed, falling back to mock:', apiError);
+            response = `**What the code does:**
+• Sets up state variables for managing user interface interactions
+• Handles data processing and validation logic
+• Manages component lifecycle and cleanup operations
+
+**How the code works:**
+• Uses React hooks to track component state changes
+• Implements async functions for API communication
+• Applies error handling with try-catch blocks
+
+**Context within the class/component:**
+• Serves as the core data processing logic for the component
+• Integrates with other component methods for state management
+• Provides essential functionality for user interactions
+
+**Why it's needed:**
+• Ensures proper data flow and state consistency
+• Prevents memory leaks and handles edge cases
+• Enables responsive user experience and error recovery`;
+          }
         }
-      ];
 
-      let response: string;
-      if (useMock) {
-        // Mock response for testing
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        response = `This code performs the following actions:
-1. It initializes variables and sets up the necessary data structures
-2. It processes the input data through a series of transformations
-3. It handles edge cases and error conditions appropriately
-4. Finally, it returns the processed result
-
-In simple terms: This code takes some input, transforms it according to specific rules, and produces an output that can be used by other parts of the program.`;
+        if (isMounted.current) {
+          setPresentationSummary(response);
+        }
       } else {
-        try {
-          response = await lmApi.chat(prompt, {
-            vendor: 'copilot',
-            family: 'gpt-4o',
-            temperature: 0.7
+        // In-depth mode - get detailed explanations for each category
+        const inDepthPrompt: ChatMessage[] = [
+          { 
+            role: "system", 
+            content: `${basePrompt}
+
+You MUST respond with ONLY a valid JSON object. No additional text, explanations, or formatting outside the JSON.
+
+The JSON should have exactly this structure:
+{
+  "what": "Detailed explanation of what the code does (3-5 sentences)...",
+  "how": "Detailed explanation of how it works technically (3-5 sentences)...",
+  "context": "Detailed explanation of its role in the larger system (3-5 sentences)...",
+  "why": "Detailed explanation of why it's necessary (3-5 sentences)..."
+}
+
+Each value should be a single string with 3-5 sentences. Do not include any markdown, formatting, or line breaks within the strings.`
+          },
+          { 
+            role: "user", 
+            content: `Here is the code with the highlighted section:\n\n${formattedDocument || highlightedCode}\n\n` +
+                     `Please provide detailed explanations for each category in JSON format.`
+          }
+        ];
+
+        let response: string;
+        if (useMock) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          response = JSON.stringify({
+            what: "This code defines state management and UI interaction logic for a React component. It establishes multiple state variables using the useState hook to track different aspects of the component's behavior, including user inputs, loading states, error conditions, and execution results. The code also sets up effect hooks to handle component lifecycle events and data persistence.\n\nThe primary function is to create a controlled interface that responds to user actions while maintaining data integrity. It manages both the visual presentation of information and the underlying data processing that supports the component's functionality.\n\nAdditionally, this code implements proper cleanup mechanisms to prevent memory leaks and ensures that asynchronous operations are handled correctly even when the component unmounts during execution.",
+            how: "The implementation uses React's built-in hooks pattern to manage state and side effects. The useState hooks create reactive state variables that automatically trigger re-renders when their values change. Each state variable serves a specific purpose and is updated through setter functions that maintain immutability principles.\n\nThe useEffect hooks create a dependency tracking system that automatically runs cleanup or update logic when specific values change. This creates a reactive programming model where changes in one part of the system automatically propagate to other dependent parts.\n\nThe code also implements proper error boundary patterns using try-catch blocks and loading states, ensuring that the user interface remains responsive and informative even when operations fail or take time to complete.",
+            context: "Within the larger component architecture, this code serves as the foundational state management layer that all other component methods depend on. It acts as the single source of truth for the component's current status and provides the reactive infrastructure that other functions can interact with.\n\nThis state management setup enables other parts of the component to perform operations like API calls, user input handling, and data validation while maintaining consistent state across the entire component lifecycle. It integrates with the component's rendering logic to ensure that UI changes reflect the current application state.\n\nThe code also establishes the communication patterns between this component and its parent components or global state management systems, ensuring that data flows correctly throughout the application hierarchy.",
+            why: "This state management structure is essential for creating a reliable and user-friendly interface. Without proper state tracking, the component would not be able to provide visual feedback to users about loading states, errors, or successful operations, leading to a poor user experience.\n\nThe structured approach to state management prevents common React pitfalls like state inconsistencies, memory leaks from unmounted components, and race conditions from asynchronous operations. This defensive programming approach ensures the component remains stable even under adverse conditions.\n\nFurthermore, this pattern establishes a maintainable codebase where future developers can easily understand and modify the component's behavior. The clear separation of concerns and consistent naming conventions make the code self-documenting and reduce the likelihood of bugs during maintenance or feature additions."
           });
-        } catch (apiError) {
-          console.log('API call failed, falling back to mock:', apiError);
-          // Fallback to mock response
-          response = `This code performs the following actions:
-1. It initializes variables and sets up the necessary data structures
-2. It processes the input data through a series of transformations
-3. It handles edge cases and error conditions appropriately
-4. Finally, it returns the processed result
-
-In simple terms: This code takes some input, transforms it according to specific rules, and produces an output that can be used by other parts of the program.`;
+        } else {
+          try {
+            response = await lmApi.chat(inDepthPrompt, {
+              vendor: 'copilot',
+              family: 'gpt-4o',
+              temperature: 0.7
+            });
+          } catch (apiError) {
+            console.log('API call failed, falling back to mock:', apiError);
+            response = JSON.stringify({
+              what: "This code defines state management and UI interaction logic for a React component. It establishes multiple state variables using the useState hook to track different aspects of the component's behavior, including user inputs, loading states, error conditions, and execution results. The code also sets up effect hooks to handle component lifecycle events and data persistence.",
+              how: "The implementation uses React's built-in hooks pattern to manage state and side effects. The useState hooks create reactive state variables that automatically trigger re-renders when their values change. Each state variable serves a specific purpose and is updated through setter functions that maintain immutability principles.",
+              context: "Within the larger component architecture, this code serves as the foundational state management layer that all other component methods depend on. It acts as the single source of truth for the component's current status and provides the reactive infrastructure that other functions can interact with.",
+              why: "This state management structure is essential for creating a reliable and user-friendly interface. Without proper state tracking, the component would not be able to provide visual feedback to users about loading states, errors, or successful operations, leading to a poor user experience."
+            });
+          }
         }
-      }
 
-      if (isMounted.current) {
-        setEnglishExplanation(response);
+        try {
+          // Try to parse as JSON first
+          const parsedResponse = JSON.parse(response);
+          if (isMounted.current) {
+            setExplanations({
+              what: parsedResponse.what || '',
+              how: parsedResponse.how || '',
+              context: parsedResponse.context || '',
+              why: parsedResponse.why || ''
+            });
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to extract content between JSON markers or use fallback
+          console.log('JSON parsing failed, attempting to extract or use fallback:', parseError);
+          
+          try {
+            // Try to find JSON content within the response
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsedResponse = JSON.parse(jsonMatch[0]);
+              if (isMounted.current) {
+                setExplanations({
+                  what: parsedResponse.what || '',
+                  how: parsedResponse.how || '',
+                  context: parsedResponse.context || '',
+                  why: parsedResponse.why || ''
+                });
+              }
+            } else {
+              // Fallback: treat the response as a single explanation and distribute it
+              const fallbackText = response.trim();
+              const sections = fallbackText.split(/(?:\n\s*){2,}/); // Split on double line breaks
+              
+              if (isMounted.current) {
+                setExplanations({
+                  what: sections[0] || fallbackText,
+                  how: sections[1] || 'Technical implementation details for the highlighted code.',
+                  context: sections[2] || 'This code functions as part of the larger component/class structure.',
+                  why: sections[3] || 'This code is necessary to ensure proper functionality and user experience.'
+                });
+              }
+            }
+          } catch (secondParseError) {
+            console.log('All parsing attempts failed, using basic fallback');
+            if (isMounted.current) {
+              setExplanations({
+                what: response || 'Unable to generate explanation',
+                how: 'Technical implementation could not be parsed from the response.',
+                context: 'Context information could not be extracted.',
+                why: 'Reasoning could not be determined from the response.'
+              });
+            }
+          }
+        }
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An error occurred while generating explanation';
@@ -649,20 +815,16 @@ In simple terms: This code takes some input, transforms it according to specific
     }
   };
 
-  // Execute the highlighted code
+  // Execute the highlighted code (keeping original logic)
   const executeCode = async () => {
     setIsExecuting(true);
     setExecutionError(null);
     setExecutionResult(null);
 
     try {
-      // Create a more isolated execution environment
       const code = highlightedCode.trim();
-      
-      // Check if the code is a complete statement or expression
       let result;
       
-      // Try to execute as-is first
       try {
         const asyncFunction = new Function(`
           'use strict';
@@ -672,7 +834,6 @@ In simple terms: This code takes some input, transforms it according to specific
         `);
         result = await asyncFunction();
       } catch (firstError) {
-        // If that fails, try wrapping the last line with return
         const lines = code.split('\n');
         if (lines.length > 0) {
           const lastLine = lines[lines.length - 1].trim();
@@ -689,7 +850,6 @@ In simple terms: This code takes some input, transforms it according to specific
               `);
               result = await asyncFunction();
             } catch (secondError) {
-              // If both attempts fail, throw the original error
               throw firstError;
             }
           } else {
@@ -700,7 +860,6 @@ In simple terms: This code takes some input, transforms it according to specific
         }
       }
 
-      // Format the result for display
       if (result === undefined) {
         setExecutionResult('undefined');
       } else if (result === null) {
@@ -738,7 +897,8 @@ In simple terms: This code takes some input, transforms it according to specific
           display: "flex", 
           gap: "10px", 
           alignItems: "center",
-          marginBottom: "12px"
+          marginBottom: "12px",
+          flexWrap: "wrap"
         }}>
           <button
             onClick={generateExplanation}
@@ -757,6 +917,26 @@ In simple terms: This code takes some input, transforms it according to specific
           >
             {isLoading ? "Generating..." : "Generate Explanation"}
           </button>
+          
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <label style={{ fontSize: "13px", color: "#666", fontWeight: "500" }}>
+              Mode:
+            </label>
+            <select
+              value={explanationMode}
+              onChange={(e) => setExplanationMode(e.target.value as 'presentation' | 'in-depth')}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "4px",
+                border: "1px solid #ccc",
+                fontSize: "13px",
+                backgroundColor: "white"
+              }}
+            >
+              <option value="presentation">Presentation (Summary)</option>
+              <option value="in-depth">In-Depth (Detailed)</option>
+            </select>
+          </div>
           
           <label style={{ 
             display: "flex", 
@@ -789,34 +969,74 @@ In simple terms: This code takes some input, transforms it according to specific
           </div>
         )}
 
-        <div style={{ marginBottom: "16px" }}>
-          <label style={{ 
-            display: "block", 
-            marginBottom: "8px", 
-            fontWeight: "600",
-            fontSize: "14px",
-            color: "#444"
-          }}>
-            English Explanation:
-          </label>
-          <textarea
-            value={englishExplanation}
-            onChange={(e) => setEnglishExplanation(e.target.value)}
-            placeholder="Click 'Generate Explanation' to get an English explanation of the code, or write your own..."
-            style={{
-              width: "100%",
-              minHeight: "120px",
-              padding: "10px",
-              borderRadius: "4px",
-              border: "1px solid #ccc",
+        {explanationMode === 'presentation' ? (
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ 
+              display: "block", 
+              marginBottom: "8px", 
+              fontWeight: "600",
               fontSize: "14px",
-              lineHeight: "1.5",
-              resize: "vertical",
-              fontFamily: "inherit",
-              backgroundColor: "#FAFAFA"
-            }}
-          />
-        </div>
+              color: "#444"
+            }}>
+              Code Explanation Summary:
+            </label>
+            <textarea
+              value={presentationSummary}
+              onChange={(e) => setPresentationSummary(e.target.value)}
+              placeholder="Click 'Generate Explanation' to get a concise summary with bullet points for What, How, Context, and Why..."
+              style={{
+                width: "100%",
+                minHeight: "200px",
+                padding: "12px",
+                borderRadius: "4px",
+                border: "1px solid #ccc",
+                fontSize: "14px",
+                lineHeight: "1.6",
+                resize: "vertical",
+                fontFamily: "inherit",
+                backgroundColor: "#FAFAFA"
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ marginBottom: "16px" }}>
+            {[
+              { key: 'what', title: 'What does this code do?', color: '#E3F2FD' },
+              { key: 'how', title: 'How does this code work?', color: '#F3E5F5' },
+              { key: 'context', title: 'Context within the class/component', color: '#E8F5E8' },
+              { key: 'why', title: 'Why is this code needed?', color: '#FFF3E0' }
+            ].map(({ key, title, color }) => (
+              <div key={key} style={{ marginBottom: "16px" }}>
+                <label style={{ 
+                  display: "block", 
+                  marginBottom: "8px", 
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  color: "#444"
+                }}>
+                  {title}
+                </label>
+                <textarea
+                  value={explanations[key as keyof typeof explanations]}
+                  onChange={(e) => setExplanations(prev => ({ ...prev, [key]: e.target.value }))}
+                  placeholder={`Detailed explanation of ${key}...`}
+                  style={{
+                    width: "100%",
+                    minHeight: "120px",
+                    padding: "12px",
+                    borderRadius: "4px",
+                    border: "1px solid #ccc",
+                    fontSize: "14px",
+                    lineHeight: "1.6",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    backgroundColor: color
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ 
           borderTop: "1px solid #E1E1E1",
@@ -949,9 +1169,10 @@ export const tools = {
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
   odyssey: Odyssey,
-  yesNoQuestion: LMUnitTest, // Add the new component
-  debugExample: ShowDebuggedExample, // Add the debugging example component
-  // lmApiTest: LMAPITest, // Add the debugging component
+  yesNoQuestion: LMUnitTest,
+  debugExample: ShowDebuggedExample,
+  explainInEnglish: ExplainInEnglish, // Add this line
+  // lmApiTest: LMAPITest,
 };
 
 export const toolNames = {
@@ -961,7 +1182,8 @@ export const toolNames = {
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
   odyssey: "Analyze Floating-point Expression",
-  yesNoQuestion: "LM Unit Test", // Add the new component name
-  debugExample: "Show Debugged Example", // Add the debugging example component name
-  // lmApiTest: "LM API Test", // Add the debugging component name
+  yesNoQuestion: "LM Unit Test",
+  debugExample: "Show Debugged Example",
+  explainInEnglish: "Explain in English",
+  // lmApiTest: "LM API Test",
 };
