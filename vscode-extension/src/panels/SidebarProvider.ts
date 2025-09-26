@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { BaseAnnotationView } from "./BaseAnnotationView";
+import { userComponents } from "../extension";
 
 export class SidebarProvider extends BaseAnnotationView implements vscode.WebviewViewProvider {
   public static readonly viewType = "codetations-annotations";
@@ -42,6 +43,14 @@ export class SidebarProvider extends BaseAnnotationView implements vscode.Webvie
     if (vscode.window.activeTextEditor) {
       this._loadAnnotationsForActiveEditor();
     }
+    
+    // Send user components to the webview on initialization
+    setTimeout(() => {
+      this.sendMessageObject({
+        command: 'refreshComponents',
+        components: userComponents
+      });
+    }, 500);
     
     // Handle panel disposal
     webviewView.onDidDispose(() => {

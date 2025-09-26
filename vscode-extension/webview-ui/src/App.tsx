@@ -2,7 +2,7 @@ import { vscode } from "./utilities/vscode";
 import "./App.css";
 import Annotation from "./Annotation";
 import { tools, toolNames } from "./tools";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 
 interface AnnotationUpdate {
   document?: string;
@@ -19,9 +19,50 @@ type ToolTypes = {
   [key: string]: React.FC<AnnotationEditorProps>;
 };
 
-const toolTypes: ToolTypes = {
+// Base tool types from our internal components
+const baseToolTypes: ToolTypes = {
   ...tools,
 };
+
+// Dynamic user-defined components will be stored here
+let userToolTypes: ToolTypes = {};
+let userToolNames: { [key: string]: string } = {};
+
+// Function to dynamically load a user component
+function loadUserComponent(componentPath: string) {
+  console.log(`Attempting to load component from path: ${componentPath}`);
+  
+  try {
+    // Convert file:// URL to a relative path if needed
+    let path = componentPath;
+    if (path.startsWith('file://')) {
+      // Remove file:// prefix and convert to a format that works with dynamic imports
+      path = path.replace(/^file:\/\//, '');
+      console.log(`Converted path to: ${path}`);
+    }
+    
+    // For testing purposes, let's also log what we're trying to import
+    console.log(`Dynamic import path: ${path}`);
+    
+    // Dynamic imports have different behavior in different environments
+    // In vite/browser context, they need to be relative or absolute URLs
+    return lazy(() => {
+      console.log(`Actually importing: ${path}`);
+      return import(/* @vite-ignore */ path)
+        .then(module => {
+          console.log(`Import succeeded for ${path}, module:`, module);
+          return module;
+        })
+        .catch(err => {
+          console.error(`Import failed for ${path}:`, err);
+          throw err;
+        });
+    });
+  } catch (error) {
+    console.error(`Error setting up dynamic import for ${componentPath}:`, error);
+    return null;
+  }
+}
 
 function AnnotationEditorContainer(props: {
   value: Annotation;
@@ -33,30 +74,41 @@ function AnnotationEditorContainer(props: {
   onDelete: (id: string) => void;
 }) {
   const { value, setValue, setSelectedAnnotationId, onDelete } = props;
+  
+  // Combine base and user-defined tool types
+  const allToolTypes = { ...baseToolTypes, ...userToolTypes };
+  const ToolComponent = allToolTypes[value.tool];
 
   return (
     <div className="annotation-container">
-      {toolTypes[value.tool]?.({
-        value,
-        setValue: (v: AnnotationUpdate) =>
-          setValue({ ...value, document: v.document, metadata: v.metadata }),
-        utils: {
-          getText: () => value.document.slice(value.start, value.end),
-          setText: (newText: string) => {
-            setValue({
-              document:
-                value.document.slice(0, value.start) + newText + value.document.slice(value.end),
-              metadata: value.metadata,
-            });
-          },
-          setMetadata: (newMetadata: any) => {
-            setValue({
-              document: value.document,
-              metadata: { ...value.metadata, ...newMetadata },
-            });
-          },
-        },
-      })}
+      {ToolComponent ? (
+        <Suspense fallback={<div>Loading component...</div>}>
+          <ToolComponent
+            value={value}
+            setValue={(v: AnnotationUpdate) =>
+              setValue({ ...value, document: v.document, metadata: v.metadata })
+            }
+            utils={{
+              getText: () => value.document.slice(value.start, value.end),
+              setText: (newText: string) => {
+                setValue({
+                  document:
+                    value.document.slice(0, value.start) + newText + value.document.slice(value.end),
+                  metadata: value.metadata,
+                });
+              },
+              setMetadata: (newMetadata: any) => {
+                setValue({
+                  document: value.document,
+                  metadata: { ...value.metadata, ...newMetadata },
+                });
+              },
+            }}
+          />
+        </Suspense>
+      ) : (
+        <div>Component not found: {value.tool}</div>
+      )}
     </div>
   );
 }
@@ -292,54 +344,26 @@ function AddNoteBanner(props: {
   onCancel: () => void;
   toolTypes: ToolTypes;
 }) {
-  const { onConfirm, selectedTool, setSelectedTool, toolTypes } = props;
-
+  // Combine base and user tool names
+  const allToolNames = { ...toolNames, ...userToolNames };
+  
   return (
-    <div className="add-note-banner" style={{
-      position: 'fixed',
-      bottom: 0,     // Changed from top: 0 to bottom: 0
-      left: 0,
-      right: 0,
-      zIndex: 100,
-      backgroundColor: '#f8f9fa',
-      borderTop: '1px solid #dee2e6',  // Changed from borderBottom to borderTop
-      padding: '12px 16px',
-      boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',  // Inverted shadow direction
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontWeight: 'bold' }}>Add Note:</span>
-        <select
-          value={selectedTool || ''}
-          onChange={(e) => setSelectedTool(e.target.value)}
-          style={{ 
-            padding: '6px 10px',
-            borderRadius: '4px',
-            border: '1px solid #ced4da'
-          }}
-        >
-          {Object.keys(toolTypes).map((toolKey) => (
-            <option key={toolKey} value={toolKey}>
-              {toolNames[toolKey as keyof typeof toolNames]}
-            </option>
-          ))}
-        </select>
+    <div className="add-note-banner">
+      <div className="add-note-title">Choose annotation type:</div>
+      <div className="add-note-tools">
+        {Object.entries(allToolNames).map(([key, name]) => (
+          <div
+            key={key}
+            className={`add-note-tool ${props.selectedTool === key ? "selected" : ""}`}
+            onClick={() => props.setSelectedTool(key)}>
+            {name}
+          </div>
+        ))}
       </div>
-      <div>
-        <button 
-          onClick={onConfirm}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: '#0d6efd',
-            border: 'none',
-            borderRadius: '4px',
-            color: 'white',
-            cursor: 'pointer'
-          }}
-        >
-          Add Note
+      <div className="add-note-actions">
+        <button onClick={props.onCancel}>Cancel</button>
+        <button onClick={props.onConfirm} disabled={!props.selectedTool}>
+          Create
         </button>
       </div>
     </div>
@@ -347,31 +371,128 @@ function AddNoteBanner(props: {
 }
 
 function App() {
-  // State for document and annotations
-  const [documentUri, setDocumentUri] = useState<string | undefined>(undefined);
-  const [documentText, setDocumentText] = useState<string>("");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-
-  // UI state
-  const [charNum, setCharNum] = useState<number | undefined>(undefined);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | undefined>(undefined);
+  const [documentText, setDocumentText] = useState<string>("");
+  const [documentUri, setDocumentUri] = useState<string>("");
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | undefined>(undefined);
-  const [chooseAnnotationType, setChooseAnnotationType] = useState<boolean>(false);
-  const [confirmAnnotation, setConfirmAnnotation] = useState<boolean>(false);
-  
-  // Annotation creation state
-  const [start, setStart] = useState<number | undefined>(undefined);
-  const [end, setEnd] = useState<number | undefined>(undefined);
-  const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
-  const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
-  
-  // Track current selection in editor
-  const [currentSelection, setCurrentSelection] = useState<{start: number, end: number} | null>(null);
-  const hasSelection = currentSelection && currentSelection.start !== currentSelection.end;
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | undefined>(undefined);
+  const [charNum, setCharNum] = useState<number | undefined>(undefined);
+  const [isOutOfSync, setIsOutOfSync] = useState<boolean>(false);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [selectedTool, setSelectedTool] = useState<string | undefined>(undefined);
+  const [showRetagBanner, setShowRetagBanner] = useState<boolean>(false);
+  const [addingAnnotationRange, setAddingAnnotationRange] = useState<
+    { start: number; end: number } | undefined
+  >(undefined);
 
-  const showRetagBanner = annotations.some((annotation) =>
-    isAnnotationOutOfSync(annotation, documentText)
-  );
+  // ... rest of the existing code ...
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      console.log("Received message:", message);
+
+      switch (message.command) {
+        case "initialize":
+          setDocumentText(message.data.documentText);
+          setDocumentUri(message.data.documentUri);
+          setAnnotations(message.data.annotations);
+          break;
+        case "refreshComponents":
+          // Load user-defined components
+          loadUserDefinedComponents(message.components);
+          break;
+        case "addAnnotation":
+          // Handle add annotation request
+          setIsAdding(true);
+          setAddingAnnotationRange({
+            start: message.data.start,
+            end: message.data.end
+          });
+          break;
+        case "updateAnnotations":
+          // Update annotations list
+          if (message.data.documentUri === documentUri) {
+            setAnnotations(message.data.annotations || []);
+            if (message.data.documentText) {
+              setDocumentText(message.data.documentText);
+            }
+          }
+          break;
+        case "handleCursorPositionChange":
+          // Handle cursor position change
+          setCharNum(message.data.position);
+          break;
+        case "chooseAnnotationType":
+          // Set up for annotation type selection
+          setIsAdding(true);
+          setAddingAnnotationRange({
+            start: message.data.start,
+            end: message.data.end
+          });
+          if (message.data.documentContent) {
+            setDocumentText(message.data.documentContent);
+          }
+          break;
+        case "removeAnnotation":
+          // Handled by parent, but we may want to update UI state
+          if (selectedAnnotationId === message.data.annotationId) {
+            setSelectedAnnotationId(undefined);
+          }
+          break;
+        case "setAnnotationColor":
+          // Update is handled by the extension
+          break;
+        // ... existing cases ...
+      }
+    };
+
+    // Register the event listener
+    window.addEventListener("message", handleMessage);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, []);
+
+  // Function to load user-defined components
+  const loadUserDefinedComponents = (components: { [key: string]: { name: string; path: string } }) => {
+    console.log("loadUserDefinedComponents called with:", components);
+    
+    const newUserToolTypes: ToolTypes = {};
+    const newUserToolNames: { [key: string]: string } = {};
+    
+    // Process each component
+    if (!components || Object.keys(components).length === 0) {
+      console.warn("No components received in loadUserDefinedComponents");
+      return;
+    }
+    
+    for (const [key, component] of Object.entries(components)) {
+      console.log(`Processing component: ${key} with path: ${component.path}`);
+      try {
+        // Load the component dynamically
+        const UserComponent = loadUserComponent(component.path);
+        if (UserComponent) {
+          console.log(`Successfully loaded component: ${key}`);
+          newUserToolTypes[key] = UserComponent;
+          newUserToolNames[key] = component.name;
+        } else {
+          console.warn(`Component loaded but is null/undefined: ${key}`);
+        }
+      } catch (error) {
+        console.error(`Failed to load component ${component.name}:`, error);
+      }
+    }
+    
+    // Update the user components
+    userToolTypes = newUserToolTypes;
+    userToolNames = newUserToolNames;
+    
+    console.log("Updated user components:", Object.keys(userToolTypes));
+    console.log("Updated user tool names:", userToolNames);
+  };
 
   // Utility functions
   const showErrorMessage = (error: string) => {
@@ -390,37 +511,23 @@ function App() {
     });
   };
 
-  const handleChooseAnnType = (start: number, end: number, documentContent: string) => {
-    setChooseAnnotationType(true);
-    setStart(start);
-    setEnd(end);
-    setDocumentText(documentContent);
-  };
-
-  const handleAddAnnotation = (start: number, end: number) => {
-    setStart(start);
-    setEnd(end);
-    // Instead of showing confirmation dialog, just set hasSelection to enable the banner
-  };
-
-  // Rename this function to be clearer since it now directly adds the annotation
   const handleCreateAnnotation = () => {
-    // Update state once the add note button is clicked
-    setConfirmAnnotation(false);
-    setChooseAnnotationType(false);
-    setCurrentSelection(null);
-
-    if (start === undefined || end === undefined) {
+    // Update state
+    setIsAdding(false);
+    
+    if (!addingAnnotationRange) {
       showErrorMessage("Error adding annotations: no highlighted text");
       return;
     }
 
+    const { start, end } = addingAnnotationRange;
+    
     if (start === end) {
       showErrorMessage("Error adding annotations: selection must not be empty");
       return;
     }
 
-    if (!newTool) {
+    if (!selectedTool) {
       showErrorMessage("Error adding annotations: no tool selected");
       return;
     }
@@ -454,7 +561,7 @@ function App() {
       start,
       end,
       document: documentText,
-      tool: newTool,
+      tool: selectedTool,
       metadata: {
         color: annotationColor
       },
@@ -484,148 +591,37 @@ function App() {
     }
   };
 
-  const handleRemoveAnnotation = () => {
-    if (!selectedAnnotationId) {
-      showErrorMessage("Error removing annotations: no selected annotation");
-      return;
-    }
-    
-    vscode.postMessage({
-      command: "removeAnnotation",
-      data: { annotationId: selectedAnnotationId }
-    });
-    
-    setSelectedAnnotationId(undefined);
-  };
-
-  const handleSetAnnotationColor = (color: string) => {
-    if (!selectedAnnotationId) {
-      showErrorMessage("Error setting annotation color: no selected annotation");
-      return;
-    }
-    
-    vscode.postMessage({
-      command: "setAnnotationColor",
-      data: {
-        annotationId: selectedAnnotationId,
-        color
-      }
-    });
-  };
-
   const handleCancelAddAnnotation = () => {
-    setConfirmAnnotation(false);
-    setStart(undefined);
-    setEnd(undefined);
+    setIsAdding(false);
+    setAddingAnnotationRange(undefined);
   };
 
+  // Add a useEffect to check if annotations need retagging
   useEffect(() => {
-    // Message handler for communication with extension
-    const handleMessage = (event: MessageEvent) => {
-      const message = JSON.parse(event.data);
-      console.debug("Received message:", message);
-      
-      switch (message.command) {
-        case "initialize":
-          // Initialize the UI with document data and annotations
-          setDocumentUri(message.data.documentUri);
-          setDocumentText(message.data.documentText);
-          setAnnotations(message.data.annotations || []);
-          return;
-          
-        case "updateAnnotations":
-          // Update annotations from extension
-          if (message.data.documentUri === documentUri) {
-            setAnnotations(message.data.annotations || []);
-            setDocumentText(message.data.documentText);
-          }
-          return;
-          
-        case "handleCursorPositionChange":
-          // Handle cursor position change
-          setCharNum(message.data.position);
-          // Track selection state
-          if (message.data.selection) {
-            const selection = message.data.selection;
-            if (selection.start === selection.end) {
-              setCurrentSelection(null);
-            } else {
-              setCurrentSelection({
-                start: selection.start,
-                end: selection.end
-              });
-              setStart(selection.start);
-              setEnd(selection.end);
-            }
-          }
-          return;
-          
-        case "addAnnotation":
-          // Start annotation creation flow
-          handleAddAnnotation(message.data.start, message.data.end);
-          return;
-          
-        case "removeAnnotation":
-          // Remove selected annotation
-          handleRemoveAnnotation();
-          return;
-          
-        case "setAnnotationColor":
-          // Set color for selected annotation
-          handleSetAnnotationColor(message.data.color);
-          return;
-          
-        case "chooseAnnotationType":
-          // Choose annotation type
-          handleChooseAnnType(message.data.start, message.data.end, message.data.documentContent);
-          return;
-      }
-    };
-    
-    window.addEventListener("message", handleMessage);
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [documentUri]);
+    // Check if any annotations need to be retagged
+    const needsRetag = annotations.some(annotation => 
+      isAnnotationOutOfSync(annotation, documentText)
+    );
+    setShowRetagBanner(needsRetag);
+  }, [annotations, documentText]);
 
-  // Find the selected annotation based on the character position
-  useEffect(() => {
-    if (charNum !== undefined) {
-      const annotation = annotations.find(
-        (annotation) => annotation.start <= charNum && annotation.end >= charNum
-      );
-      if (annotation) {
-        // Set the selected annotation id
-        vscode.postMessage({
-          command: "setSelectedAnnotationId",
-          data: {
-            annotationId: annotation.id
-          }
-        });
-        setSelectedAnnotationId(annotation.id);
-      }
-    }
-  }, [charNum, annotations]);
+  // ... rest of the existing code ...
 
-  if (!chooseAnnotationType) {
-    return (
-      <main>
-        {hasSelection && (
-          <AddNoteBanner
-            onConfirm={handleCreateAnnotation}
-            selectedTool={newTool}
-            setSelectedTool={setNewTool}
-            onCancel={handleCancelAddAnnotation}
-            toolTypes={toolTypes}
-          />
-        )}
-        
-        {showRetagBanner && (
-          <RetagBanner 
-            onRetag={handleRetag} 
-          />
-        )}
-        
+  return (
+    <div className="App">
+      {showRetagBanner && <RetagBanner onRetag={handleRetag} />}
+      {isAdding && (
+        <AddNoteBanner
+          onConfirm={handleCreateAnnotation}
+          selectedTool={selectedTool}
+          setSelectedTool={setSelectedTool}
+          onCancel={handleCancelAddAnnotation}
+          toolTypes={{ ...baseToolTypes, ...userToolTypes }}
+        />
+      )}
+      {annotations.length === 0 ? (
+        <div className="no-annotations">No annotations found</div>
+      ) : (
         <AnnotationSidebarView
           annotations={annotations}
           setAnnotations={setAnnotations}
@@ -637,88 +633,9 @@ function App() {
           setHoveredAnnotationId={setHoveredAnnotationId}
           onDeleteAnnotation={handleDeleteAnnotation}
         />
-
-        {!hasSelection && (
-          <p>To add more annotations, highlight text in the editor and choose a note type.</p>
-        )}
-      </main>
-    );
-  } else {
-    return (
-      <main>
-        <div className="choose-annotation-type" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #dee2e6',
-          padding: '12px 16px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>Choose Annotation Type</div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <select
-              value={newTool || ''}
-              onChange={(e) => {
-                setNewTool(e.target.value);
-              }}
-              style={{ 
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: '1px solid #ced4da',
-                flexGrow: 1
-              }}
-            >
-              {Object.keys(toolTypes).map((toolKey) => (
-                <option key={toolKey} value={toolKey}>
-                  {toolNames[toolKey as keyof typeof toolNames]}
-                </option>
-              ))}
-            </select>
-            <button 
-              onClick={handleCreateAnnotation}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#0d6efd',
-                border: 'none',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Submit
-            </button>
-            <button 
-              onClick={handleCancelAddAnnotation}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #ced4da',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-        
-        <AnnotationSidebarView
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-          documentText={documentText}
-          charNum={charNum}
-          selectedAnnotationId={selectedAnnotationId}
-          setSelectedAnnotationId={setSelectedAnnotationId}
-          hoveredAnnotationId={hoveredAnnotationId}
-          setHoveredAnnotationId={setHoveredAnnotationId}
-          onDeleteAnnotation={handleDeleteAnnotation}
-        />
-      </main>
-    );
-  }
+      )}
+    </div>
+  );
 }
 
 export default App;

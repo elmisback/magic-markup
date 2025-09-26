@@ -45,6 +45,10 @@
       {
         "command": "codetations.moveSelected",
         "title": "Codetations: Move Selected"
+      },
+      {
+        "command": "codetations.compileUserComponents",
+        "title": "Codetations: Compile User Components"
       }
     ],
     "menus": {
@@ -96,6 +100,10 @@
     "eslint": "^7.19.0",
     "glob": "^7.1.6",
     "prettier": "^2.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "typescript": "^4.9.5",
     "vscode-test": "^1.5.0"
   },
@@ -103,6 +111,7 @@
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "diff": "^8.0.0-beta",
+    "esbuild": "^0.19.4",
     "express": "^4.19.2",
     "openai": "^4.53.2",
     "ws": "^8.18.0"
