@@ -3,6 +3,11 @@ import "./App.css";
 import Annotation from "./Annotation";
 import { tools, toolNames } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
+import DarkModeToggle from "./DarkModeToggle";
+import Header from "./Header";
+import EmptyState from "./EmptyState";
+import AnnotationTile from "./AnnotationTile";
+import AddAnnotationBanner from "./AddAnnotationBanner";
 
 interface AnnotationUpdate {
   document?: string;
@@ -108,7 +113,10 @@ function AnnotationSidebarView(props: {
         annotationRefs &&
         annotationRefs.current[closestAnnotationIndex]
       ) {
-        annotationRefs.current[closestAnnotationIndex]?.scrollIntoView({ behavior: "smooth" });
+        annotationRefs.current[closestAnnotationIndex]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest"
+        });
       }
     }
   }, [charNum, annotations]);
@@ -127,14 +135,14 @@ function AnnotationSidebarView(props: {
     if (startElement) {
       startElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    
+
     // Send message to jump to annotation in editor
     vscode.postMessage({
       command: "jumpToAnnotation",
       data: {
         start: value.start,
         end: value.end,
-        annotationId: value.id  // Add the annotation ID
+        annotationId: value.id
       }
     });
 
@@ -149,16 +157,16 @@ function AnnotationSidebarView(props: {
 
   const handleAnnotationUpdate = (id: string, value: AnnotationUpdate) => {
     console.log("Updating annotation:", id, value);
-    
+
     const annotation = annotations.find(a => a.id === id);
     if (!annotation) return;
-    
+
     const updatedAnnotation = {
       ...annotation,
       ...(value.document ? { document: value.document } : {}),
       ...(value.metadata ? { metadata: { ...annotation.metadata, ...value.metadata } } : {})
     };
-    
+
     // Send update to extension
     vscode.postMessage({
       command: "updateAnnotation",
@@ -173,84 +181,50 @@ function AnnotationSidebarView(props: {
     onDeleteAnnotation(id);
   };
 
+  if (annotations.length === 0) {
+    return (
+      <EmptyState
+        title="No Annotations Yet"
+        message="Highlight text in the editor and click 'Add Note' to create annotations."
+        icon={
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        }
+      />
+    );
+  }
+
   return (
-    <>
+    <div className="annotations-list">
       {[...annotations].sort(key((a: Annotation) => a.start)).map((annotation, index) => (
         <div
           key={annotation.id}
           ref={(ref) => (annotationRefs.current[index] = ref)}
-          className={`annotation-tile ${
-            props.selectedAnnotationId === annotation.id ? "selected" : ""
-          }`}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-            // use color from annotation metadata for left side if available
-            borderLeft: annotation.metadata?.color
-              ? `5px solid ${annotation.metadata.color}`
-              : "5px solid rgba(255,255,0,0.3)",
-          }}
-          onClick={handleClick(annotation.id)}>
-          <div
-            className="annotation-info"
-            style={{
-              // use flexbox to align items
-              display: "flex",
-              gap: "4px",
-              fontSize: "smaller",
-              alignItems: "center"
-            }}>
-            <div className="line-number">
-              Line {documentText.slice(0, annotation.start).split("\n").length}
-            </div>
-            -
-            <div className="annotation-type" style={{ fontWeight: "bold" }}>
-              {toolNames[annotation.tool as keyof typeof toolNames]}
-            </div>
-            {isAnnotationOutOfSync(annotation, documentText) && (
-              <div className="needs-retag-indicator" style={{ color: "red", marginLeft: "auto" }}>
-                Needs Retag
-              </div>
-            )}
-            <button 
-              className="delete-button"
-              onClick={(e) => handleDeleteClick(annotation.id, e)}
-              style={{
-                marginLeft: "auto",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#d32f2f",
-                fontSize: "12px",
-                padding: "4px 8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              title="Delete Annotation"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
-            </button>
-          </div>
-          <AnnotationEditorContainer
-            key={index}
-            value={annotation}
-            setValue={(value) => handleAnnotationUpdate(annotation.id, value)}
-            hoveredAnnotationId={props.hoveredAnnotationId}
-            setHoveredAnnotationId={props.setHoveredAnnotationId}
-            selectedAnnotationId={props.selectedAnnotationId}
-            setSelectedAnnotationId={props.setSelectedAnnotationId}
-            onDelete={onDeleteAnnotation}
-          />
+        >
+          <AnnotationTile
+            annotation={annotation}
+            selected={props.selectedAnnotationId === annotation.id}
+            isOutOfSync={isAnnotationOutOfSync(annotation, documentText)}
+            documentText={documentText}
+            onClick={handleClick(annotation.id)}
+            onDelete={handleDeleteClick}
+          >
+            <AnnotationEditorContainer
+              key={index}
+              value={annotation}
+              setValue={(value) => handleAnnotationUpdate(annotation.id, value)}
+              hoveredAnnotationId={props.hoveredAnnotationId}
+              setHoveredAnnotationId={props.setHoveredAnnotationId}
+              selectedAnnotationId={props.selectedAnnotationId}
+              setSelectedAnnotationId={props.setSelectedAnnotationId}
+              onDelete={onDeleteAnnotation}
+            />
+          </AnnotationTile>
         </div>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -258,19 +232,27 @@ function RetagBanner(props: {
   onRetag: () => void;
 }) {
   return (
-    <div className="retag-banner" style={{ 
-      padding: "10px", 
-      marginBottom: "10px", 
-      backgroundColor: "#ffe0e0", 
-      borderRadius: "4px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center"
-    }}>
-      <span>Document has been edited and some annotations need updating</span>
-      <div>
-        <button onClick={props.onRetag} style={{ marginRight: "8px" }}>Update Annotations</button>
+    <div className="banner retag-banner">
+      <div className="banner-content">
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>Document has been edited and some annotations need updating</span>
+        </div>
       </div>
+      <button onClick={props.onRetag} className="primary">Update Annotations</button>
     </div>
   );
 }
@@ -285,6 +267,8 @@ const isAnnotationOutOfSync = (annotation: Annotation, currentDocumentText: stri
   return currentDocumentText !== annotation.document || annotation.start === annotation.end;
 };
 
+// Kept for backwards compatibility, but no longer in use
+// Instead using the enhanced AddAnnotationBanner component
 function AddNoteBanner(props: {
   onConfirm: () => void;
   selectedTool: string | undefined;
@@ -295,54 +279,13 @@ function AddNoteBanner(props: {
   const { onConfirm, selectedTool, setSelectedTool, toolTypes } = props;
 
   return (
-    <div className="add-note-banner" style={{
-      position: 'fixed',
-      bottom: 0,     // Changed from top: 0 to bottom: 0
-      left: 0,
-      right: 0,
-      zIndex: 100,
-      backgroundColor: '#f8f9fa',
-      borderTop: '1px solid #dee2e6',  // Changed from borderBottom to borderTop
-      padding: '12px 16px',
-      boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',  // Inverted shadow direction
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontWeight: 'bold' }}>Add Note:</span>
-        <select
-          value={selectedTool || ''}
-          onChange={(e) => setSelectedTool(e.target.value)}
-          style={{ 
-            padding: '6px 10px',
-            borderRadius: '4px',
-            border: '1px solid #ced4da'
-          }}
-        >
-          {Object.keys(toolTypes).map((toolKey) => (
-            <option key={toolKey} value={toolKey}>
-              {toolNames[toolKey as keyof typeof toolNames]}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <button 
-          onClick={onConfirm}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: '#0d6efd',
-            border: 'none',
-            borderRadius: '4px',
-            color: 'white',
-            cursor: 'pointer'
-          }}
-        >
-          Add Note
-        </button>
-      </div>
-    </div>
+    <AddAnnotationBanner
+      onConfirm={onConfirm}
+      selectedTool={selectedTool}
+      setSelectedTool={setSelectedTool}
+      onCancel={props.onCancel}
+      toolTypes={toolTypes}
+    />
   );
 }
 
@@ -358,13 +301,14 @@ function App() {
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | undefined>(undefined);
   const [chooseAnnotationType, setChooseAnnotationType] = useState<boolean>(false);
   const [confirmAnnotation, setConfirmAnnotation] = useState<boolean>(false);
-  
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
   // Annotation creation state
   const [start, setStart] = useState<number | undefined>(undefined);
   const [end, setEnd] = useState<number | undefined>(undefined);
   const defaultTool = Object.keys(toolTypes).length > 0 ? Object.keys(toolTypes)[0] : undefined;
   const [newTool, setNewTool] = useState<string | undefined>(defaultTool);
-  
+
   // Track current selection in editor
   const [currentSelection, setCurrentSelection] = useState<{start: number, end: number} | null>(null);
   const hasSelection = currentSelection && currentSelection.start !== currentSelection.end;
@@ -519,20 +463,103 @@ function App() {
     setEnd(undefined);
   };
 
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newDarkModeState = !isDarkMode;
+    setIsDarkMode(newDarkModeState);
+
+    // Update body class for CSS
+    if (newDarkModeState) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+
+    // Save preference to localStorage
+    try {
+      localStorage.setItem('codetations-dark-mode', newDarkModeState ? 'true' : 'false');
+    } catch (e) {
+      console.error("Error saving dark mode preference:", e);
+    }
+
+    // Send dark mode change to extension
+    vscode.postMessage({
+      command: "setDarkMode",
+      data: {
+        isDarkMode: newDarkModeState
+      }
+    });
+  };
+
+  // Load dark mode preference on startup
+  useEffect(() => {
+    try {
+      // Try to get from localStorage
+      const savedDarkMode = localStorage.getItem('codetations-dark-mode');
+      const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      // First check localStorage, then check system preference
+      const shouldUseDarkMode = savedDarkMode
+        ? savedDarkMode === 'true'
+        : prefersDarkMode;
+
+      if (shouldUseDarkMode) {
+        setIsDarkMode(true);
+        document.body.classList.add('dark-mode');
+      }
+    } catch (e) {
+      console.error("Error loading dark mode preference:", e);
+    }
+
+    // Listen for system color scheme changes
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleColorSchemeChange = (e: MediaQueryListEvent) => {
+      // Only change if user hasn't set a preference
+      if (!localStorage.getItem('codetations-dark-mode')) {
+        setIsDarkMode(e.matches);
+        if (e.matches) {
+          document.body.classList.add('dark-mode');
+        } else {
+          document.body.classList.remove('dark-mode');
+        }
+      }
+    };
+
+    try {
+      // Add listener for system preference changes
+      darkModeMediaQuery.addEventListener('change', handleColorSchemeChange);
+      // Remove listener on cleanup
+      return () => darkModeMediaQuery.removeEventListener('change', handleColorSchemeChange);
+    } catch (e) {
+      // Fallback for older browsers that don't support addEventListener on MediaQueryList
+      console.warn("Browser doesn't support MediaQueryList.addEventListener", e);
+    }
+  }, []);
+
   useEffect(() => {
     // Message handler for communication with extension
     const handleMessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data);
       console.debug("Received message:", message);
-      
+
       switch (message.command) {
         case "initialize":
           // Initialize the UI with document data and annotations
           setDocumentUri(message.data.documentUri);
           setDocumentText(message.data.documentText);
           setAnnotations(message.data.annotations || []);
+
+          // Check if dark mode preference is present in initialization data
+          if (message.data.isDarkMode !== undefined) {
+            setIsDarkMode(message.data.isDarkMode);
+            if (message.data.isDarkMode) {
+              document.body.classList.add('dark-mode');
+            } else {
+              document.body.classList.remove('dark-mode');
+            }
+          }
           return;
-          
+
         case "updateAnnotations":
           // Update annotations from extension
           if (message.data.documentUri === documentUri) {
@@ -540,7 +567,7 @@ function App() {
             setDocumentText(message.data.documentText);
           }
           return;
-          
+
         case "handleCursorPositionChange":
           // Handle cursor position change
           setCharNum(message.data.position);
@@ -559,29 +586,29 @@ function App() {
             }
           }
           return;
-          
+
         case "addAnnotation":
           // Start annotation creation flow
           handleAddAnnotation(message.data.start, message.data.end);
           return;
-          
+
         case "removeAnnotation":
           // Remove selected annotation
           handleRemoveAnnotation();
           return;
-          
+
         case "setAnnotationColor":
           // Set color for selected annotation
           handleSetAnnotationColor(message.data.color);
           return;
-          
+
         case "chooseAnnotationType":
           // Choose annotation type
           handleChooseAnnType(message.data.start, message.data.end, message.data.documentContent);
           return;
       }
     };
-    
+
     window.addEventListener("message", handleMessage);
     return () => {
       window.removeEventListener("message", handleMessage);
@@ -610,112 +637,106 @@ function App() {
   if (!chooseAnnotationType) {
     return (
       <main>
-        {hasSelection && (
-          <AddNoteBanner
-            onConfirm={handleCreateAnnotation}
-            selectedTool={newTool}
-            setSelectedTool={setNewTool}
-            onCancel={handleCancelAddAnnotation}
-            toolTypes={toolTypes}
-          />
-        )}
-        
-        {showRetagBanner && (
-          <RetagBanner 
-            onRetag={handleRetag} 
-          />
-        )}
-        
-        <AnnotationSidebarView
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-          documentText={documentText}
-          charNum={charNum}
-          selectedAnnotationId={selectedAnnotationId}
-          setSelectedAnnotationId={setSelectedAnnotationId}
-          hoveredAnnotationId={hoveredAnnotationId}
-          setHoveredAnnotationId={setHoveredAnnotationId}
-          onDeleteAnnotation={handleDeleteAnnotation}
+        <Header
+          isDarkMode={isDarkMode}
+          toggleDarkMode={toggleDarkMode}
+          onRetag={handleRetag}
+          needsRetagging={showRetagBanner}
         />
 
-        {!hasSelection && (
-          <p>To add more annotations, highlight text in the editor and choose a note type.</p>
-        )}
+        <div className="app-container">
+          <div className="content-area">
+            {showRetagBanner && (
+              <RetagBanner onRetag={handleRetag} />
+            )}
+
+            <AnnotationSidebarView
+              annotations={annotations}
+              setAnnotations={setAnnotations}
+              documentText={documentText}
+              charNum={charNum}
+              selectedAnnotationId={selectedAnnotationId}
+              setSelectedAnnotationId={setSelectedAnnotationId}
+              hoveredAnnotationId={hoveredAnnotationId}
+              setHoveredAnnotationId={setHoveredAnnotationId}
+              onDeleteAnnotation={handleDeleteAnnotation}
+            />
+          </div>
+
+          {hasSelection && (
+            <AddAnnotationBanner
+              onConfirm={handleCreateAnnotation}
+              selectedTool={newTool}
+              setSelectedTool={setNewTool}
+              onCancel={handleCancelAddAnnotation}
+              toolTypes={toolTypes}
+            />
+          )}
+        </div>
       </main>
     );
   } else {
     return (
       <main>
-        <div className="choose-annotation-type" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #dee2e6',
-          padding: '12px 16px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>Choose Annotation Type</div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <select
-              value={newTool || ''}
-              onChange={(e) => {
-                setNewTool(e.target.value);
-              }}
-              style={{ 
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: '1px solid #ced4da',
-                flexGrow: 1
-              }}
-            >
-              {Object.keys(toolTypes).map((toolKey) => (
-                <option key={toolKey} value={toolKey}>
-                  {toolNames[toolKey as keyof typeof toolNames]}
-                </option>
-              ))}
-            </select>
-            <button 
-              onClick={handleCreateAnnotation}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#0d6efd',
-                border: 'none',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Submit
-            </button>
-            <button 
-              onClick={handleCancelAddAnnotation}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #ced4da',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
+        <Header
+          isDarkMode={isDarkMode}
+          toggleDarkMode={toggleDarkMode}
+          needsRetagging={false}
+        />
+
+        <div className="app-container">
+          <div className="content-area">
+            <div className="banner">
+              <div className="banner-content">
+                <h3>Choose Annotation Type</h3>
+                <p>Select the type of annotation you would like to create</p>
+
+                <div className="form-control">
+                  <select
+                    value={newTool || ''}
+                    onChange={(e) => {
+                      setNewTool(e.target.value);
+                    }}
+                    className="annotation-type-select"
+                  >
+                    {Object.keys(toolTypes).map((toolKey) => (
+                      <option key={toolKey} value={toolKey}>
+                        {toolNames[toolKey as keyof typeof toolNames]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="button-group">
+                  <button
+                    onClick={handleCreateAnnotation}
+                    className="primary"
+                  >
+                    Create Annotation
+                  </button>
+                  <button
+                    onClick={handleCancelAddAnnotation}
+                    className="secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <AnnotationSidebarView
+              annotations={annotations}
+              setAnnotations={setAnnotations}
+              documentText={documentText}
+              charNum={charNum}
+              selectedAnnotationId={selectedAnnotationId}
+              setSelectedAnnotationId={setSelectedAnnotationId}
+              hoveredAnnotationId={hoveredAnnotationId}
+              setHoveredAnnotationId={setHoveredAnnotationId}
+              onDeleteAnnotation={handleDeleteAnnotation}
+            />
           </div>
         </div>
-        
-        <AnnotationSidebarView
-          annotations={annotations}
-          setAnnotations={setAnnotations}
-          documentText={documentText}
-          charNum={charNum}
-          selectedAnnotationId={selectedAnnotationId}
-          setSelectedAnnotationId={setSelectedAnnotationId}
-          hoveredAnnotationId={hoveredAnnotationId}
-          setHoveredAnnotationId={setHoveredAnnotationId}
-          onDeleteAnnotation={handleDeleteAnnotation}
-        />
       </main>
     );
   }
