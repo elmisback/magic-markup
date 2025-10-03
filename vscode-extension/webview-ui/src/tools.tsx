@@ -1161,6 +1161,487 @@ Each value should be a single string with 3-5 sentences. Do not include any mark
     </div>
   );
 };
+
+
+const OutputVisualizer: AnnotationType = (props) => {
+  // highlighted code & full document
+  const highlightedCode: string = props.utils.getText() || "";
+  const documentText: string = (props.value && (props.value.document || props.value.document)) || "";
+  const startPos = props.value?.start ?? 0;
+  const endPos = props.value?.end ?? 0;
+
+  // UI / state
+  const [intendedFunction, setIntendedFunction] = useState<string>(props.value?.metadata?.intendedFunction || "");
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [actualOutput, setActualOutput] = useState<string | React.ReactNode | undefined>(props.value?.metadata?.actualOutput);
+  const [actualVariableChanges, setActualVariableChanges] = useState<Record<string, { before: any; after: any }>>(props.value?.metadata?.actualVariableChanges || {});
+  const [llmPrediction, setLLMPrediction] = useState<any>(props.value?.metadata?.llmPrediction || null);
+  const [executionHistory, setExecutionHistory] = useState<any[]>(props.value?.metadata?.executionHistory || []);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // persistent execution environment that survives re-renders/runs
+  const envRef = useRef<Record<string, any>>((props.value?.metadata?.env) || {});
+
+  // track component mounted state
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
+
+  // helper: shallow clone of env for snapshots
+  const cloneEnv = (env: Record<string, any>) => {
+    const out: Record<string, any> = {};
+    Object.keys(env).forEach(k => {
+      try {
+        out[k] = JSON.parse(JSON.stringify(env[k]));
+      } catch {
+        out[k] = env[k];
+      }
+    });
+    return out;
+  };
+
+  // helper: compute diff between two snapshots (before/after)
+  const computeDiff = (before: Record<string, any>, after: Record<string, any>) => {
+    const keys = new Set<string>([...Object.keys(before || {}), ...Object.keys(after || {})]);
+    const diff: Record<string, { before: any; after: any }> = {};
+    keys.forEach(k => {
+      const bv = before ? before[k] : undefined;
+      const av = after ? after[k] : undefined;
+      // treat NaN and objects conservatively; prefer JSON-stringified comparison for deep-ish equality
+      let equal = false;
+      try {
+        equal = JSON.stringify(bv) === JSON.stringify(av);
+      } catch {
+        equal = bv === av;
+      }
+      if (!equal) {
+        diff[k] = { before: bv, after: av };
+      }
+    });
+    return diff;
+  };
+
+  // Attempt to run the highlighted code in the persistent env.
+  // We capture the last expression by wrapping the user's code so that the last expression becomes a return when applicable.
+  const runHighlightedCode = async () => {
+    setErrorMessage(null);
+    setIsRunning(true);
+
+    const env = envRef.current;
+    const beforeSnapshot = cloneEnv(env);
+
+    try {
+      // Normalize code: ensure the last expression is returned if it's an expression.
+      // Strategy: split into lines, detect if last non-empty line looks like a declaration/statement that shouldn't be returned.
+      // If last line looks like an expression, wrap it with `return (...)`.
+      const trimmed = highlightedCode.trim();
+      let wrappedBody = trimmed;
+      if (trimmed.length > 0) {
+        const lines = trimmed.split("\n");
+        // find last non-empty line
+        let lastIndex = lines.length - 1;
+        while (lastIndex >= 0 && lines[lastIndex].trim() === "") lastIndex--;
+        const lastLine = lastIndex >= 0 ? lines[lastIndex].trim() : "";
+        // regex heuristic: treat these as statements/declarations that should NOT be auto-returned
+        const statementStarters = /^(?:let|const|var|function|class|if|for|while|switch|try|catch|export|import|interface|type)\b/;
+        const isExpressionLike = lastLine !== "" && !statementStarters.test(lastLine) && !lastLine.startsWith("return") && !lastLine.startsWith("throw");
+        if (isExpressionLike) {
+          // replace last line with `return ( <lastLine> );`
+          lines[lastIndex] = `return ( ${lines[lastIndex]} )`;
+          wrappedBody = lines.join("\n");
+        } else {
+          // keep as-is; maybe user used explicit return
+          wrappedBody = lines.join("\n");
+        }
+      }
+
+      // Build an async wrapper so `await` inside highlighted code works.
+      // We use `with(env)` to give the code access to env variables as free variables.
+      // Wrap in an async IIFE and return its result so evaluation can be awaited.
+      // NOTE: This may still throw for TypeScript/JSX/syntax content; we handle that below.
+      const runner = new Function("env", `
+        "use strict";
+        with(env) {
+          return (async () => {
+            ${wrappedBody}
+          })();
+        }
+      `);
+
+      // Call runner and await result (supports promises)
+      let result: any;
+      try {
+        result = await runner(env);
+      } catch (runError) {
+        // If runtime error occurs, still want to compute variable changes (side-effects may have happened).
+        // We'll compute changes based on env after the attempted execution.
+        const afterSnapshotOnError = cloneEnv(env);
+        const diffOnError = computeDiff(beforeSnapshot, afterSnapshotOnError);
+        setActualVariableChanges(diffOnError);
+        setActualOutput(
+          <div style={{ padding: "8px", borderRadius: 6, border: "1px solid #f5c6cb", background: "#fff1f2", color: "#8b0000" }}>
+            Execution error: {String(runError && (runError as Error).message ? (runError as Error).message : runError)}
+          </div>
+        );
+        // save metadata & history
+        const rec = { code: highlightedCode, actualResult: undefined, actualChanges: diffOnError, error: String(runError) };
+        setExecutionHistory(prev => [...prev, rec]);
+        props.utils.setMetadata({ actualOutput: String(runError), actualVariableChanges: diffOnError, executionHistory: [...executionHistory, rec], env: envRef.current });
+        setIsRunning(false);
+        return;
+      }
+
+      // If we get here, code executed to completion (result may be undefined)
+      const afterSnapshot = cloneEnv(env);
+      const diff = computeDiff(beforeSnapshot, afterSnapshot);
+      setActualVariableChanges(diff);
+
+      // Display result:
+      if (result === undefined) {
+        if (Object.keys(diff).length > 0) {
+          setActualOutput(
+            <div style={{ padding: "8px", borderRadius: 6, border: "1px solid #f0e68c", background: "#fffbe6", color: "#5a4b00" }}>
+              (Executed — no explicit return. See variable changes below.)
+            </div>
+          );
+        } else {
+          setActualOutput(
+            <div style={{ padding: "8px", borderRadius: 6, border: "1px solid #d3d3d3", background: "#fafafa", color: "#444" }}>
+              (Executed — no return and no observable variable changes.)
+            </div>
+          );
+        }
+      } else if (typeof result === "object" && React.isValidElement(result)) {
+        // If the code returned a React element, render it directly
+        setActualOutput(result);
+      } else {
+        setActualOutput(String(result));
+      }
+
+      // Save history and metadata
+      const historyEntry = { code: highlightedCode, actualResult: result, actualChanges: diff, timestamp: new Date().toISOString() };
+      setExecutionHistory(prev => [...prev, historyEntry]);
+      props.utils.setMetadata({
+        actualOutput: result === undefined ? undefined : result,
+        actualVariableChanges: diff,
+        executionHistory: [...executionHistory, historyEntry],
+        env: envRef.current,
+        intendedFunction
+      });
+    } catch (err) {
+      // If a SyntaxError or other compile-time issue happens, do NOT simply print "incorrect syntax".
+      // Instead, fall back to LLM-based analysis that scans the whole file and simulates outcome.
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(String(errMsg));
+      // Try to analyze via LLM fallback (document-level simulation)
+      await analyzeWithLLMFallback(errMsg);
+    } finally {
+      if (isMounted.current) setIsRunning(false);
+    }
+  };
+
+  // LLM fallback analysis — ask the LLM to read the entire file and simulate the highlighted code.
+  // The LLM should return a JSON object with keys:
+  // { predictedReturn: string | object, variableChanges: { varName: { before: ..., after: ... } }, explanation: string }
+  const analyzeWithLLMFallback = async (triggeringError?: string) => {
+    setIsAnalyzing(true);
+    setLLMPrediction(null);
+
+    // Compose prompt carefully: include the entire file and the highlighted snippet and ask for JSON-only output.
+    const fullDoc = documentText || "(no document text provided)";
+    const highlighted = highlightedCode || "(no highlighted code)";
+
+    const systemMsg: ChatMessage = {
+      role: "system",
+      content:
+        "You are a careful code analyst. The user will give you a full source file and a highlighted section. " +
+        "Your job is to inspect the entire file (not just the highlighted snippet) and predict what the highlighted snippet will produce when executed, and what variables (anywhere in the file) the highlighted snippet will modify. " +
+        "If the highlighted snippet cannot actually be executed because it is TypeScript or JSX or imports, you should still simulate the likely runtime behavior based on a JavaScript interpretation and the rest of the file. " +
+        "Return only valid JSON as described in the user's request. Do not output any extra commentary or markdown."
+    };
+
+    const userMsg: ChatMessage = {
+      role: "user",
+      content:
+        `Full file content (start):\n\n${fullDoc}\n\nFull file content (end)\n\n` +
+        `Highlighted section (start):\n\n${highlighted}\n\nHighlighted section (end)\n\n` +
+        `If relevant, mention any definitions, initializations, or types in the file that affect the highlighted snippet.` +
+        ` If you are making assumptions, state them in the "explanation" field. If a variable's value cannot be determined exactly, give your best guess. ` +
+        `Now respond with EXACT JSON using the following shape:\n\n` +
+        `{\n` +
+        `  "predictedReturn": <a JSON value or string representation>,\n` +
+        `  "variableChanges": { "varName": { "before": <value-or-unknown>, "after": <value-or-unknown> }, ... },\n` +
+        `  "explanation": "<short explanation>",\n` +
+        `  "confidence": "<low|medium|high>"\n` +
+        `}\n\n` +
+        `If you cannot find anything to change, return an empty object for variableChanges and predictedReturn=null.\n` +
+        (triggeringError ? `The code runner previously failed with: ${triggeringError}\n` : "")
+    };
+
+    try {
+      const parsed = await lmApi.chat([systemMsg, userMsg], {
+        vendor: "copilot",
+        family: "gpt-4o",
+        temperature: 0.0
+      });
+
+      // parsed may be a string — try strict parse first, then fallback to extracting the first {...} block
+      let json: any = null;
+      try {
+        json = JSON.parse(parsed);
+      } catch (parseErr) {
+        const match = String(parsed).match(/\{[\s\S]*\}/);
+        if (match) {
+          try {
+            json = JSON.parse(match[0]);
+          } catch (e) {
+            // fallback to wrapping as text
+            json = { predictedReturn: String(parsed), variableChanges: {}, explanation: "Could not parse strict JSON from model output", confidence: "low" };
+          }
+        } else {
+          json = { predictedReturn: String(parsed), variableChanges: {}, explanation: "No JSON object found in model output", confidence: "low" };
+        }
+      }
+
+      // Normalize expected shape
+      if (!json || typeof json !== "object") {
+        json = { predictedReturn: json, variableChanges: {}, explanation: "Model returned non-object", confidence: "low" };
+      } else {
+        json.variableChanges = json.variableChanges || {};
+        if (!("predictedReturn" in json)) json.predictedReturn = null;
+        json.explanation = String(json.explanation || "").trim();
+        json.confidence = json.confidence || "medium";
+      }
+
+      if (isMounted.current) {
+        setLLMPrediction(json);
+        // Persist into metadata so user can see it later
+        props.utils.setMetadata({
+          llmPrediction: json,
+          intendedFunction
+        });
+      }
+    } catch (apiErr) {
+      const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+      if (isMounted.current) {
+        setLLMPrediction({ predictedReturn: null, variableChanges: {}, explanation: `LLM request failed: ${msg}`, confidence: "low" });
+      }
+    } finally {
+      if (isMounted.current) setIsAnalyzing(false);
+    }
+  };
+
+  // Reset persistent env
+  const resetEnvironment = () => {
+    envRef.current = {};
+    setActualVariableChanges({});
+    setActualOutput(undefined);
+    setExecutionHistory([]);
+    props.utils.setMetadata({ env: {}, actualVariableChanges: {}, actualOutput: undefined, executionHistory: [] });
+  };
+
+  // Save intendedFunction to metadata when changed
+  useEffect(() => {
+    props.utils.setMetadata({ intendedFunction });
+  }, [intendedFunction]);
+
+  // UI sub-components (verbose, with labels and help text to match your other annotation types)
+  const RenderHeader = () => (
+    <div style={{ marginBottom: "12px" }}>
+      <h3 style={{ margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600, color: "#1f4b8f" }}>Output Visualizer</h3>
+      <div style={{ fontSize: "13px", color: "#555" }}>
+        Execute or simulate the highlighted code. The tool will try to run the code locally first; if it cannot run (syntax, TypeScript, JSX or imports), the LLM will read the entire file and simulate/predict the return and variable changes.
+      </div>
+    </div>
+  );
+
+  const IntendedFunctionBlock = () => (
+    <div style={{ marginBottom: "12px" }}>
+      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Intended function</label>
+      <textarea
+        value={intendedFunction}
+        onChange={(e) => setIntendedFunction(e.target.value)}
+        placeholder="Describe what the highlighted code is supposed to do..."
+        className="textarea"
+        style={{ width: "100%", minHeight: 72, padding: "8px", fontSize: 13 }}
+      />
+    </div>
+  );
+
+  const HighlightedCodeBlock = () => (
+    <div style={{ marginBottom: "12px" }}>
+      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Highlighted code</label>
+      <pre style={{ padding: "8px", background: "#fafafa", border: "1px solid #e7e7e7", borderRadius: 6, overflowX: "auto", fontSize: 12 }}>{highlightedCode || "(no code selected)"}</pre>
+    </div>
+  );
+
+  const ControlsBlock = () => (
+    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+      <button onClick={runHighlightedCode} disabled={isRunning} style={{ padding: "8px 12px", background: isRunning ? "#e0e0e0" : "#0b6efd", color: "white", borderRadius: 6, border: "none", cursor: isRunning ? "not-allowed" : "pointer" }}>
+        {isRunning ? "Running…" : "Run (try real execution)"}
+      </button>
+
+      <button onClick={() => analyzeWithLLMFallback()} disabled={isAnalyzing} style={{ padding: "8px 12px", background: isAnalyzing ? "#e0e0e0" : "#6f42c1", color: "white", borderRadius: 6, border: "none", cursor: isAnalyzing ? "not-allowed" : "pointer" }}>
+        {isAnalyzing ? "Analyzing…" : "Analyze with LLM (simulate by reading entire file)"}
+      </button>
+
+      <button onClick={resetEnvironment} style={{ padding: "8px 12px", background: "#d9534f", color: "white", borderRadius: 6, border: "none" }}>
+        Reset Environment
+      </button>
+
+      <div style={{ marginLeft: "auto", fontSize: 12, color: "#666" }}>
+        <div>Env variables: <strong>{Object.keys(envRef.current || {}).length}</strong></div>
+      </div>
+    </div>
+  );
+
+  const ActualOutputBlock = () => (
+    <div style={{ marginTop: 12 }}>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Actual execution (real runtime)</label>
+      <div style={{ border: "1px solid #e9ecef", padding: 10, borderRadius: 6, background: "#fff" }}>
+        {errorMessage && <div style={{ marginBottom: 8, color: "#d9534f" }}>Runner note: {errorMessage}</div>}
+        <div style={{ marginBottom: 8 }}>
+          <strong>Output:</strong>
+        </div>
+        <div style={{ minHeight: 30 }}>{actualOutput ? (typeof actualOutput === "string" ? <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{actualOutput}</pre> : actualOutput) : <span style={{ color: "#666" }}>(not run yet)</span>}</div>
+
+        <div style={{ marginTop: 12 }}>
+          <strong>Variable changes (before → after):</strong>
+          {Object.keys(actualVariableChanges || {}).length === 0 ? (
+            <div style={{ marginTop: 8, color: "#666" }}>(no variable changes observed)</div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+              <thead>
+                <tr style={{ background: "#f5f5f5" }}>
+                  <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>Variable</th>
+                  <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>Before</th>
+                  <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(actualVariableChanges || {}).map(([k, v]) => (
+                  <tr key={k}>
+                    <td style={{ border: "1px solid #eee", padding: 6, fontFamily: "monospace", fontSize: 12 }}>{k}</td>
+                    <td style={{ border: "1px solid #eee", padding: 6, fontSize: 12 }}>{String(v.before)}</td>
+                    <td style={{ border: "1px solid #eee", padding: 6, fontSize: 12 }}>{String(v.after)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const LLMPredictionBlock = () => (
+    <div style={{ marginTop: 12 }}>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>LLM-based simulation / prediction (reads whole file)</label>
+      <div style={{ border: "1px solid #e9ecef", padding: 10, borderRadius: 6, background: "#fff" }}>
+        {isAnalyzing ? (
+          <div>Analyzing entire file... (LLM)</div>
+        ) : llmPrediction ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>
+              <strong>Predicted return / output:</strong>
+              <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                {typeof llmPrediction.predictedReturn === "object" ? <ObjectInspector data={llmPrediction.predictedReturn} /> : (String(llmPrediction.predictedReturn) || "(null)")}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <strong>Predicted variable changes:</strong>
+              {llmPrediction.variableChanges && Object.keys(llmPrediction.variableChanges).length > 0 ? (
+                <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+                  <thead>
+                    <tr style={{ background: "#f5f5f5" }}>
+                      <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>Variable</th>
+                      <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>Before</th>
+                      <th style={{ border: "1px solid #eee", padding: 6, textAlign: "left", fontSize: 12 }}>After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(llmPrediction.variableChanges).map(([k, v]: any) => (
+                      <tr key={k}>
+                        <td style={{ border: "1px solid #eee", padding: 6, fontFamily: "monospace", fontSize: 12 }}>{k}</td>
+                        <td style={{ border: "1px solid #eee", padding: 6, fontSize: 12 }}>{String((v && v.before) ?? "unknown")}</td>
+                        <td style={{ border: "1px solid #eee", padding: 6, fontSize: 12 }}>{String((v && v.after) ?? "unknown")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ color: "#666" }}>(LLM predicts no variable changes)</div>
+              )}
+            </div>
+
+            {llmPrediction.explanation && (
+              <div style={{ marginTop: 10 }}>
+                <strong>LLM explanation:</strong>
+                <div style={{ marginTop: 6, color: "#444" }}>{llmPrediction.explanation}</div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+              Confidence: <strong>{String(llmPrediction.confidence ?? "unknown")}</strong>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "#666" }}>(no LLM prediction yet — click "Analyze with LLM")</div>
+        )}
+      </div>
+    </div>
+  );
+
+  const HistoryBlock = () => (
+    <div style={{ marginTop: 12 }}>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Execution history</label>
+      <div style={{ border: "1px solid #e9ecef", padding: 8, borderRadius: 6, background: "#fff" }}>
+        {executionHistory.length === 0 ? (
+          <div style={{ color: "#666" }}>(no prior runs)</div>
+        ) : (
+          executionHistory.slice().reverse().map((h, idx) => (
+            <div key={idx} style={{ padding: 8, borderBottom: "1px solid #f1f1f1" }}>
+              <div style={{ fontSize: 12, color: "#666" }}>{h.timestamp || "(no timestamp)"}</div>
+              <div style={{ fontFamily: "monospace", marginTop: 6, whiteSpace: "pre-wrap" }}>{h.code}</div>
+              <div style={{ marginTop: 6 }}>
+                <strong>Result:</strong> {h.actualResult === undefined ? <em>(no explicit return)</em> : <span style={{ whiteSpace: "pre-wrap" }}>{String(h.actualResult)}</span>}
+              </div>
+              {h.actualChanges && Object.keys(h.actualChanges).length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <strong>Changes:</strong>
+                  <ul style={{ marginTop: 6 }}>
+                    {Object.entries(h.actualChanges).map(([k, v]) => (
+                      <li key={k}><code>{k}</code>: {String((v as any).before)} → {String((v as any).after)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {h.error && <div style={{ marginTop: 6, color: "#b00020" }}><strong>Error:</strong> {String(h.error)}</div>}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  // Main render
+  return (
+    <div style={{ padding: 12, fontFamily: "Poppins, -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 14, maxWidth: "100%" }}>
+      <RenderHeader />
+      <IntendedFunctionBlock />
+      <HighlightedCodeBlock />
+      <ControlsBlock />
+      <ActualOutputBlock />
+      <LLMPredictionBlock />
+      <HistoryBlock />
+    </div>
+  );
+};
+
+
+
+
 /* TODO: Add all tools to be used here. */
 export const tools = {
   comment: Comment,
@@ -1171,7 +1652,8 @@ export const tools = {
   odyssey: Odyssey,
   yesNoQuestion: LMUnitTest,
   debugExample: ShowDebuggedExample,
-  explainInEnglish: ExplainInEnglish, // Add this line
+  explainInEnglish: ExplainInEnglish, 
+  outputVisualizer: OutputVisualizer, 
   // lmApiTest: LMAPITest,
 };
 
@@ -1185,5 +1667,6 @@ export const toolNames = {
   yesNoQuestion: "LM Unit Test",
   debugExample: "Show Debugged Example",
   explainInEnglish: "Explain in English",
+  outputVisualizer: "Output Visualizer",
   // lmApiTest: "LM API Test",
 };
