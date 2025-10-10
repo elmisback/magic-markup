@@ -174,6 +174,21 @@ export abstract class BaseAnnotationView {
               return;
             }
             const { annotation: newAnnotation } = message.data;
+            
+            // Ensure document and original document are properly defined
+            if (!newAnnotation.document) {
+              newAnnotation.document = editor.document.getText();
+            }
+            
+            if (!newAnnotation.original || !newAnnotation.original.document) {
+              newAnnotation.original = {
+                ...newAnnotation.original || {},
+                document: editor.document.getText(),
+                start: newAnnotation.start,
+                end: newAnnotation.end
+              };
+            }
+            
             annotationTracker.addAnnotation(editor.document, newAnnotation);
             return;
 
@@ -403,8 +418,9 @@ export abstract class BaseAnnotationView {
    * Sends a message to the webview context.
    */
   public sendMessageObject(message: any) {
-    // Implement in child classes
-    this.webview.postMessage(JSON.stringify(message));
+    if (this.webview) {
+      this.webview.postMessage(message);
+    }
   }
   
   /**
@@ -417,26 +433,22 @@ export abstract class BaseAnnotationView {
       return;
     }
 
-    this.webview.postMessage(
-      JSON.stringify({
-        command: "addAnnotation",
-        data: {
-          start: editor.document.offsetAt(editor.selection.start),
-          end: editor.document.offsetAt(editor.selection.end),
-        },
-      })
-    );
+    this.webview.postMessage({
+      command: "addAnnotation",
+      data: {
+        start: editor.document.offsetAt(editor.selection.start),
+        end: editor.document.offsetAt(editor.selection.end),
+      },
+    });
   }
 
   /**
    * Handles the command to remove the selected annotation
    */
   public removeAnnotation(): void {
-    this.webview.postMessage(
-      JSON.stringify({
-        command: "removeAnnotation",
-      })
-    );
+    this.webview.postMessage({
+      command: "removeAnnotation",
+    });
   }
 
   /**
@@ -446,14 +458,12 @@ export abstract class BaseAnnotationView {
     // Get the color from the user
     vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
       if (color) {
-        this.webview.postMessage(
-          JSON.stringify({
-            command: "setAnnotationColor",
-            data: {
-              color: color,
-            },
-          })
-        );
+        this.webview.postMessage({
+          command: "setAnnotationColor",
+          data: {
+            color: color,
+          },
+        });
       }
     });
   }

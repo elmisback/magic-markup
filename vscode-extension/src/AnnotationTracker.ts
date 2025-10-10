@@ -141,9 +141,9 @@ export class AnnotationTracker implements vscode.Disposable {
         const { document: annDoc, ...rest } = ann;
         // Compute diff from global document to annotation's document
         let documentDiff = undefined;
-        if (annDoc !== globalDocument) {
+        if (annDoc && annDoc !== globalDocument) {
           try {
-            documentDiff = createPatch(document.fileName, globalDocument, annDoc);
+            documentDiff = createPatch(document.fileName, globalDocument || '', annDoc);
           } catch (e) {
             documentDiff = undefined;
             console.error("Error creating document diff:", e);
@@ -154,9 +154,9 @@ export class AnnotationTracker implements vscode.Disposable {
           ...restOriginal
         } } = ann;
         let originalDocumentDiff = undefined;
-        if (originalDocument !== globalDocument) {
+        if (originalDocument && originalDocument !== globalDocument) {
           try {
-            originalDocumentDiff = createPatch(document.fileName, globalDocument, originalDocument);
+            originalDocumentDiff = createPatch(document.fileName, globalDocument || '', originalDocument);
           } catch (e) {
             originalDocumentDiff = undefined;
             console.error("Error creating original document diff:", e);
