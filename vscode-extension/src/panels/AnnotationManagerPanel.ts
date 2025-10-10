@@ -433,8 +433,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const { codeWithSnippetDelimited, delimiter } = this._preprocessAnnotation(annotation);
 
     try {
-      // Get the API key from settings
-      const apiKey = vscode.workspace.getConfiguration().get("codetations.apiKey") as string;
+      console.log(`Retagging annotation ${annotation.id}`);
+
+      // Check for empty annotation text
+      if (annotation.start === annotation.end) {
+        console.warn(`Annotation ${annotation.id} has empty selection, using original positions`);
+        return {
+          ...annotation,
+          document: currentDocumentText,
+          start: annotation.original.start,
+          end: annotation.original.end
+        };
+      }
+
+      // Skip retagging if documents already match
+      if (annotation.document === currentDocumentText) {
+        console.log(`Annotation ${annotation.id} already matches current document, skipping retag`);
+        return annotation;
+      }
 
       // Use the retagUpdate function to get the new positions
       const result = await retagUpdate(
@@ -442,12 +458,60 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         currentDocumentText,
         delimiter
       );
-      if (!result.out) {
-        window.showErrorMessage("Error retagging annotation: no result returned");
-        console.error("Error retagging annotation: no result returned");
-        console.error(codeWithSnippetDelimited);
+
+      // Handle errors in the result
+      if (result.error) {
+        const errorMessage = result.error instanceof Error ? result.error.message : String(result.error);
+        console.error(`Retagging failed for annotation ${annotation.id}: ${errorMessage} (${result.errorType})`);
+
+        // Display different messages based on error type
+        switch (result.errorType) {
+          case "model":
+            window.showErrorMessage(`Language model error while retagging: ${errorMessage}`);
+            break;
+          case "JSON parse":
+          case "JSON validation":
+            window.showErrorMessage(`Invalid response format while retagging: ${errorMessage}`);
+            break;
+          case "snippet matching":
+            window.showErrorMessage(`Could not locate annotation in updated code: ${errorMessage}`);
+            break;
+          case "validation":
+            window.showErrorMessage(`Validation error during retagging: ${errorMessage}`);
+            break;
+          default:
+            window.showErrorMessage(`Error retagging annotation: ${errorMessage}`);
+        }
+
+        // For debugging
+        console.debug("Annotation details:", {
+          id: annotation.id,
+          start: annotation.start,
+          end: annotation.end,
+          text: annotation.document.substring(annotation.start, annotation.end),
+          errorType: result.errorType
+        });
+
+        // Return original annotation on error
         return annotation;
       }
+
+      // Handle missing output
+      if (!result.out) {
+        console.error(`Retagging returned no result for annotation ${annotation.id}`);
+        window.showErrorMessage("Error retagging annotation: no result returned (maybe all annotation anchor text was deleted?)");
+        return annotation;
+      }
+
+      // Validate the result
+      if (result.out.leftIdx < 0 || result.out.rightIdx > currentDocumentText.length ||
+          result.out.leftIdx >= result.out.rightIdx) {
+        console.error(`Invalid retag positions: leftIdx=${result.out.leftIdx}, rightIdx=${result.out.rightIdx}`);
+        window.showErrorMessage("Error retagging annotation: invalid positions returned");
+        return annotation;
+      }
+
+      console.log(`Successfully retagged annotation ${annotation.id} to positions ${result.out.leftIdx}-${result.out.rightIdx}`);
 
       // Update the annotation with the new positions
       return {
@@ -457,8 +521,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         end: result.out.rightIdx,
       };
     } catch (error) {
-      console.error("Error retagging annotation:", error);
-      window.showErrorMessage(`Error retagging annotation: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Unexpected error retagging annotation ${annotation.id}:`, error);
+      window.showErrorMessage(`Unexpected error retagging annotation: ${errorMessage}`);
       return annotation; // Return original annotation on error
     }
   }
@@ -476,51 +541,122 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const currentDocumentText = editor.document.getText();
     const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
 
+    // Check if there are annotations to retag
+    if (annotations.length === 0) {
+      window.showInformationMessage("No annotations found to retag");
+      return;
+    }
+
+    // Check if any annotations need retagging
+    const needsRetagging = annotations.some(ann =>
+      ann.document !== currentDocumentText || ann.start === ann.end
+    );
+
+    if (!needsRetagging) {
+      window.showInformationMessage("All annotations are already up-to-date");
+      return;
+    }
+
     // Show progress notification
     window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: "Retagging annotations...",
-        cancellable: false,
+        cancellable: true,
       },
-      async (progress) => {
+      async (progress, token) => {
         try {
           // Update progress as we process each annotation
           const total = annotations.length;
           let processed = 0;
+          let successful = 0;
+          let skipped = 0;
+          let failed = 0;
 
-          // Retag all annotations
-          const updatedAnnotations = await Promise.all(
-            annotations.map(async (annotation) => {
-              // HACK -- if the annotation is empty, use the original positions
-              if (annotation.start === annotation.end) {
-                annotation.document = annotation.original.document;
-                annotation.start = annotation.original.start;
-                annotation.end = annotation.original.end;
+          // Process annotations one by one instead of all at once
+          // This provides better progressive feedback and allows for early cancellation
+          const updatedAnnotations: Annotation[] = [];
+
+          for (const annotation of annotations) {
+            // Check for cancellation
+            if (token.isCancellationRequested) {
+              window.showInformationMessage("Annotation retagging was cancelled");
+              break;
+            }
+
+            try {
+              // Process the annotation
+              let retagged;
+
+              // Skip annotations that don't need retagging
+              if (annotation.document === currentDocumentText) {
+                retagged = annotation;
+                skipped++;
+              } else {
+                // Retag the annotation
+                retagged = await this._retagAnnotation(annotation, currentDocumentText);
+
+                // Check if retagging was successful (positions changed)
+                if (retagged !== annotation) {
+                  successful++;
+                } else {
+                  // Annotation returned unchanged, which indicates a failure
+                  failed++;
+                }
               }
-              if (annotation.document === currentDocumentText) { return annotation; }
-              const retagged = await this._retagAnnotation(annotation, currentDocumentText);
+
+              updatedAnnotations.push(retagged);
+
+              // Update progress
               processed++;
               progress.report({
-                message: `Processed ${processed}/${total} annotations`,
+                message: `Processed ${processed}/${total} annotations (${successful} updated, ${failed} failed)`,
                 increment: (1 / total) * 100,
               });
-              return retagged;
-            })
-          );
 
-          // Update all annotations at once
-          annotations.forEach((oldAnnotation, index) => {
-            annotationTracker.updateAnnotation(editor.document, updatedAnnotations[index]);
-          });
+            } catch (e) {
+              // Handle individual annotation failures
+              console.error(`Error processing annotation ${annotation.id}:`, e);
+              updatedAnnotations.push(annotation); // Keep original
+              failed++;
+              processed++;
 
-          // Notify webview of the updated annotations
-          this._loadAnnotationsForActiveEditor();
+              progress.report({
+                message: `Processed ${processed}/${total} annotations (${failed} failed)`,
+                increment: (1 / total) * 100,
+              });
+            }
+          }
+
+          // Only update annotations if we have processed at least some
+          if (processed > 0 && !token.isCancellationRequested) {
+            // Update all annotations at once
+            annotations.forEach((oldAnnotation, index) => {
+              if (index < updatedAnnotations.length) {
+                annotationTracker.updateAnnotation(editor.document, updatedAnnotations[index]);
+              }
+            });
+
+            // Notify webview of the updated annotations
+            this._loadAnnotationsForActiveEditor();
+
+            // Show summary
+            if (failed > 0) {
+              window.showWarningMessage(
+                `Retagging completed: ${successful} updated, ${skipped} already up-to-date, ${failed} failed`
+              );
+            } else {
+              window.showInformationMessage(
+                `Retagging completed: ${successful} updated, ${skipped} already up-to-date`
+              );
+            }
+          }
 
           return true;
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           console.error("Error retagging annotations:", error);
-          window.showErrorMessage(`Error retagging annotations: ${error}`);
+          window.showErrorMessage(`Error retagging annotations: ${errorMessage}`);
           return false;
         }
       }
