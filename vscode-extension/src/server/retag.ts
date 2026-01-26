@@ -3,22 +3,50 @@ import OpenAI from "openai";
 // import dotenv from 'dotenv'
 
 function normalizeStringAndMapPositions(str: string) {
-  let normalized = "";
-  let positionMap = [];
-  let originalPosition = 0;
-
-  for (let i = 0; i < str.length; i++) {
-    if (str[i].match(/\s/) && (i === 0 || str[i - 1].match(/\s/))) {
-      // Skip multiple whitespaces
-      continue;
-    }
-    // Add character to normalized string and map its position
-    normalized += str[i].match(/\s/) ? " " : str[i];
-    positionMap.push(originalPosition);
-    originalPosition = i + 1;
+  // Handle null or undefined input
+  if (!str) {
+    console.warn("Null or undefined string passed to normalizeStringAndMapPositions");
+    return { normalized: "", positionMap: [0] };
   }
 
-  return { normalized, positionMap };
+  try {
+    let normalized = "";
+    let positionMap = [];
+
+    // Always start with position 0
+    positionMap.push(0);
+
+    // Normalize the string by collapsing whitespace and mapping positions
+    let previousWasWhitespace = false;
+
+    for (let i = 0; i < str.length; i++) {
+      const isWhitespace = /\s/.test(str[i]);
+
+      if (isWhitespace) {
+        // Only add a single space for consecutive whitespace characters
+        if (!previousWasWhitespace) {
+          normalized += " ";
+          positionMap.push(i);
+          previousWasWhitespace = true;
+        }
+      } else {
+        // Add non-whitespace character as is
+        normalized += str[i];
+        positionMap.push(i);
+        previousWasWhitespace = false;
+      }
+    }
+
+    // Ensure positionMap has at least one entry
+    if (positionMap.length === 0) {
+      positionMap.push(0);
+    }
+
+    return { normalized, positionMap };
+  } catch (e) {
+    console.error("Error in normalizeStringAndMapPositions:", e);
+    return { normalized: "", positionMap: [0] };
+  }
 }
 
 function findOriginalPositions(
@@ -27,34 +55,124 @@ function findOriginalPositions(
   matchEnd: number,
   positionMap: number[]
 ) {
-  // Adjust the positions based on the position map
-  const originalStart = positionMap[matchStart + 1] - 1;
-  const originalEnd = positionMap[matchEnd] + (originalStr[positionMap[matchEnd]] === " " ? 0 : 1);
+  try {
+    // Validate inputs
+    if (matchStart < 0 || matchEnd < matchStart ||
+        matchStart >= positionMap.length || matchEnd >= positionMap.length) {
+      throw new Error(`Invalid match positions: start=${matchStart}, end=${matchEnd}, mapLength=${positionMap.length}`);
+    }
 
-  return { originalStart, originalEnd };
+    // Carefully compute start position
+    let originalStart;
+    if (matchStart + 1 < positionMap.length) {
+      originalStart = positionMap[matchStart + 1] - 1;
+    } else {
+      // Fall back to direct match if we're at the end of the position map
+      originalStart = positionMap[matchStart];
+    }
+
+    // Validate originalStart
+    if (originalStart < 0 || originalStart >= originalStr.length) {
+      originalStart = Math.max(0, Math.min(originalStr.length - 1, positionMap[matchStart]));
+    }
+
+    // Carefully compute end position
+    let originalEnd;
+    if (matchEnd < positionMap.length) {
+      originalEnd = positionMap[matchEnd];
+      // Adjust end position based on whether it ends with whitespace
+      if (originalEnd < originalStr.length && originalStr[originalEnd] !== " ") {
+        originalEnd += 1;
+      }
+    } else {
+      // Fall back to string length if we're beyond the position map
+      originalEnd = originalStr.length;
+    }
+
+    // Validate originalEnd
+    if (originalEnd <= originalStart || originalEnd > originalStr.length) {
+      originalEnd = Math.min(originalStr.length, originalStart + 1);
+    }
+
+    return { originalStart, originalEnd };
+  } catch (e) {
+    console.error("Error in findOriginalPositions:", e);
+    // Return safe defaults that won't crash the application
+    return {
+      originalStart: Math.max(0, Math.min(originalStr.length - 1, matchStart)),
+      originalEnd: Math.min(originalStr.length, Math.max(matchStart + 1, matchEnd))
+    };
+  }
 }
 
 function findStartAndEndNormalized(largerString: string, substring: string, nthOccurence = 0) {
-  // Normalize and map positions
-  const { normalized: normalizedLargerString, positionMap } =
-    normalizeStringAndMapPositions(largerString);
-  const { normalized: normalizedSubstring } = normalizeStringAndMapPositions(substring);
+  // Add validation for inputs
+  if (!largerString || !substring) {
+    console.error("Invalid inputs to findStartAndEndNormalized:", { largerString: !!largerString, substring: !!substring });
+    return { start: -1, end: -1 };
+  }
 
-  // Assume we found the match in the normalized strings (example positions)
-  let matchStart = normalizedLargerString.indexOf(normalizedSubstring);
-  let matchEnd = matchStart + normalizedSubstring.length - 1;
+  try {
+    // Normalize and map positions
+    const { normalized: normalizedLargerString, positionMap } =
+      normalizeStringAndMapPositions(largerString);
+    const { normalized: normalizedSubstring } = normalizeStringAndMapPositions(substring);
 
-  // Find original positions
-  const { originalStart, originalEnd } = findOriginalPositions(
-    largerString,
-    matchStart,
-    matchEnd,
-    positionMap
-  );
-  return {
-    start: originalStart,
-    end: originalEnd,
-  };
+    // If either normalization resulted in empty strings, return not found
+    if (!normalizedLargerString || !normalizedSubstring) {
+      console.warn("Normalization resulted in empty strings");
+      return { start: -1, end: -1 };
+    }
+
+    // Find the nth occurrence of the substring
+    let matchStart = -1;
+    let currentIndex = 0;
+    let currentOccurrence = 0;
+
+    // Handle case where nthOccurence is 0 (treat as first occurrence)
+    const targetOccurrence = nthOccurence === 0 ? 1 : nthOccurence;
+
+    while (currentOccurrence < targetOccurrence) {
+      matchStart = normalizedLargerString.indexOf(normalizedSubstring, currentIndex);
+
+      if (matchStart === -1) {
+        // Not enough occurrences found
+        console.warn(`Could not find occurrence ${targetOccurrence} of substring in text`);
+        return { start: -1, end: -1 };
+      }
+
+      currentOccurrence++;
+      if (currentOccurrence < targetOccurrence) {
+        currentIndex = matchStart + 1;
+      }
+    }
+
+    const matchEnd = matchStart + normalizedSubstring.length - 1;
+
+    // Make sure we have valid indices before trying to find original positions
+    if (matchStart >= 0 && matchEnd >= matchStart &&
+        matchStart < positionMap.length && matchEnd < positionMap.length) {
+
+      // Find original positions
+      const { originalStart, originalEnd } = findOriginalPositions(
+        largerString,
+        matchStart,
+        matchEnd,
+        positionMap
+      );
+
+      return {
+        start: originalStart,
+        end: originalEnd,
+      };
+    } else {
+      console.warn("Invalid match indices:", { matchStart, matchEnd, positionMapLength: positionMap.length });
+      return { start: -1, end: -1 };
+    }
+  } catch (e) {
+    console.error("Error in findStartAndEndNormalized:", e);
+    return { start: -1, end: -1 };
+  }
 }
 
 type CodeUpdate = {
@@ -119,42 +237,75 @@ async function copilotPromptGPTForJSON(t: string) {
     vscode.LanguageModelChatMessage.User(t),
     vscode.LanguageModelChatMessage.User('Now respond with the JSON object only. ONLY output raw JSON. Do not emit markdown formatting.')
   ];
-  // const craftedPrompt = [
-  //   vscode.LanguageModelChatMessage.User(
-  //     'You are a cat! Think carefully and step by step like a cat would. Your job is to explain computer science concepts in the funny manner of a cat, using cat metaphors. Always start your response by stating what concept you are explaining. Always include code samples.'
-  //   ),
-  //   vscode.LanguageModelChatMessage.User('I want to understand recursion')
-  // ];
+
   try {
     console.log('Selecting model...');
-    const [model] = await vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' });
-    console.log('Selected model:', model);
-    const response = await model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
-    console.log('Got response:', response);
-    let fullResponse = '';
-    for await (const chunk of response.text) {
-      console.debug('Got chunk:', chunk);
-      fullResponse += chunk;
+    // Try to select the model with a timeout
+    const modelSelection = await Promise.race([
+      vscode.lm.selectChatModels({ vendor: 'copilot', family: 'gpt-4o' }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)) // 10 second timeout
+    ]);
+
+    // Check if model selection timed out or returned null/empty array
+    if (!modelSelection || !Array.isArray(modelSelection) || modelSelection.length === 0) {
+      console.error('Model selection failed or timed out');
+      throw new Error('Failed to select language model: Timeout or no models available');
     }
-    return fullResponse;
-    // TODO figure out how to get the completion here
+
+    const [model] = modelSelection;
+    console.log('Selected model:', model);
+
+    // Create a cancellation token with a timeout
+    const cts = new vscode.CancellationTokenSource();
+    const timeoutMs = 30000; // 30 seconds
+    const timeout = setTimeout(() => cts.cancel(), timeoutMs);
+
+    try {
+      const response = await model.sendRequest(craftedPrompt, {}, cts.token);
+      console.log('Got response:', response);
+
+      let fullResponse = '';
+      for await (const chunk of response.text) {
+        console.debug('Got chunk:', chunk);
+        fullResponse += chunk;
+      }
+
+      // Clear the timeout since we got a response
+      clearTimeout(timeout);
+
+      if (!fullResponse || fullResponse.trim() === '') {
+        throw new Error('Empty response from language model');
+      }
+
+      return fullResponse;
+    } finally {
+      clearTimeout(timeout);
+      cts.dispose();
+    }
   } catch (err) {
     // Making the chat request might fail because
     // - model does not exist
     // - user consent not given
     // - quota limits were exceeded
+    // - timeout occurred
+
+    let errorMessage = 'Language model request failed';
+
     if (err instanceof vscode.LanguageModelError) {
       console.error('Problem with extension LM api:', err.message, err.code, err.cause);
-      if (err.cause instanceof Error && err.cause.message.includes('off_topic')) {
-        // stream.markdown(
-        //   vscode.l10n.t("I'm sorry, I can only explain computer science concepts.")
-        // );
-        throw err;
+      errorMessage = `Language model error: ${err.message}`;
+
+      if (err.cause instanceof Error) {
+        if (err.cause.message.includes('off_topic')) {
+          errorMessage = 'The model considers this request off-topic';
+        }
       }
-    } else {
-      // add other error handling logic
-      throw err;
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
     }
+
+    console.error('Error in copilotPromptGPTForJSON:', errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
@@ -163,76 +314,110 @@ const retagUpdate = async (
   updatedCodeWithoutDelimiters: string,
   delimiter: string
 ) => {
-  console.log(codeWithSnippetDelimited, updatedCodeWithoutDelimiters, delimiter);
-  // const gptOut = await getFirstChoice(await getChatCompletion(
-  //   'gpt-4-turbo-preview',
-  //   [{role: 'user',
-  //     content: prompt_breakdown9({codeWithSnippetDelimited,
-  //                                 updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
-  //                                 delimiter})}]))
-  // console.log(gptOut)
+  // Validate inputs
+  if (!codeWithSnippetDelimited || !updatedCodeWithoutDelimiters || !delimiter) {
+    return {
+      error: new Error("Missing required parameters for retagging"),
+      errorType: "validation"
+    };
+  }
+
+  console.log("Retagging with delimiter:", delimiter);
+  console.log("Original code length:", codeWithSnippetDelimited.length);
+  console.log("Updated code length:", updatedCodeWithoutDelimiters.length);
+
+  // Check if delimiter exists in the input code
+  if (!codeWithSnippetDelimited.includes(delimiter)) {
+    return {
+      error: new Error("Delimiter not found in input code"),
+      errorType: "validation"
+    };
+  }
 
   let gptOut = "";
   try {
-    // const gptOutCompletion = await openai.chat.completions.create({
-    //   messages: [
-    //     {
-    //       role: "system",
-    //       content: "You are a helpful assistant designed to output JSON.",
-    //     },
-    //     {
-    //       role: "user",
-    //       content: prompt_breakdown11({
-    //         codeWithSnippetDelimited,
-    //         updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
-    //         delimiter,
-    //       }),
-    //     },
-    //   ],
-    //   model: "gpt-4o",
-    //   response_format: { type: "json_object" },
-    // });
-    // console.log(gptOutCompletion);
-
-    // gptOut = gptOutCompletion.choices[0]?.message.content || "";
-
-    gptOut = await copilotPromptGPTForJSON( prompt_breakdown11({
+    // Create the prompt for the language model
+    const promptText = prompt_breakdown11({
       codeWithSnippetDelimited,
       updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
       delimiter,
-    }) ) || '';
-    console.log(gptOut);
+    });
+
+    // Get response from language model
+    gptOut = await copilotPromptGPTForJSON(promptText) || '';
+    console.log("LM Response:", gptOut.substring(0, 200) + (gptOut.length > 200 ? "..." : ""));
+
+    // Check if response is empty
+    if (!gptOut || gptOut.trim() === '') {
+      return {
+        error: new Error("Empty response from language model"),
+        errorType: "model",
+        prompt: promptText
+      };
+    }
   } catch (e) {
-    return { error: e, errorType: "model" };
+    console.error("Error getting response from language model:", e);
+    return {
+      error: e instanceof Error ? e : new Error(String(e)),
+      errorType: "model"
+    };
   }
+
+  // Parse the JSON response
   let gptRetaggingJSON;
   try {
     gptRetaggingJSON = JSON.parse(gptOut);
-    console.log(gptRetaggingJSON);
+    console.log("Parsed JSON:", gptRetaggingJSON);
+
+    // Validate the expected JSON structure
+    if (!gptRetaggingJSON ||
+        typeof gptRetaggingJSON !== 'object' ||
+        !gptRetaggingJSON[1] ||
+        !gptRetaggingJSON[2] ||
+        !gptRetaggingJSON[3] ||
+        !gptRetaggingJSON[4]) {
+      return {
+        error: new Error("Invalid JSON structure in model response"),
+        errorType: "JSON validation",
+        gptOut
+      };
+    }
+
+    // Validate the types of JSON values
+    if (typeof gptRetaggingJSON[1] !== 'string' ||
+        typeof gptRetaggingJSON[2] !== 'number' ||
+        typeof gptRetaggingJSON[3] !== 'number' ||
+        typeof gptRetaggingJSON[4] !== 'number') {
+      return {
+        error: new Error("Invalid data types in model response"),
+        errorType: "JSON validation",
+        gptOut
+      };
+    }
+
+    // Validate the ranges of line numbers
+    const lineCount = updatedCodeWithoutDelimiters.split('\n').length;
+    if (gptRetaggingJSON[2] < 1 ||
+        gptRetaggingJSON[3] < gptRetaggingJSON[2] ||
+        gptRetaggingJSON[2] > lineCount ||
+        gptRetaggingJSON[3] > lineCount) {
+      return {
+        error: new Error(`Invalid line numbers: [${gptRetaggingJSON[2]}, ${gptRetaggingJSON[3]}], document has ${lineCount} lines`),
+        errorType: "range validation",
+        gptOut
+      };
+    }
+
   } catch (e) {
-    // (This should never happen based on the OpenAI documentation.)
-    return { error: e, errorType: "JSON parse", gptOut };
+    console.error("Error parsing JSON from model response:", e);
+    return {
+      error: e instanceof Error ? e : new Error(String(e)),
+      errorType: "JSON parse",
+      gptOut
+    };
   }
-  // console.log(completion.choices[0].message.content);
-  /* Unhandled issues:
-   * the response may be incorrect; could check across several tries to mitigate
-   * the response may be correct but there may be multiple correct responses; disambiguation needed
-   * the response may have an unreadable format, leading to failure in the next part
-   */
 
-  // const gptRetaggingJSONString = (await askMX([
-  //       { role: 'system',
-  //         content: 'You are a text parser designed to output JSON.'},
-  //       { role: 'user',
-  //         content: retagPromptGPT(gptOut)}
-  //   ])).trim() // sometimes Mixtral puts a space in front of the response...
-  // console.log(gptRetaggingJSONString)
-  // const gptRetaggingJSON = JSON.parse(gptRetaggingJSONString)
-  /* Unhandled issues:
-   * the response may be incorrect given the input
-   * failure to parse
-   */
-
+  // Helper type for the parameter structure
   type UpdateParameters = {
     code: string;
     snippet: string;
@@ -243,6 +428,7 @@ const retagUpdate = async (
     delimiterEnd: string;
   };
 
+  // Function to compute the new position of the annotation
   const computeUpdatedCodeWithSnippetRetagged = ({
     code,
     snippet,
@@ -252,45 +438,67 @@ const retagUpdate = async (
     delimiterStart,
     delimiterEnd,
   }: UpdateParameters) => {
-    // Note lineStart and lineEnd are 1-indexed.
-    /* We expand the search by one line if it fails on the identified segment to handle off-by-one issues. */
-    /* NOTE expanded search was introduced after the initial evaluation.
-    /* Unhandled issues:
-      * any non-whitespace typos in the output (even e.g. missing comments) will cause a failure to match
-      * potentially allowing the model to place the delimiter interactively 
-        would guarantee placement in the "intended" location,
-        but this is slow
-    */
+    // Validate function inputs
+    if (!code || !snippet || lineStart < 1 || lineEnd < lineStart) {
+      throw new Error(`Invalid parameters: code=${!!code}, snippet=${!!snippet}, lineStart=${lineStart}, lineEnd=${lineEnd}`);
+    }
 
+    console.log(`Computing annotation position: lines ${lineStart}-${lineEnd}, occurrence #${nthOccurrence}`);
+    console.log(`Snippet (first 50 chars): ${snippet.substring(0, 50)}${snippet.length > 50 ? "..." : ""}`);
+
+    // Note lineStart and lineEnd are 1-indexed.
+    // Get the section of code where we expect to find the snippet
     let sectionString = code
       .split("\n")
       .slice(lineStart - 1, lineEnd)
       .join("\n");
+
     let lenUpToSection = code
       .split("\n")
       .slice(0, lineStart - 1)
       .map((s) => s + "\n")
       .join("").length;
+
+    // Try to find the snippet in the section
     let snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence);
+
+    // If not found, expand the search area by one line in each direction
     if (snippetIdxInSection.start === -1) {
-      lineStart = Math.max(0, lineStart - 1);
+      console.log("Snippet not found in initial section, expanding search area");
+      lineStart = Math.max(1, lineStart - 1);
       lineEnd = Math.min(lineEnd + 1, code.split("\n").length);
+
       sectionString = code
         .split("\n")
         .slice(lineStart - 1, lineEnd)
         .join("\n");
+
       lenUpToSection = code
         .split("\n")
         .slice(0, lineStart - 1)
         .map((s) => s + "\n")
         .join("").length;
+
       snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence);
+
+      // If still not found, throw an error
+      if (snippetIdxInSection.start === -1) {
+        throw new Error(`Snippet not found in code section (lines ${lineStart}-${lineEnd})`);
+      }
     }
-    // const sectionString = code.split('\n').slice(lineStart - 1, lineEnd).join('\n')
-    // const lenUpToSection = code.split('\n').slice(0, lineStart - 1).map(s=>s + '\n').join('').length
-    // const snippetIdxInSection = findStartAndEndNormalized(sectionString, snippet, nthOccurrence)
+
+    // Compute the absolute positions in the file
     const leftIdx = lenUpToSection + snippetIdxInSection.start;
     const rightIdx = leftIdx + snippetIdxInSection.end - snippetIdxInSection.start;
+
+    // Validate the calculated indices
+    if (leftIdx < 0 || rightIdx > code.length || leftIdx >= rightIdx) {
+      throw new Error(`Invalid annotation indices: leftIdx=${leftIdx}, rightIdx=${rightIdx}, codeLength=${code.length}`);
+    }
+
+    console.log(`Found snippet at positions ${leftIdx}-${rightIdx}`);
+
+    // Return the updated code with delimiters and the positions
     return {
       updatedCodeWithDelimiters:
         code.slice(0, leftIdx) +
@@ -302,7 +510,10 @@ const retagUpdate = async (
       rightIdx,
     };
   };
+
+  // Try to compute the new annotation position
   try {
+    console.log("Attempting to compute updated annotation position");
     const out = computeUpdatedCodeWithSnippetRetagged({
       code: updatedCodeWithoutDelimiters,
       snippet: gptRetaggingJSON[1],
@@ -313,12 +524,12 @@ const retagUpdate = async (
       delimiterEnd: delimiter,
     });
 
-    console.log(out);
-
+    console.log("Successfully retagged annotation at:", out.leftIdx, out.rightIdx);
     return { gptRetaggingJSON, out };
   } catch (e) {
+    console.error("Error computing annotation position:", e);
     return {
-      error: e,
+      error: e instanceof Error ? e : new Error(String(e)),
       errorType: "snippet matching",
       gptOut,
       gptRetaggingJSON,

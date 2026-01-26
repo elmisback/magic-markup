@@ -60,13 +60,17 @@ export abstract class BaseAnnotationView {
     // Get annotations from the tracker
     const annotations = annotationTracker.getAnnotationsForDocument(editor.document);
 
+    // Get dark mode preference
+    const isDarkMode = vscode.workspace.getConfiguration().get('codetations.darkMode', false);
+
     // Send information to webview
     this.sendMessageObject({
       command: "initialize",
       data: {
         documentUri: editor.document.uri.toString(),
         documentText: editor.document.getText(),
-        annotations: annotations
+        annotations: annotations,
+        isDarkMode: isDarkMode
       },
     });
   }
@@ -155,7 +159,8 @@ export abstract class BaseAnnotationView {
 
         if (!editor) {
           // Most commands require an active editor
-          if (command !== "hello" && command !== "lm.chat" && command !== "lm.cancelRequest") {
+          if (command !== "hello" && command !== "lm.chat" && command !== "lm.cancelRequest" &&
+              command !== "setDarkMode" && command !== "open-external") {
             window.showErrorMessage("No active text editor found");
             return;
           }
@@ -201,7 +206,7 @@ export abstract class BaseAnnotationView {
             // Retag annotations in the active document
             this.retagAnnotations();
             return;
-            
+
           case "setSelectedAnnotationId":
             // Set the selected annotation ID
             if (!editor) {
@@ -266,9 +271,23 @@ export abstract class BaseAnnotationView {
             }
             return;
 
+          case "setDarkMode":
+            // Store dark mode preference in extension context
+            try {
+              // Store the dark mode preference in the extension's global state
+              vscode.workspace.getConfiguration().update(
+                'codetations.darkMode',
+                message.data.isDarkMode,
+                vscode.ConfigurationTarget.Global
+              );
+            } catch (error) {
+              console.error("Error saving dark mode preference to extension:", error);
+            }
+            return;
+
           case "open-external":
             // Open link in external window
-            vscode.env.openExternal(message.url);
+            vscode.env.openExternal(vscode.Uri.parse(message.url));
             return;
         }
       },
@@ -315,7 +334,7 @@ export abstract class BaseAnnotationView {
         delimiter
       );
       if (!result.out) {
-        window.showErrorMessage("Error retagging annotation: no result returned");
+        window.showErrorMessage("Error retagging annotation: no result returned (maybe all annotation anchor text was deleted?)");
         console.error("Error retagging annotation: no result returned");
         console.error(codeWithSnippetDelimited);
         return annotation;

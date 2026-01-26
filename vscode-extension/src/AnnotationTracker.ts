@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { createPatch, applyPatch } from "diff";
+import { createPatch, applyPatch, parsePatch } from "diff";
 import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
 export interface Annotation {
   // HACK this just duplicates "../webview-ui/src/Annotation.tsx"
@@ -29,12 +29,83 @@ export class AnnotationTracker implements vscode.Disposable {
   private documentAnnotations: Map<string, Annotation[]> = new Map();
   private decorationTypes: Map<string, vscode.TextEditorDecorationType[]> = new Map();
   private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
-  
+
   // Store the document content cache
   private documentContentCache = new Map<string, string>();
-  
+
   // Track accumulated changes for proper position updates
   private pendingChanges = new Map<string, vscode.TextDocumentContentChangeEvent[]>();
+
+  /**
+   * Logging levels for diff compression
+   */
+  private readonly LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  };
+
+  /**
+   * Current log level (can be adjusted based on configuration)
+   */
+  private logLevel = this.LOG_LEVELS.WARN;
+
+  /**
+   * Log a message with the specified level
+   * @param level The log level
+   * @param message The message to log
+   * @param args Additional arguments to log
+   */
+  private log(level: number, message: string, ...args: any[]): void {
+    if (level >= this.logLevel) {
+      switch (level) {
+        case this.LOG_LEVELS.DEBUG:
+          console.debug(`[DIFF] ${message}`, ...args);
+          break;
+        case this.LOG_LEVELS.INFO:
+          console.log(`[DIFF] ${message}`, ...args);
+          break;
+        case this.LOG_LEVELS.WARN:
+          console.warn(`[DIFF] ${message}`, ...args);
+          break;
+        case this.LOG_LEVELS.ERROR:
+          console.error(`[DIFF] ${message}`, ...args);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Validate a diff patch to ensure it can be safely applied
+   * @param source The source text
+   * @param patch The patch to validate
+   * @returns True if the patch is valid and can be applied, false otherwise
+   */
+  private validatePatch(source: string, patch: string): boolean {
+    try {
+      // Check if patch is valid by parsing it
+      const parsedPatches = parsePatch(patch);
+      if (!parsedPatches || parsedPatches.length === 0) {
+        this.log(this.LOG_LEVELS.WARN, "Invalid patch: no patches found");
+        return false;
+      }
+
+      // Check patch structure
+      this.log(this.LOG_LEVELS.DEBUG, "Validating patch with hunks:", parsedPatches.map(p => p.hunks.length).reduce((a, b) => a + b, 0));
+
+      // Check if patch can be applied successfully
+      const result = applyPatch(source, patch);
+      const isValid = result !== false && result !== null;
+      if (!isValid) {
+        this.log(this.LOG_LEVELS.WARN, "Patch application failed");
+      }
+      return isValid;
+    } catch (e) {
+      this.log(this.LOG_LEVELS.ERROR, "Error validating patch:", e);
+      return false;
+    }
+  }
   
   constructor(private context: vscode.ExtensionContext) {
     // Setup buffer change listeners
@@ -55,8 +126,7 @@ export class AnnotationTracker implements vscode.Disposable {
   public async loadAnnotationsForDocument(document: vscode.TextDocument): Promise<Annotation[]> {
     const documentKey = document.uri.toString();
     const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath);
-    console.debug(`Loading annotations for ${documentKey} from ${annotationsUri}`);
-    // TODO we have only sort-of validated that diff loading works correctly.
+    this.log(this.LOG_LEVELS.INFO, `Loading annotations for ${documentKey} from ${annotationsUri}`);
     if (this.documentAnnotations.has(documentKey)) {
       // Already loaded
       return this.documentAnnotations.get(documentKey) as Annotation[];
@@ -69,14 +139,54 @@ export class AnnotationTracker implements vscode.Disposable {
         
         // Reconstruct each annotation's document field using applyPatch
         const reconstructedAnnotations = state.annotations.map(ann => {
-          const reconstructedDoc = 
-            ann.documentDiff ?
-              applyPatch(state.document, ann.documentDiff) || state.document
-            : ann.document || state.document;
-          const originalDoc =
-            ann.original.documentDiff ?
-              applyPatch(state.document, ann.original.documentDiff) || reconstructedDoc
-            : ann.original.document;
+          // Process document diff
+          let reconstructedDoc = ann.document || state.document;
+          if (ann.documentDiff) {
+            try {
+              // First validate the patch
+              if (this.validatePatch(state.document, ann.documentDiff)) {
+                const patchResult = applyPatch(state.document, ann.documentDiff);
+                if (patchResult !== false && patchResult !== null) {
+                  reconstructedDoc = patchResult;
+                } else {
+                  this.log(this.LOG_LEVELS.WARN, `Failed to apply document diff for annotation ${ann.id}. Using fallback.`);
+                  // Keep using the fallback document if provided, otherwise use state.document
+                  reconstructedDoc = ann.document || state.document;
+                }
+              } else {
+                this.log(this.LOG_LEVELS.WARN, `Invalid document diff for annotation ${ann.id}. Using fallback.`);
+                reconstructedDoc = ann.document || state.document;
+              }
+            } catch (e) {
+              this.log(this.LOG_LEVELS.ERROR, `Error applying document diff for annotation ${ann.id}:`, e);
+              reconstructedDoc = ann.document || state.document;
+            }
+          }
+
+          // Process original document diff
+          let originalDoc = ann.original.document || reconstructedDoc;
+          if (ann.original.documentDiff) {
+            try {
+              // First validate the patch
+              if (this.validatePatch(state.document, ann.original.documentDiff)) {
+                const patchResult = applyPatch(state.document, ann.original.documentDiff);
+                if (patchResult !== false && patchResult !== null) {
+                  originalDoc = patchResult;
+                } else {
+                  this.log(this.LOG_LEVELS.WARN, `Failed to apply original document diff for annotation ${ann.id}. Using fallback.`);
+                  // Keep using the fallback original document if provided, otherwise use reconstructedDoc
+                  originalDoc = ann.original.document || reconstructedDoc;
+                }
+              } else {
+                this.log(this.LOG_LEVELS.WARN, `Invalid original document diff for annotation ${ann.id}. Using fallback.`);
+                originalDoc = ann.original.document || reconstructedDoc;
+              }
+            } catch (e) {
+              this.log(this.LOG_LEVELS.ERROR, `Error applying original document diff for annotation ${ann.id}:`, e);
+              originalDoc = ann.original.document || reconstructedDoc;
+            }
+          }
+
           return {
             ...ann,
             document: reconstructedDoc,
@@ -103,7 +213,7 @@ export class AnnotationTracker implements vscode.Disposable {
         return [];
       }
     } catch (error) {
-      console.error(`Error loading annotations for ${documentKey}:`, error);
+      this.log(this.LOG_LEVELS.ERROR, `Error loading annotations for ${documentKey}:`, error);
       this.documentAnnotations.set(documentKey, []);
       return [];
     }
@@ -128,10 +238,11 @@ export class AnnotationTracker implements vscode.Disposable {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    console.debug(`Saving annotations for ${documentKey} to ${annotationsUri}`);
+    this.log(this.LOG_LEVELS.INFO, `Saving annotations for ${documentKey} to ${annotationsUri}`);
 
-    // Save the global document string
-    const globalDocument = annotations.length > 0 ? annotations[0].document : document.getText();
+    // Get the current document text as the global reference
+    // Always use the current editor document text to ensure consistency
+    const globalDocument = document.getText();
 
     // Write annotations to file with documentDiffs
     const state = {
@@ -144,9 +255,14 @@ export class AnnotationTracker implements vscode.Disposable {
         if (annDoc !== globalDocument) {
           try {
             documentDiff = createPatch(document.fileName, globalDocument, annDoc);
+            // Use our validation method to check if the patch is valid
+            if (!this.validatePatch(globalDocument, documentDiff)) {
+              this.log(this.LOG_LEVELS.WARN, `Created patch for annotation ${ann.id} could not be validated. Using full document content instead.`);
+              documentDiff = undefined;
+            }
           } catch (e) {
             documentDiff = undefined;
-            console.error("Error creating document diff:", e);
+            this.log(this.LOG_LEVELS.ERROR, `Error creating document diff for annotation ${ann.id}:`, e);
           }
         }
         const { original: {
@@ -157,9 +273,14 @@ export class AnnotationTracker implements vscode.Disposable {
         if (originalDocument !== globalDocument) {
           try {
             originalDocumentDiff = createPatch(document.fileName, globalDocument, originalDocument);
+            // Use our validation method to check if the patch is valid
+            if (!this.validatePatch(globalDocument, originalDocumentDiff)) {
+              this.log(this.LOG_LEVELS.WARN, `Created original document patch for annotation ${ann.id} could not be validated. Using full document content instead.`);
+              originalDocumentDiff = undefined;
+            }
           } catch (e) {
             originalDocumentDiff = undefined;
-            console.error("Error creating original document diff:", e);
+            this.log(this.LOG_LEVELS.ERROR, `Error creating original document diff for annotation ${ann.id}:`, e);
           }
         }
         return {
