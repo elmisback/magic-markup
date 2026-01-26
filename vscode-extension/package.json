@@ -108,6 +108,6 @@
     "ws": "^8.18.0"
   },
   "extensionDependencies": [
-    "github.copilot"
+    "github.copilot-chat"
   ]
 }
