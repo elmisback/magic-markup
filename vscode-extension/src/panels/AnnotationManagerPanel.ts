@@ -6,7 +6,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 import { LMApiHandler } from "./LMApiHandler";
-import { annotationTracker } from "../extension";
+import { annotationTracker, userComponents } from "../extension";
 import { Annotation } from "../AnnotationTracker";
 import retagUpdate from "../server/retag";
 import { BaseAnnotationView } from "./BaseAnnotationView";
@@ -36,6 +36,13 @@ export class AnnotationManagerPanel extends BaseAnnotationView {
 
     // Set the HTML content for the webview panel
     this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri);
+    
+    // Send user components immediately after the panel is created
+    // This ensures components are available as soon as the panel loads
+    setTimeout(() => {
+      // Call the new method to handle component refresh
+      this.refreshComponents(userComponents);
+    }, 500); // Short delay to make sure the webview is ready
   }
 
   /**
@@ -49,6 +56,22 @@ export class AnnotationManagerPanel extends BaseAnnotationView {
       // If the webview panel already exists reveal it
       AnnotationManagerPanel.currentPanel._panel.reveal(ViewColumn.Two, true);
     } else {
+       // Get workspace root
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      const workspaceRootUri = workspaceFolders ? workspaceFolders[0].uri : undefined;
+
+      // Define allowed resource roots
+      const localResourceRoots = [
+        Uri.joinPath(extensionUri, "out"),
+        Uri.joinPath(extensionUri, "webview-ui/build")
+      ];
+      if (workspaceRootUri) {
+        // Add the user components output directory in the workspace
+        localResourceRoots.push(Uri.joinPath(workspaceRootUri, 'codetations_components', 'out'));
+      } else {
+        console.warn("Workspace root not found, cannot set localResourceRoots for user components.");
+      }
+
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
         "showAnnotations",
@@ -57,10 +80,8 @@ export class AnnotationManagerPanel extends BaseAnnotationView {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [
-            Uri.joinPath(extensionUri, "out"),
-            Uri.joinPath(extensionUri, "webview-ui/build"),
-          ],
+          // Use the defined localResourceRoots
+          localResourceRoots: localResourceRoots,
         }
       );
 
@@ -120,6 +141,43 @@ export class AnnotationManagerPanel extends BaseAnnotationView {
       endOffset
     );
   }
+
+  /**
+   * Sends an object as a JSON message to the webview.
+   * @param message The message object to send.
+   */
+  public sendMessageObject(message: any) {
+    if (this._panel) {
+      this._panel.webview.postMessage(message);
+    }
+  }
+
+  /**
+   * Converts component paths to webview URIs and sends them to the panel.
+   * @param components The user components object with fsPaths.
+   */
+  public refreshComponents(components: typeof userComponents) {
+    if (!this._panel) {
+      console.warn("Attempted to refresh components on a disposed panel.");
+      return;
+    }
+
+    const webview = this._panel.webview;
+    const webviewUserComponents = Object.entries(components).reduce((acc, [key, component]) => {
+      try {
+        const webviewUri = webview.asWebviewUri(vscode.Uri.file(component.path));
+        acc[key] = { ...component, path: webviewUri.toString() };
+      } catch (e) {
+        console.error(`Failed to create webview URI for ${component.path} in refreshComponents:`, e);
+      }
+      return acc;
+    }, {} as typeof userComponents);
+
+    this.sendMessageObject({
+      command: 'refreshComponents',
+      components: webviewUserComponents
+    });
+  }
 }
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -140,13 +198,27 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   ) {
     this._view = webviewView;
     
+    // Get workspace root
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceRootUri = workspaceFolders ? workspaceFolders[0].uri : undefined;
+
+    // Define allowed resource roots
+    const sidebarLocalResourceRoots = [
+      vscode.Uri.joinPath(this._extensionUri, "out"),
+      vscode.Uri.joinPath(this._extensionUri, "webview-ui/build")
+    ];
+    if (workspaceRootUri) {
+       // Add the user components output directory in the workspace
+      sidebarLocalResourceRoots.push(vscode.Uri.joinPath(workspaceRootUri, 'codetations_components', 'out'));
+    } else {
+      console.warn("Workspace root not found, cannot set localResourceRoots for user components in sidebar.");
+    }
+    
     webviewView.webview.options = {
       enableScripts: true,
       // retainContextWhenHidden: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this._extensionUri, "out"),
-        vscode.Uri.joinPath(this._extensionUri, "webview-ui/build"),
-      ],
+      // Use the defined localResourceRoots
+      localResourceRoots: sidebarLocalResourceRoots,
     };
 
     // Initialize the LM API Handler
@@ -167,6 +239,29 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (vscode.window.activeTextEditor) {
       this._loadAnnotationsForActiveEditor();
     }
+    
+    // Send user components to the webview on initialization
+    setTimeout(() => {
+      // Convert fsPaths to webview URIs for the sidebar
+      const webviewUserComponents = Object.entries(userComponents).reduce((acc, [key, component]) => {
+         try {
+          // Use the sidebar's webview instance
+          const webviewUri = webviewView.webview.asWebviewUri(vscode.Uri.file(component.path)); 
+          acc[key] = { ...component, path: webviewUri.toString() };
+        } catch (e) {
+          console.error(`Failed to create webview URI for sidebar component ${component.path}:`, e);
+          // Optionally skip this component or handle the error
+        }
+        return acc;
+      }, {} as typeof userComponents);
+      
+      this.sendMessageObject({
+        command: 'refreshComponents',
+        components: webviewUserComponents // Send the converted components
+      });
+      // Call the new method to handle component refresh
+      // this.refreshComponents(userComponents);
+    }, 500);
     
     // Handle panel disposal
     webviewView.onDidDispose(() => {
@@ -215,15 +310,29 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     const nonce = getNonce();
 
+    // Define the import map
+    const importMap = {
+      imports: {
+        "react": scriptUri.toString(), // Map "react" to the main script URI
+        "react-dom": scriptUri.toString(), // Map "react-dom" to the main script URI
+        "react-dom/client": scriptUri.toString() // Often needed as well
+      }
+    };
+
     return /*html*/ `
       <!DOCTYPE html>
       <html lang="en">
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}  https://*.googleapis.com 'unsafe-eval'; script-src 'nonce-${nonce}' http://localhost:* 'unsafe-eval'; connect-src 'self' http://localhost:*; font-src https://fonts.gstatic.com; ">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://*.googleapis.com 'unsafe-eval'; script-src 'nonce-${nonce}' ${webview.cspSource} http://localhost:* 'unsafe-eval'; connect-src 'self' http://localhost:*; font-src https://fonts.gstatic.com;">
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
           <title>Annotations</title>
+          
+          <!-- Add the import map -->
+          <script type="importmap" nonce="${nonce}">
+            ${JSON.stringify(importMap)}
+          </script>
         </head>
         <body>
           <div id="root"></div>
@@ -532,7 +641,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
    */
   public sendMessageObject(message: any) {
     if (this._view) {
-      this._view.webview.postMessage(JSON.stringify(message));
+      this._view.webview.postMessage(message);
     }
   }
   
@@ -547,13 +656,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
 
     this._view.webview.postMessage(
-      JSON.stringify({
+      {
         command: "addAnnotation",
         data: {
           start: editor.document.offsetAt(editor.selection.start),
           end: editor.document.offsetAt(editor.selection.end),
         },
-      })
+      }
     );
   }
 
@@ -564,9 +673,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     
     this._view.webview.postMessage(
-      JSON.stringify({
+      {
         command: "removeAnnotation",
-      })
+      }
     );
   }
 
@@ -580,12 +689,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.window.showInputBox({ prompt: "Enter a color" }).then((color) => {
       if (color && this._view) {
         this._view.webview.postMessage(
-          JSON.stringify({
+          {
             command: "setAnnotationColor",
             data: {
               color: color,
             },
-          })
+          }
         );
       }
     });
