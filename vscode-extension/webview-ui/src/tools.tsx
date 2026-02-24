@@ -1896,518 +1896,596 @@
     );
   };
   const Generator: React.FC<AnnotationEditorProps> = (props) => {
-    // State management
-    const [userInput, setUserInput] = useState(props.value.metadata.userInput || '');
-    const [generatedCode, setGeneratedCode] = useState(props.value.metadata.generatedCode || '');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [useMock, setUseMock] = useState(false);
-    const [apiDiagnostics, setApiDiagnostics] = useState<string>('');
-    const [GeneratedComponent, setGeneratedComponent] = useState<React.FC<AnnotationEditorProps> | null>(null);
-    
-    const isMounted = useRef(true);
+  // State management
+  const [userInput, setUserInput] = useState(props.value.metadata.userInput || '');
+  const [generatedCode, setGeneratedCode] = useState(props.value.metadata.generatedCode || '');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [useMock, setUseMock] = useState(false);
+  const [apiDiagnostics, setApiDiagnostics] = useState<string>('');
+  const [GeneratedComponent, setGeneratedComponent] = useState<React.FC<AnnotationEditorProps> | null>(null);
+  
+  const isMounted = useRef(true);
 
-    // Fallback mock API - only used when real API completely fails
-    // This does NOT generate predetermined templates - it shows an error
-    const fallbackMockLmApi = {
-      chat: async (messages: any, options?: any) => {
-        console.log('[FallbackMockAPI] Real API failed - showing error component');
-        
-        // Return a simple error component instead of predetermined templates
-        return `
-  const [error] = useState('API unavailable');
+  // Fallback mock API - only used when real API completely fails
+  // This does NOT generate predetermined templates - it shows the actual error
+  const fallbackMockLmApi = {
+    chat: async (messages: any, options?: any, errorDetails?: string) => {
+      console.log('[FallbackMockAPI] Real API failed - showing error component with details');
+      
+      // Escape the error message for safe inclusion in JavaScript string
+      const safeErrorDetails = (errorDetails || 'Unknown error')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+      
+      // Return an error component that displays the actual error
+      return `
+const [showDetails, setShowDetails] = useState(false);
 
-  console.log('[FallbackComponent] Real API failed, showing error');
+console.log('[FallbackComponent] Real API failed, showing error');
 
-  return React.createElement('div',
-    { style: { padding: '10px', fontFamily: 'Poppins, sans-serif', color: '#D83B01' } },
+return React.createElement('div',
+  { style: { padding: '10px', fontFamily: 'Poppins, sans-serif' } },
+  React.createElement('div',
+    { style: { padding: '12px', backgroundColor: '#FED9CC', border: '2px solid #D83B01', borderRadius: '6px', marginBottom: '10px' } },
     React.createElement('h3', 
-      { style: { ...commonTextStyle, marginBottom: '10px', color: '#D83B01' } },
-      '⚠️ API Unavailable'
+      { style: { ...commonTextStyle, marginBottom: '10px', color: '#D83B01', fontSize: '16px' } },
+      '⚠️ API Error'
     ),
     React.createElement('p',
-      { style: { ...commonTextStyle, fontSize: '12px' } },
-      'The component generation API is not available. Please check your connection or API configuration.'
+      { style: { ...commonTextStyle, fontSize: '13px', marginBottom: '10px' } },
+      'The component generation API failed. See error details below:'
     ),
-    React.createElement('p',
-      { style: { ...commonTextStyle, fontSize: '11px', color: '#666', marginTop: '10px' } },
-      'Your request: "${userInput}"'
+    React.createElement('div',
+      { style: { marginTop: '10px', marginBottom: '10px' } },
+      React.createElement('button',
+        {
+          onClick: () => setShowDetails(!showDetails),
+          style: {
+            padding: '6px 12px',
+            backgroundColor: '#D83B01',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }
+        },
+        showDetails ? '▼ Hide Error Details' : '▶ Show Error Details'
+      )
     ),
-    React.createElement('p',
-      { style: { ...commonTextStyle, fontSize: '11px', color: '#666', marginTop: '5px' } },
-      'Highlighted text: ' + props.utils.getText()
-    )
-  );
-        `.trim();
-      }
-    };
-
-    useEffect(() => {
-      // Comprehensive API diagnostics
-      const diagnostics = [];
-      
-      diagnostics.push('=== API Diagnostics ===');
-      diagnostics.push(`vscode: ${typeof vscode} ${vscode ? '✓' : '✗'}`);
-      diagnostics.push(`lmApi: ${typeof lmApi} ${lmApi ? '✓' : '✗'}`);
-      
-      if (lmApi) {
-        diagnostics.push(`lmApi.chat: ${typeof lmApi.chat} ${typeof lmApi.chat === 'function' ? '✓' : '✗'}`);
-      }
-      
-      diagnostics.push(`fallbackMockLmApi: ${typeof fallbackMockLmApi} ${fallbackMockLmApi ? '✓' : '✗'}`);
-      
-      const diagText = diagnostics.join('\n');
-      setApiDiagnostics(diagText);
-      console.log(diagText);
-      
-      // Only use mock if the real API is not available
-      const lmApiAvailable = typeof lmApi !== 'undefined' && lmApi !== null && typeof lmApi.chat === 'function';
-      
-      if (!lmApiAvailable) {
-        console.warn('[Generator] Real lmApi not available - fallback mode enabled');
-        setUseMock(true);
-      } else {
-        console.log('[Generator] Real lmApi is available');
-        setUseMock(false);
-      }
-      
-      return () => {
-        isMounted.current = false;
-      };
-    }, []);
-
-    // Load existing generated component on mount
-    useEffect(() => {
-      if (generatedCode && isMounted.current) {
-        try {
-          compileComponent(generatedCode);
-        } catch (err) {
-          console.error("[Generator] Failed to compile existing code:", err);
+    showDetails && React.createElement('pre',
+      {
+        style: {
+          marginTop: '10px',
+          padding: '10px',
+          backgroundColor: '#fff',
+          border: '1px solid #D83B01',
+          borderRadius: '4px',
+          fontSize: '11px',
+          overflow: 'auto',
+          maxHeight: '200px',
+          fontFamily: 'monospace',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word'
         }
-      }
-    }, []);
-
-    // Save state to metadata
-    useEffect(() => {
-      props.utils.setMetadata({
-        userInput,
-        generatedCode,
-      });
-    }, [userInput, generatedCode]);
-
-    // Get document context
-    const anchorText = props.utils.getText();
-    const documentText = props.value.document || '';
-    const startPos = props.value.start;
-    const endPos = props.value.end;
-
-    const createFormattedDocument = () => {
-      if (!documentText) return '';
-      
-      const before = documentText.substring(0, startPos);
-      const highlighted = documentText.substring(startPos, endPos);
-      const after = documentText.substring(endPos);
-      
-      return `${before}<<<HIGHLIGHTED>${highlighted}</HIGHLIGHTED>>>${after}`;
-    };
-
-    const generateAnnotation = async () => {
-      if (!userInput.trim()) {
-        setError('Please describe what you want the annotation to do');
-        return;
-      }
-
-      setIsGenerating(true);
-      setError(null);
-
-      try {
-        const formattedDocument = createFormattedDocument();
-        
-        const prompt: ChatMessage[] = [
-          {
-            role: "system",
-            content: `You are an expert React developer creating annotation components for a code annotation system. 
-
-  CONTEXT:
-  - You will receive a description of what the annotation should do
-  - You have access to the highlighted code/text and surrounding document context
-  - The annotation component receives props of type AnnotationEditorProps with these key utilities:
-    * props.utils.getText() - gets the highlighted text
-    * props.utils.setText(newText) - updates the highlighted text
-    * props.utils.setMetadata(obj) - persists data across sessions
-    * props.value.metadata - retrieves persisted data
-    * props.value.document - the full document text for context
-    * props.value.start/end - position of highlighted text
-
-  CRITICAL REQUIREMENT - NO JSX:
-  You MUST use React.createElement() instead of JSX syntax because the code will be compiled without a JSX transformer.
-  DO NOT use angle brackets like <div>, <button>, etc.
-  Instead use: React.createElement('div', { style: {...} }, 'content')
-
-  REQUIREMENTS:
-  1. Generate ONLY the component function body using React.createElement
-  2. Do NOT include: imports, export statements, or the component function declaration
-  3. Use React hooks (useState, useEffect, useRef) as needed - they're available from React destructuring
-  4. Store all state in metadata using props.utils.setMetadata() for persistence
-  5. Use the commonTextStyle constant for consistent styling: { fontFamily: "Poppins, sans-serif", fontSize: "14px", color: "black" }
-  6. Include comprehensive console.log statements for debugging with format: console.log('[ComponentName] message', data)
-  7. Handle errors gracefully with try-catch blocks
-  8. The lmApi is available with this EXACT signature:
-    const response = await lmApi.chat(messages, { vendor: 'copilot-chat', family: 'gpt-4o', temperature: 0.32 });
-    IMPORTANT: lmApi.chat() returns a STRING directly, NOT an object. Use it like: const text = await lmApi.chat(messages, options);
-  9. Use props.value.document to understand code context for better defaults and behavior
-  10. Keep explanations and messages concise and user-friendly
-  11. GENERATE EXACTLY WHAT THE USER REQUESTS - do not fall back to predetermined templates
-
-  OUTPUT FORMAT:
-  Return ONLY valid JavaScript code using React.createElement().
-  Start directly with useState/useEffect declarations or the return statement.
-  DO NOT wrap code in markdown code blocks.
-
-  EXAMPLE OUTPUT STRUCTURE:
-  const [value, setValue] = useState(props.value.metadata.value || '');
-  console.log('[ComponentName] Initialized with value:', value);
-
-  useEffect(() => {
-    props.utils.setMetadata({ value });
-  }, [value]);
-
-  const handleAction = async () => {
-    console.log('[ComponentName] Action triggered');
-    try {
-      const result = await lmApi.chat([
-        { role: 'system', content: 'You are helpful.' },
-        { role: 'user', content: 'Hello' }
-      ], { vendor: 'copilot-chat', family: 'gpt-4o', temperature: 0.5 });
-      console.log('[ComponentName] Got result:', result);
-    } catch (error) {
-      console.error('[ComponentName] Error:', error);
+      },
+      '${safeErrorDetails}'
+    )
+  ),
+  React.createElement('div',
+    { style: { padding: '10px', backgroundColor: '#F0F0F0', borderRadius: '4px', fontSize: '12px' } },
+    React.createElement('p',
+      { style: { ...commonTextStyle, fontWeight: 'bold', marginBottom: '8px' } },
+      'Your request:'
+    ),
+    React.createElement('p',
+      { style: { ...commonTextStyle, fontSize: '12px', fontStyle: 'italic', marginBottom: '10px' } },
+      props.value.metadata.userInput || 'No request provided'
+    ),
+    React.createElement('p',
+      { style: { ...commonTextStyle, fontWeight: 'bold', marginBottom: '8px' } },
+      'Highlighted text:'
+    ),
+    React.createElement('pre',
+      { style: { ...commonTextStyle, fontSize: '11px', backgroundColor: '#fff', padding: '8px', borderRadius: '4px', overflow: 'auto', maxHeight: '100px' } },
+      props.utils.getText() || 'No text highlighted'
+    )
+  )
+);
+      `.trim();
     }
   };
 
-  return React.createElement('div', 
-    { style: { padding: "10px", fontFamily: "Poppins, sans-serif" } },
-    React.createElement('button', 
-      { onClick: handleAction, style: commonTextStyle },
-      'Click Me'
-    ),
-    React.createElement('p', { style: commonTextStyle }, value)
-  );`
-          },
-          {
-            role: "user",
-            content: `Create an annotation component based on this EXACT description:
-  ${userInput}
-
-  Document context (highlighted section marked):
-  ${formattedDocument || 'No document context available'}
-
-  Highlighted text:
-  ${anchorText || 'No text highlighted'}
-
-  IMPORTANT: Generate a component that fulfills the EXACT request above. Do not use predetermined templates or generic components. Create custom functionality that matches what the user specifically asked for.
-
-  Generate the component implementation now.`
-          }
-        ];
-
-        console.log('[Generator] Starting generation...');
-        console.log('[Generator] Force fallback mode:', useMock);
-        console.log('[Generator] User request:', userInput);
-        
-        let response: string;
-        let apiUsed = 'unknown';
-        
-        if (useMock) {
-          console.log('[Generator] Using fallback API (manual override - NOT RECOMMENDED)');
-          response = await fallbackMockLmApi.chat(prompt);
-          apiUsed = 'fallback-manual';
-        } else {
-          console.log('[Generator] Attempting real lmApi...');
-          console.log('[Generator] lmApi type:', typeof lmApi);
-          console.log('[Generator] lmApi.chat type:', typeof lmApi?.chat);
-          
-          try {
-            const startTime = Date.now();
-            response = await lmApi.chat(prompt, {
-              vendor: 'copilot-chat',
-              family: 'gpt-4o',
-              temperature: 0.3
-            });
-            const elapsed = Date.now() - startTime;
-            console.log(`[Generator] Real API succeeded in ${elapsed}ms`);
-            apiUsed = 'real';
-          } catch (apiError: unknown) {
-            console.error('[Generator] Real API failed:', apiError);
-            console.error('[Generator] Error type:', (apiError as any)?.constructor?.name);
-            console.error('[Generator] Error message:', (apiError instanceof Error) ? apiError.message : String(apiError));
-            console.log('[Generator] Falling back to error component');
-            
-            response = await fallbackMockLmApi.chat(prompt);
-            apiUsed = 'fallback-auto';
-          }
-        }
-
-        console.log('[Generator] API used:', apiUsed);
-        console.log('[Generator] Response length:', response?.length);
-        console.log('[Generator] Response preview:', response?.substring(0, 100));
-
-        // Extract code from response (remove markdown code blocks if present)
-        let code = response.trim();
-        const codeBlockMatch = code.match(/```(?:javascript|typescript|jsx|tsx)?\n([\s\S]*?)\n```/);
-        if (codeBlockMatch) {
-          code = codeBlockMatch[1].trim();
-          console.log('[Generator] Extracted code from markdown block');
-        }
-
-        console.log('[Generator] Final code length:', code.length);
-        
-        if (isMounted.current) {
-          setGeneratedCode(code);
-          compileComponent(code);
-          console.log('[Generator] Component compiled successfully');
-        }
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'An error occurred while generating the annotation';
-        console.error('[Generator] Error:', errorMsg, err);
-        if (isMounted.current) {
-          setError(errorMsg);
-        }
-      } finally {
-        if (isMounted.current) {
-          setIsGenerating(false);
-        }
-      }
+  useEffect(() => {
+    // Comprehensive API diagnostics
+    const diagnostics = [];
+    
+    diagnostics.push('=== API Diagnostics ===');
+    diagnostics.push(`vscode: ${typeof vscode} ${vscode ? '✓' : '✗'}`);
+    diagnostics.push(`lmApi: ${typeof lmApi} ${lmApi ? '✓' : '✗'}`);
+    
+    if (lmApi) {
+      diagnostics.push(`lmApi.chat: ${typeof lmApi.chat} ${typeof lmApi.chat === 'function' ? '✓' : '✗'}`);
+    }
+    
+    diagnostics.push(`fallbackMockLmApi: ${typeof fallbackMockLmApi} ${fallbackMockLmApi ? '✓' : '✗'}`);
+    
+    const diagText = diagnostics.join('\n');
+    setApiDiagnostics(diagText);
+    console.log(diagText);
+    
+    // Only use mock if the real API is not available
+    const lmApiAvailable = typeof lmApi !== 'undefined' && lmApi !== null && typeof lmApi.chat === 'function';
+    
+    if (!lmApiAvailable) {
+      console.warn('[Generator] Real lmApi not available - fallback mode enabled');
+      setUseMock(true);
+    } else {
+      console.log('[Generator] Real lmApi is available');
+      setUseMock(false);
+    }
+    
+    return () => {
+      isMounted.current = false;
     };
+  }, []);
 
-    const compileComponent = (code: string) => {
+  // Load existing generated component on mount
+  useEffect(() => {
+    if (generatedCode && isMounted.current) {
       try {
-        console.log('[Generator] Compiling component...');
-        
-        const commonTextStyle = {
-          fontFamily: "Poppins, sans-serif",
-          fontSize: "14px",
-          color: "black",
-        };
-
-        // Create a function that returns a React component
-        const componentFunction = new Function(
-          'React',
-          'props',
-          'lmApi',
-          'mockLmApi',
-          'vscode',
-          'commonTextStyle',
-          `
-          const { useState, useEffect, useRef } = React;
-          ${code}
-          `
-        );
-
-        // Create a wrapper component
-        const WrappedComponent: React.FC<AnnotationEditorProps> = (componentProps) => {
-          return componentFunction(
-            React,
-            componentProps,
-            lmApi,
-            mockLmApi,
-            vscode,
-            commonTextStyle
-          );
-        };
-
-        setGeneratedComponent(() => WrappedComponent);
-        console.log('[Generator] Component compiled and set successfully');
+        compileComponent(generatedCode);
       } catch (err) {
-        console.error('[Generator] Compilation error:', err);
-        throw new Error(`Failed to compile generated component: ${err instanceof Error ? err.message : String(err)}`);
+        console.error("[Generator] Failed to compile existing code:", err);
       }
-    };
+    }
+  }, []);
 
-    const resetGenerator = () => {
-      console.log('[Generator] Resetting generator');
-      setGeneratedCode('');
-      setGeneratedComponent(null);
-      setError(null);
-    };
+  // Save state to metadata
+  useEffect(() => {
+    props.utils.setMetadata({
+      userInput,
+      generatedCode,
+    });
+  }, [userInput, generatedCode]);
 
-    // If we have a generated component, render it
-    if (GeneratedComponent) {
-      return (
-        <div style={{ padding: "10px", fontFamily: "Poppins, sans-serif" }}>
-          <div style={{
-            marginBottom: "10px",
-            padding: "8px",
-            backgroundColor: "#E8F5E9",
-            border: "1px solid #4CAF50",
-            borderRadius: "4px",
-            fontSize: "12px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}>
-            <span>✓ Generated annotation active</span>
-            <button
-              onClick={resetGenerator}
-              style={{
-                padding: "4px 8px",
-                backgroundColor: "#f44336",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "12px"
-              }}
-            >
-              Reset
-            </button>
-          </div>
-          <GeneratedComponent {...props} />
-        </div>
-      );
+  // Get document context
+  const anchorText = props.utils.getText();
+  const documentText = props.value.document || '';
+  const startPos = props.value.start;
+  const endPos = props.value.end;
+
+  const createFormattedDocument = () => {
+    if (!documentText) return '';
+    
+    const before = documentText.substring(0, startPos);
+    const highlighted = documentText.substring(startPos, endPos);
+    const after = documentText.substring(endPos);
+    
+    return `${before}<<<HIGHLIGHTED>${highlighted}</HIGHLIGHTED>>>${after}`;
+  };
+
+  const generateAnnotation = async () => {
+    if (!userInput.trim()) {
+      setError('Please describe what you want the annotation to do');
+      return;
     }
 
-    // Otherwise, show the input interface
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const formattedDocument = createFormattedDocument();
+      
+      const prompt: ChatMessage[] = [
+        {
+          role: "system",
+          content: `You are an expert React developer creating annotation components for a code annotation system. 
+
+CONTEXT:
+- You will receive a description of what the annotation should do
+- You have access to the highlighted code/text and surrounding document context
+- The annotation component receives props of type AnnotationEditorProps with these key utilities:
+  * props.utils.getText() - gets the highlighted text
+  * props.utils.setText(newText) - updates the highlighted text
+  * props.utils.setMetadata(obj) - persists data across sessions
+  * props.value.metadata - retrieves persisted data
+  * props.value.document - the full document text for context
+  * props.value.start/end - position of highlighted text
+
+CRITICAL REQUIREMENT - NO JSX:
+You MUST use React.createElement() instead of JSX syntax because the code will be compiled without a JSX transformer.
+DO NOT use angle brackets like <div>, <button>, etc.
+Instead use: React.createElement('div', { style: {...} }, 'content')
+
+REQUIREMENTS:
+1. Generate ONLY the component function body using React.createElement
+2. Do NOT include: imports, export statements, or the component function declaration
+3. Use React hooks (useState, useEffect, useRef) as needed - they're available from React destructuring
+4. Store all state in metadata using props.utils.setMetadata() for persistence
+5. Use the commonTextStyle constant for consistent styling: { fontFamily: "Poppins, sans-serif", fontSize: "14px", color: "black" }
+6. Include comprehensive console.log statements for debugging with format: console.log('[ComponentName] message', data)
+7. Handle errors gracefully with try-catch blocks
+8. The lmApi is available with this EXACT signature:
+   const response = await lmApi.chat(messages, { vendor: 'copilot', family: 'gpt-4o', temperature: 0.32 });
+   IMPORTANT: lmApi.chat() returns a STRING directly, NOT an object. Use it like: const text = await lmApi.chat(messages, options);
+9. Use props.value.document to understand code context for better defaults and behavior
+10. Keep explanations and messages concise and user-friendly
+11. GENERATE EXACTLY WHAT THE USER REQUESTS - do not fall back to predetermined templates
+
+OUTPUT FORMAT:
+Return ONLY valid JavaScript code using React.createElement().
+Start directly with useState/useEffect declarations or the return statement.
+DO NOT wrap code in markdown code blocks.
+
+EXAMPLE OUTPUT STRUCTURE:
+const [value, setValue] = useState(props.value.metadata.value || '');
+console.log('[ComponentName] Initialized with value:', value);
+
+useEffect(() => {
+  props.utils.setMetadata({ value });
+}, [value]);
+
+const handleAction = async () => {
+  console.log('[ComponentName] Action triggered');
+  try {
+    const result = await lmApi.chat([
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'Hello' }
+    ], { vendor: 'copilot', family: 'gpt-4o', temperature: 0.5 });
+    console.log('[ComponentName] Got result:', result);
+  } catch (error) {
+    console.error('[ComponentName] Error:', error);
+  }
+};
+
+return React.createElement('div', 
+  { style: { padding: "10px", fontFamily: "Poppins, sans-serif" } },
+  React.createElement('button', 
+    { onClick: handleAction, style: commonTextStyle },
+    'Click Me'
+  ),
+  React.createElement('p', { style: commonTextStyle }, value)
+);`
+        },
+        {
+          role: "user",
+          content: `Create an annotation component based on this EXACT description:
+${userInput}
+
+Document context (highlighted section marked):
+${formattedDocument || 'No document context available'}
+
+Highlighted text:
+${anchorText || 'No text highlighted'}
+
+IMPORTANT: Generate a component that fulfills the EXACT request above. Do not use predetermined templates or generic components. Create custom functionality that matches what the user specifically asked for.
+
+Generate the component implementation now.`
+        }
+      ];
+
+      console.log('[Generator] Starting generation...');
+      console.log('[Generator] Force fallback mode:', useMock);
+      console.log('[Generator] User request:', userInput);
+      
+      let response: string;
+      let apiUsed = 'unknown';
+      
+      if (useMock) {
+        console.log('[Generator] Using fallback API (manual override - NOT RECOMMENDED)');
+        response = await fallbackMockLmApi.chat(prompt, undefined, 'Manual fallback mode enabled - real API was not attempted');
+        apiUsed = 'fallback-manual';
+      } else {
+        console.log('[Generator] Attempting real lmApi...');
+        console.log('[Generator] lmApi type:', typeof lmApi);
+        console.log('[Generator] lmApi.chat type:', typeof lmApi?.chat);
+        
+        try {
+          const startTime = Date.now();
+          response = await lmApi.chat(prompt, {
+            vendor: 'copilot',
+            family: 'gpt-4o',
+            temperature: 0.3
+          });
+          const elapsed = Date.now() - startTime;
+          console.log(`[Generator] Real API succeeded in ${elapsed}ms`);
+          apiUsed = 'real';
+        } catch (apiError: unknown) {
+          console.error('[Generator] Real API failed:', apiError);
+          console.error('[Generator] Error type:', (apiError as any)?.constructor?.name);
+          console.error('[Generator] Error message:', (apiError instanceof Error) ? apiError.message : String(apiError));
+          console.log('[Generator] Falling back to error component');
+          
+          // Format the error details for display
+          let errorDetails = '';
+          if (apiError instanceof Error) {
+            errorDetails = `Error: ${apiError.message}\n\nStack trace:\n${apiError.stack || 'No stack trace available'}`;
+          } else {
+            errorDetails = `Error: ${String(apiError)}\n\nType: ${(apiError as any)?.constructor?.name || 'unknown'}`;
+          }
+          
+          // Add any additional error properties
+          if (typeof apiError === 'object' && apiError !== null) {
+            const errorObj = apiError as any;
+            const extraProps = Object.keys(errorObj).filter(k => k !== 'message' && k !== 'stack' && k !== 'name');
+            if (extraProps.length > 0) {
+              errorDetails += '\n\nAdditional details:\n';
+              extraProps.forEach(prop => {
+                errorDetails += `${prop}: ${JSON.stringify(errorObj[prop], null, 2)}\n`;
+              });
+            }
+          }
+          
+          response = await fallbackMockLmApi.chat(prompt, undefined, errorDetails);
+          apiUsed = 'fallback-auto';
+        }
+      }
+
+      console.log('[Generator] API used:', apiUsed);
+      console.log('[Generator] Response length:', response?.length);
+      console.log('[Generator] Response preview:', response?.substring(0, 100));
+
+      // Extract code from response (remove markdown code blocks if present)
+      let code = response.trim();
+      const codeBlockMatch = code.match(/```(?:javascript|typescript|jsx|tsx)?\n([\s\S]*?)\n```/);
+      if (codeBlockMatch) {
+        code = codeBlockMatch[1].trim();
+        console.log('[Generator] Extracted code from markdown block');
+      }
+
+      console.log('[Generator] Final code length:', code.length);
+      
+      if (isMounted.current) {
+        setGeneratedCode(code);
+        compileComponent(code);
+        console.log('[Generator] Component compiled successfully');
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred while generating the annotation';
+      console.error('[Generator] Error:', errorMsg, err);
+      if (isMounted.current) {
+        setError(errorMsg);
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  const compileComponent = (code: string) => {
+    try {
+      console.log('[Generator] Compiling component...');
+      
+      const commonTextStyle = {
+        fontFamily: "Poppins, sans-serif",
+        fontSize: "14px",
+        color: "black",
+      };
+
+      // Create a function that returns a React component
+      const componentFunction = new Function(
+        'React',
+        'props',
+        'lmApi',
+        'mockLmApi',
+        'vscode',
+        'commonTextStyle',
+        `
+        const { useState, useEffect, useRef } = React;
+        ${code}
+        `
+      );
+
+      // Create a wrapper component
+      const WrappedComponent: React.FC<AnnotationEditorProps> = (componentProps) => {
+        return componentFunction(
+          React,
+          componentProps,
+          lmApi,
+          mockLmApi,
+          vscode,
+          commonTextStyle
+        );
+      };
+
+      setGeneratedComponent(() => WrappedComponent);
+      console.log('[Generator] Component compiled and set successfully');
+    } catch (err) {
+      console.error('[Generator] Compilation error:', err);
+      throw new Error(`Failed to compile generated component: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const resetGenerator = () => {
+    console.log('[Generator] Resetting generator');
+    setGeneratedCode('');
+    setGeneratedComponent(null);
+    setError(null);
+  };
+
+  // If we have a generated component, render it
+  if (GeneratedComponent) {
     return (
       <div style={{ padding: "10px", fontFamily: "Poppins, sans-serif" }}>
-        {apiDiagnostics && (
-          <details style={{ marginBottom: "15px", fontSize: "11px", color: "#666" }}>
-            <summary style={{ cursor: "pointer", fontWeight: "bold" }}>
-              API Diagnostics (click to expand)
-            </summary>
-            <pre style={{
-              marginTop: "8px",
-              padding: "8px",
-              backgroundColor: "#f5f5f5",
-              borderRadius: "4px",
-              overflow: "auto"
-            }}>
-              {apiDiagnostics}
-            </pre>
-          </details>
-        )}
-        
-        <div style={{ marginBottom: "12px" }}>
-          <label style={{
-            display: "block",
-            marginBottom: "6px",
-            fontWeight: "bold",
-            fontSize: "14px"
-          }}>
-            Describe the annotation you want to create:
-          </label>
-          <textarea
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder="Example: Create a color picker that lets me change the hex color value in this code... or Create a timer that counts down from the number in this variable..."
-            style={{
-              width: "100%",
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #ccc",
-              fontSize: "14px",
-              minHeight: "80px",
-              resize: "vertical",
-              fontFamily: "Poppins, sans-serif"
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: "15px", display: "flex", gap: "10px", alignItems: "center" }}>
+        <div style={{
+          marginBottom: "10px",
+          padding: "8px",
+          backgroundColor: "#E8F5E9",
+          border: "1px solid #4CAF50",
+          borderRadius: "4px",
+          fontSize: "12px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <span>✓ Generated annotation active</span>
           <button
-            onClick={generateAnnotation}
-            disabled={isGenerating || !userInput.trim()}
+            onClick={resetGenerator}
             style={{
-              padding: "6px 12px",
-              backgroundColor: isGenerating ? "#cccccc" : "#0078D4",
+              padding: "4px 8px",
+              backgroundColor: "#f44336",
               color: "white",
               border: "none",
               borderRadius: "4px",
-              cursor: isGenerating ? "default" : "pointer",
-              fontSize: "14px"
+              cursor: "pointer",
+              fontSize: "12px"
             }}
           >
-            {isGenerating ? "Generating..." : "Generate"}
+            Reset
           </button>
-
-          <label style={{
-            display: "flex",
-            alignItems: "center",
-            fontSize: "12px",
-            cursor: "pointer",
-            marginLeft: "10px"
-          }}>
-            <input
-              type="checkbox"
-              checked={useMock}
-              onChange={() => setUseMock(!useMock)}
-              style={{ marginRight: "5px" }}
-            />
-            Force fallback mode (shows error - for testing only)
-          </label>
-          
-          <span style={{ fontSize: "11px", color: "#666", marginLeft: "10px" }}>
-            {useMock ? "⚠️ Fallback Mode" : "✓ Real API"}
-          </span>
         </div>
+        <GeneratedComponent {...props} />
+      </div>
+    );
+  }
 
-        {error && (
-          <div style={{
-            color: "#D83B01",
-            backgroundColor: "#FED9CC",
+  // Otherwise, show the input interface
+  return (
+    <div style={{ padding: "10px", fontFamily: "Poppins, sans-serif" }}>
+      {apiDiagnostics && (
+        <details style={{ marginBottom: "15px", fontSize: "11px", color: "#666" }}>
+          <summary style={{ cursor: "pointer", fontWeight: "bold" }}>
+            API Diagnostics (click to expand)
+          </summary>
+          <pre style={{
+            marginTop: "8px",
+            padding: "8px",
+            backgroundColor: "#f5f5f5",
+            borderRadius: "4px",
+            overflow: "auto"
+          }}>
+            {apiDiagnostics}
+          </pre>
+        </details>
+      )}
+      
+      <div style={{ marginBottom: "12px" }}>
+        <label style={{
+          display: "block",
+          marginBottom: "6px",
+          fontWeight: "bold",
+          fontSize: "14px"
+        }}>
+          Describe the annotation you want to create:
+        </label>
+        <textarea
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          placeholder="Example: Create a color picker that lets me change the hex color value in this code... or Create a timer that counts down from the number in this variable..."
+          style={{
+            width: "100%",
             padding: "8px",
             borderRadius: "4px",
-            marginBottom: "12px",
-            fontSize: "14px"
-          }}>
-            {error}
-          </div>
-        )}
+            border: "1px solid #ccc",
+            fontSize: "14px",
+            minHeight: "80px",
+            resize: "vertical",
+            fontFamily: "Poppins, sans-serif"
+          }}
+        />
+      </div>
 
-        {generatedCode && !GeneratedComponent && (
-          <div style={{
-            marginTop: "15px",
-            padding: "10px",
-            backgroundColor: "#FFF3CD",
-            border: "1px solid #FFC107",
+      <div style={{ marginBottom: "15px", display: "flex", gap: "10px", alignItems: "center" }}>
+        <button
+          onClick={generateAnnotation}
+          disabled={isGenerating || !userInput.trim()}
+          style={{
+            padding: "6px 12px",
+            backgroundColor: isGenerating ? "#cccccc" : "#0078D4",
+            color: "white",
+            border: "none",
             borderRadius: "4px",
-            fontSize: "12px"
-          }}>
-            <strong>Generated code (failed to compile):</strong>
-            <pre style={{
-              marginTop: "8px",
-              padding: "8px",
-              backgroundColor: "#F5F5F5",
-              borderRadius: "4px",
-              overflow: "auto",
-              maxHeight: "200px",
-              fontSize: "11px"
-            }}>
-              {generatedCode}
-            </pre>
-          </div>
-        )}
+            cursor: isGenerating ? "default" : "pointer",
+            fontSize: "14px"
+          }}
+        >
+          {isGenerating ? "Generating..." : "Generate"}
+        </button>
 
+        <label style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          cursor: "pointer",
+          marginLeft: "10px"
+        }}>
+          <input
+            type="checkbox"
+            checked={useMock}
+            onChange={() => setUseMock(!useMock)}
+            style={{ marginRight: "5px" }}
+          />
+          Force fallback mode (shows error - for testing only)
+        </label>
+        
+        <span style={{ fontSize: "11px", color: "#666", marginLeft: "10px" }}>
+          {useMock ? "⚠️ Fallback Mode" : "✓ Real API"}
+        </span>
+      </div>
+
+      {error && (
+        <div style={{
+          color: "#D83B01",
+          backgroundColor: "#FED9CC",
+          padding: "8px",
+          borderRadius: "4px",
+          marginBottom: "12px",
+          fontSize: "14px"
+        }}>
+          {error}
+        </div>
+      )}
+
+      {generatedCode && !GeneratedComponent && (
         <div style={{
           marginTop: "15px",
           padding: "10px",
-          backgroundColor: "#F0F0F0",
+          backgroundColor: "#FFF3CD",
+          border: "1px solid #FFC107",
           borderRadius: "4px",
-          fontSize: "12px",
-          color: "#666"
+          fontSize: "12px"
         }}>
-          <strong>Tips:</strong>
-          <ul style={{ marginTop: "5px", marginBottom: "0", paddingLeft: "20px" }}>
-            <li>Be specific about what the annotation should do</li>
-            <li>Describe the exact behavior and UI you want</li>
-            <li>Mention if it should interact with the highlighted text</li>
-            <li>State if data should persist across sessions</li>
-            <li>Examples: "rating stars", "color picker", "countdown timer", "progress tracker"</li>
-          </ul>
+          <strong>Generated code (failed to compile):</strong>
+          <pre style={{
+            marginTop: "8px",
+            padding: "8px",
+            backgroundColor: "#F5F5F5",
+            borderRadius: "4px",
+            overflow: "auto",
+            maxHeight: "200px",
+            fontSize: "11px"
+          }}>
+            {generatedCode}
+          </pre>
         </div>
+      )}
+
+      <div style={{
+        marginTop: "15px",
+        padding: "10px",
+        backgroundColor: "#F0F0F0",
+        borderRadius: "4px",
+        fontSize: "12px",
+        color: "#666"
+      }}>
+        <strong>Tips:</strong>
+        <ul style={{ marginTop: "5px", marginBottom: "0", paddingLeft: "20px" }}>
+          <li>Be specific about what the annotation should do</li>
+          <li>Describe the exact behavior and UI you want</li>
+          <li>Mention if it should interact with the highlighted text</li>
+          <li>State if data should persist across sessions</li>
+          <li>Examples: "rating stars", "color picker", "countdown timer", "progress tracker"</li>
+        </ul>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 
 
