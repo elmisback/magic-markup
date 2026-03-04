@@ -21,10 +21,12 @@ export class LMApiHandler {
       // Select appropriate model based on options
       const modelOptions = {
         vendor: message.data.options?.vendor || 'copilot',
-        family: message.data.options?.family || 'gpt-4o'
+        family: message.data.options?.family || 'auto'
       };
       
       console.log(`Selecting model with options:`, modelOptions);
+      //console.log('HERE', await vscode.lm.selectChatModels());
+      // gpt-5-mini gpt-4o-mini copilot-fast gpt-4o claude-haiku-4.5 gpt-4.1 oswe-vscode-prime auto
       const [model] = await vscode.lm.selectChatModels(modelOptions);
       
       if (!model) {
