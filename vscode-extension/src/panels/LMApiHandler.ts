@@ -68,15 +68,16 @@ export class LMApiHandler {
           
           // Start consuming the stream and sending chunks
           let fullContent = '';
-          for await (const chunk of response.text) {
-            fullContent += chunk;
+          for await (const chunk of response.stream) {
+            const text = (chunk as any).part?.value ?? '';
+            fullContent += text;
             
             // Send chunk to webview
             this._webview.postMessage(JSON.stringify({
               id: message.id,
               command: message.command,
               chunk: {
-                content: chunk,
+                content: text,
                 isComplete: false
               }
             }));
@@ -105,9 +106,18 @@ export class LMApiHandler {
           
           // Collect the full content from the stream
           let fullContent = '';
-          for await (const chunk of response.text) {
+          /*for await (const chunk of response.text) {
             fullContent += chunk;
-          }
+          }*/
+         let chunkCount = 0;
+         for await (const chunk of response.stream) {
+          chunkCount++;
+          console.log(`CHUNK ${chunkCount}:`, JSON.stringify(chunk));
+          const text = (chunk as any).part?.value ?? '';
+          fullContent += text;
+         }
+          console.log('FULL CONTENT RAW:', JSON.stringify(fullContent));
+          console.log('FULL CONTENT LENGTH:', fullContent.length);
           
           console.log(`Collected full content, length: ${fullContent.length}`);
           
