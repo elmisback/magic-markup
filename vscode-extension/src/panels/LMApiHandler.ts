@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { LanguageModelTextPart, LanguageModelToolCallPart } from "vscode";
 
 export class LMApiHandler {
   private _webview: vscode.Webview;
@@ -68,18 +69,23 @@ export class LMApiHandler {
           
           // Start consuming the stream and sending chunks
           let fullContent = '';
-          for await (const chunk of response.text) {
-            fullContent += chunk;
-            
-            // Send chunk to webview
-            this._webview.postMessage(JSON.stringify({
-              id: message.id,
-              command: message.command,
-              chunk: {
-                content: chunk,
-                isComplete: false
-              }
-            }));
+          for await (const chunk of response.stream) {
+            if (chunk instanceof LanguageModelTextPart) {
+              console.log("TEXT", chunk);
+              // Send chunk to webview
+              this._webview.postMessage(JSON.stringify({
+                id: message.id,
+                command: message.command,
+                chunk: {
+                  content: chunk.value,
+                  isComplete: false
+                }
+              }));
+              fullContent += chunk.value;
+
+            } else if (chunk instanceof LanguageModelToolCallPart) {
+              console.log("TOOL CALL", chunk);
+            }
           }
           
           // Send the final complete message
@@ -105,9 +111,21 @@ export class LMApiHandler {
           
           // Collect the full content from the stream
           let fullContent = '';
-          for await (const chunk of response.text) {
+          /*for await (const chunk of response.text) {
             fullContent += chunk;
+          }*/
+          let chunkCount = 0;
+          for await (const chunk of response.stream) {
+            if (chunk instanceof LanguageModelTextPart) {
+              console.log("TEXT", chunk);
+              chunkCount++;
+              fullContent += chunk.value;
+            } else if (chunk instanceof LanguageModelToolCallPart) {
+              console.log("TOOL CALL", chunk);
+            }
           }
+          console.log('FULL CONTENT RAW:', JSON.stringify(fullContent));
+          console.log('FULL CONTENT LENGTH:', fullContent.length);
           
           console.log(`Collected full content, length: ${fullContent.length}`);
           

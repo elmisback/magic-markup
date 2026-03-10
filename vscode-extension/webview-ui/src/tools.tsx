@@ -469,7 +469,7 @@
               }
             ]
             const parsed = await lmApi.chat(prompt, {
-              vendor: 'copilot-chat',
+              vendor: 'copilot',
               family: 'gpt-4o',
               temperature: 0.3
             })
@@ -663,7 +663,7 @@
             } else {
               try {
                 response = await lmApi.chat(presentationPrompt, {
-                  vendor: 'copilot-chat',
+                  vendor: 'copilot',
                   family: 'gpt-4o',
                   temperature: 0.7
                 });
@@ -732,7 +732,7 @@
             } else {
               try {
                 response = await lmApi.chat(inDepthPrompt, {
-                  vendor: 'copilot-chat',
+                  vendor: 'copilot',
                   family: 'gpt-4o',
                   temperature: 0.7
                 });
@@ -1737,7 +1737,7 @@
 
       try {
         const resp = await lmApi.chat(prompt, {
-          vendor: "copilot-chat",
+          vendor: "copilot",
           family: "gpt-4o",
           temperature: 0.2,
         });
