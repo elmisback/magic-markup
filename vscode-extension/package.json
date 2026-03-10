@@ -24,7 +24,8 @@
         {
           "id": "codetations-annotations",
           "name": "Annotations",
-          "type": "webview"
+          "type": "webview",
+          "icon": "$(zap)"
         }
       ]
     },
