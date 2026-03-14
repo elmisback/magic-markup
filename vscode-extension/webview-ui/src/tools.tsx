@@ -663,10 +663,12 @@
             } else {
               try {
                 response = await lmApi.chat(presentationPrompt, {
-                  vendor: 'copilot-chat',
+                  vendor: 'copilot',
                   family: 'gpt-4o',
                   temperature: 0.7
                 });
+                console.log('SENDING RESPONSE:', JSON.stringify(response));
+                console.log('RESPONSE LENGTH:', response.length);
               } catch (apiError) {
                 console.log('API call failed, falling back to mock:', apiError);
                 response = `**What the code does:**
@@ -732,10 +734,12 @@
             } else {
               try {
                 response = await lmApi.chat(inDepthPrompt, {
-                  vendor: 'copilot-chat',
+                  vendor: 'copilot',
                   family: 'gpt-4o',
                   temperature: 0.7
                 });
+                console.log('SENDING RESPONSE:', JSON.stringify(response));
+                console.log('RESPONSE LENGTH:', response.length);
               } catch (apiError) {
                 console.log('API call failed, falling back to mock:', apiError);
                 response = JSON.stringify({

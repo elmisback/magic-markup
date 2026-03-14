@@ -132,9 +132,10 @@ async function copilotPromptGPTForJSON(t: string) {
     const response = await model.sendRequest(craftedPrompt, {}, new vscode.CancellationTokenSource().token);
     console.log('Got response:', response);
     let fullResponse = '';
-    for await (const chunk of response.text) {
+    for await (const chunk of response.stream) {
       console.debug('Got chunk:', chunk);
-      fullResponse += chunk;
+      const text = (chunk as any).part?.value ?? '';
+      fullResponse += text;
     }
     return fullResponse;
     // TODO figure out how to get the completion here
