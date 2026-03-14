@@ -469,7 +469,7 @@
               }
             ]
             const parsed = await lmApi.chat(prompt, {
-              vendor: 'copilot-chat',
+              vendor: 'copilot',
               family: 'gpt-4o',
               temperature: 0.3
             })
@@ -1741,7 +1741,7 @@
 
       try {
         const resp = await lmApi.chat(prompt, {
-          vendor: "copilot-chat",
+          vendor: "copilot",
           family: "gpt-4o",
           temperature: 0.2,
         });

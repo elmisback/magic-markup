@@ -109,7 +109,7 @@ The object must look like: {1: <code>, 2: <number>, 3: <number>, 4: <number>}
 
 The answer to 1 should be a code string only, without markdown formatting or extra notes.`;
 
-import vscode from 'vscode';
+import vscode, { LanguageModelTextPart, LanguageModelToolCallPart } from 'vscode';
 
 async function copilotPromptGPTForJSON(t: string) {
   const craftedPrompt = [
@@ -133,9 +133,12 @@ async function copilotPromptGPTForJSON(t: string) {
     console.log('Got response:', response);
     let fullResponse = '';
     for await (const chunk of response.stream) {
-      console.debug('Got chunk:', chunk);
-      const text = (chunk as any).part?.value ?? '';
-      fullResponse += text;
+      if (chunk instanceof LanguageModelTextPart) {
+        console.debug("TEXT", chunk);
+        fullResponse += chunk.value;
+      } else if (chunk instanceof LanguageModelToolCallPart) {
+        console.debug("TOOL CALL", chunk);
+      }
     }
     return fullResponse;
     // TODO figure out how to get the completion here
