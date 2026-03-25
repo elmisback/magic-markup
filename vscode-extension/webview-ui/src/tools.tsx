@@ -225,6 +225,7 @@ const DisplayHTML: React.FC<AnnotationEditorProps> = (props) => {
 const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
   const [expression, setExpression] = useState(props.value.metadata.expression || "loading...");
   const [retryParse, setRetryParse] = useState(false);
+  const [sessionLink, setSessionLink] = useState(props.value.metadata.odysseySessionLink || "");
 
   useEffect(() => {
     // Only make API call if expression is "loading..." or retry was clicked
@@ -255,7 +256,6 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
 
         const newExpression = parsed;
         setExpression(newExpression);
-        // Store in metadata for persistence
         props.utils.setMetadata({ expression: newExpression });
         setRetryParse(false);
       };
@@ -264,12 +264,33 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
     }
   }, [props.utils, retryParse]);
 
-  // Update metadata when user manually edits the expression
   const handleExpressionChange = (evt: React.ChangeEvent<HTMLInputElement>) => {
     const newExpression = evt.target.value;
     setExpression(newExpression);
     props.utils.setMetadata({ expression: newExpression });
   };
+
+  const handleSessionLinkChange = (evt: React.ChangeEvent<HTMLInputElement>) => {
+    const newLink = evt.target.value;
+    setSessionLink(newLink);
+    props.utils.setMetadata({ odysseySessionLink: newLink });
+  };
+
+  const openSessionLink = () => {
+    const urlToOpen = sessionLink.trim();
+    if (!urlToOpen) return;
+    vscode.postMessage({ command: "open-external", url: urlToOpen });
+  };
+
+  const isValidSessionLink = (() => {
+    try {
+      if (!sessionLink.trim()) return false;
+      new URL(sessionLink.trim());
+      return true;
+    } catch {
+      return false;
+    }
+  })();
 
   const odysseyBase = "https://herbie-fp.github.io/odyssey/?spec=";
   const url = odysseyBase + encodeURIComponent(expression);
@@ -298,6 +319,18 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
           </svg>
         </button>
       </p>
+
+      <p>Paste and save your Odyssey session link:</p>
+      <input
+        type="url"
+        className="odyssey-text"
+        placeholder="https://herbie-fp.github.io/odyssey/..."
+        value={sessionLink}
+        onChange={handleSessionLinkChange}
+      />
+      <button onClick={openSessionLink} disabled={!isValidSessionLink}>
+        Open saved session
+      </button>
     </div>
   );
 };
