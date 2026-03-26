@@ -14,6 +14,8 @@ import {
   OutputVisualizer,
 } from "./additionalTools";
 
+import MarkdownNote from "./MarkdownEditor";
+
 type AnnotationType = React.FC<AnnotationEditorProps>;
 interface ImageData {
   file: File;
@@ -349,6 +351,7 @@ export const tools = {
   outputVisualizer: OutputVisualizer,
   formalSpecification: FormalSpecification,
   Generator: Generator,
+  MarkdownNote: MarkdownNote,
   // lmApiTest: LMAPITest,
 };
 
@@ -365,5 +368,6 @@ export const toolNames = {
   outputVisualizer: "Output Visualizer",
   formalSpecification: "Formal Specification",
   Generator: "Annotation Generator",
+  MarkdownNote: "Markdown Note",
   // lmApiTest: "LM API Test",
 };
