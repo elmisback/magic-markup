@@ -27,7 +27,7 @@ import React, { useRef } from "react";
 
 
 /* ── helper ─────────────────────────────────────────────────────────── */
-
+ 
 function readFileAsDataURL(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -36,9 +36,9 @@ function readFileAsDataURL(file: File | Blob): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
-
+ 
 /* ── toolbar button ─────────────────────────────────────────────────── */
-
+ 
 const TBButton: React.FC<{
   onClick: () => void;
   active?: boolean;
@@ -66,12 +66,20 @@ const TBButton: React.FC<{
     {children}
   </button>
 );
-
+ 
 /* ── component ──────────────────────────────────────────────────────── */
-
+ 
+const DEFAULT_EDITOR_HEIGHT = 180;
+const MIN_EDITOR_HEIGHT = 80;
+ 
 const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+ 
+  const editorHeight: number =
+    props.value.metadata.editorHeight ?? DEFAULT_EDITOR_HEIGHT;
+ 
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -87,7 +95,7 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (!items) return false;
-
+ 
         for (const item of Array.from(items)) {
           if (item.type.startsWith("image/")) {
             event.preventDefault();
@@ -110,16 +118,16 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
       handleDrop: (view, event) => {
         const files = event.dataTransfer?.files;
         if (!files || files.length === 0) return false;
-
+ 
         const file = files[0];
         if (!file.type.startsWith("image/")) return false;
-
+ 
         event.preventDefault();
         const coords = view.posAtCoords({
           left: event.clientX,
           top: event.clientY,
         });
-
+ 
         readFileAsDataURL(file).then((src) => {
           const node = view.state.schema.nodes.image.create({ src });
           if (coords) {
@@ -128,12 +136,12 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
             view.dispatch(view.state.tr.replaceSelectionWith(node));
           }
         });
-
+ 
         return true;
       },
     },
   });
-
+ 
   const insertImageFromFile = React.useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -144,9 +152,9 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
     },
     [editor]
   );
-
+ 
   if (!editor) return null;
-
+ 
   return (
     <div style={{ fontFamily: "Poppins, sans-serif" }}>
       {/* ── toolbar ── */}
@@ -188,9 +196,9 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
         >
           {"</>"}
         </TBButton>
-
+ 
         <span style={{ borderLeft: "1px solid #ccc", margin: "0 2px" }} />
-
+ 
         <TBButton
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor.isActive("heading", { level: 2 })}
@@ -226,9 +234,9 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
         >
           {"{ }"}
         </TBButton>
-
+ 
         <span style={{ borderLeft: "1px solid #ccc", margin: "0 2px" }} />
-
+ 
         <TBButton onClick={() => fileInputRef.current?.click()} title="Upload image">
           <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
             <svg
@@ -250,22 +258,74 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
           </span>
         </TBButton>
       </div>
-
+ 
       {/* ── editor surface ── */}
-      <EditorContent
-        editor={editor}
+      <div
+        ref={editorWrapperRef}
         style={{
-          minHeight: 180,
-          maxHeight: 400,
+          height: editorHeight,
           overflowY: "auto",
           border: "1px solid #ccc",
-          borderRadius: 4,
+          borderRadius: "4px 4px 0 0",
           padding: 8,
           fontSize: 13,
           lineHeight: 1.5,
         }}
-      />
-
+      >
+        <EditorContent editor={editor} />
+      </div>
+ 
+      {/* ── resize handle ── */}
+      <div
+        onPointerDown={(e) => {
+          e.preventDefault();
+          dragState.current = { startY: e.clientY, startH: editorHeight };
+          const onMove = (ev: PointerEvent) => {
+            if (!dragState.current) return;
+            const newH = Math.max(
+              MIN_EDITOR_HEIGHT,
+              dragState.current.startH + (ev.clientY - dragState.current.startY)
+            );
+            // Update the wrapper height directly for responsive feel
+            if (editorWrapperRef.current) {
+              editorWrapperRef.current.style.height = `${newH}px`;
+            }
+          };
+          const onUp = (ev: PointerEvent) => {
+            if (dragState.current) {
+              const finalH = Math.max(
+                MIN_EDITOR_HEIGHT,
+                dragState.current.startH + (ev.clientY - dragState.current.startY)
+              );
+              props.utils.setMetadata({ editorHeight: finalH });
+            }
+            dragState.current = null;
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+          };
+          document.addEventListener("pointermove", onMove);
+          document.addEventListener("pointerup", onUp);
+        }}
+        style={{
+          height: 7,
+          cursor: "ns-resize",
+          background: "#eee",
+          borderRadius: "0 0 4px 4px",
+          border: "1px solid #ccc",
+          borderTop: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* grip dots */}
+        <svg width="20" height="4" viewBox="0 0 20 4" fill="#999">
+          <circle cx="4" cy="2" r="1.2" />
+          <circle cx="10" cy="2" r="1.2" />
+          <circle cx="16" cy="2" r="1.2" />
+        </svg>
+      </div>
+ 
       {/* hidden file input for the Image toolbar button */}
       <input
         ref={fileInputRef}
@@ -274,7 +334,7 @@ const MarkdownNote: React.FC<AnnotationEditorProps> = (props) => {
         onChange={insertImageFromFile}
         style={{ display: "none" }}
       />
-
+ 
       {/* ── inline styles for the Tiptap content area ── */}
       <style>{`
         .tiptap {
