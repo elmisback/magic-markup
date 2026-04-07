@@ -51,7 +51,7 @@ function AnnotationEditorContainer(props: {
           },
           setMetadata: (newMetadata: any) => {
             setValue({
-              document: value.document,
+              // document: value.document,
               metadata: { ...value.metadata, ...newMetadata },
             });
           },
@@ -148,14 +148,14 @@ function AnnotationSidebarView(props: {
   };
 
   const handleAnnotationUpdate = (id: string, value: AnnotationUpdate) => {
-    console.log("Updating annotation:", id, value);
+    console.log("Webview: updating annotation:", id, value);
     
     const annotation = annotations.find(a => a.id === id);
     if (!annotation) return;
     
     const updatedAnnotation = {
       ...annotation,
-      ...(value.document ? { document: value.document } : {}),
+      ...(value.document ? { document: value.document } : {document: undefined}),
       ...(value.metadata ? { metadata: { ...annotation.metadata, ...value.metadata } } : {})
     };
     
@@ -523,7 +523,7 @@ function App() {
     // Message handler for communication with extension
     const handleMessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data);
-      console.debug("Received message:", message);
+      console.debug("Webview: handleMessage: Received message:", message);
       
       switch (message.command) {
         case "initialize":

@@ -375,7 +375,9 @@ export class AnnotationTracker implements vscode.Disposable {
    * Updates the decorations in the editor
    */
   public updateDecorations(document: vscode.TextDocument): void {
+    console.log("Updating decorations for document", document.uri.toString());
     const documentKey = document.uri.toString();
+    console.log(this.documentAnnotations.get(documentKey));
     const annotations = this.documentAnnotations.get(documentKey) || [];
     
     // Clear existing decorations
@@ -524,12 +526,13 @@ export class AnnotationTracker implements vscode.Disposable {
   /**
    * Notifies the annotation panel of changed annotations
    */
-  private notifyAnnotationsChanged(document: vscode.TextDocument): void {
+  private async notifyAnnotationsChanged(document: vscode.TextDocument): Promise<void> {
+    console.log("Notifying annotation panel of changes for document", document.uri.toString());
     if (AnnotationManagerPanel.currentPanel) {
       const documentKey = document.uri.toString();
       const annotations = this.documentAnnotations.get(documentKey) || [];
       
-      AnnotationManagerPanel.currentPanel.sendMessageObject({
+      await AnnotationManagerPanel.currentPanel.sendMessageObject({
         command: "updateAnnotations",
         data: {
           documentUri: document.uri.toString(),
@@ -620,22 +623,95 @@ export class AnnotationTracker implements vscode.Disposable {
 
   /**
    * Updates an existing annotation
+   * 
+   * forces changes to wait until other document updates are processed
    */
-  public updateAnnotation(document: vscode.TextDocument, updatedAnnotation: Annotation): void {
+  public async updateAnnotation(document: vscode.TextDocument, updatedAnnotation: Annotation): Promise<void> {
+    console.log("Updating annotation", updatedAnnotation.id, "for document", document.uri.toString(), "with updated annotation", updatedAnnotation);
     const documentKey = document.uri.toString();
     const annotations = this.documentAnnotations.get(documentKey) || [];
+    const fixedUpdatedAnnotation = {
+      ...updatedAnnotation,
+      document: updatedAnnotation.document || document.getText() // Ensure the annotation's document field is updated to match the current document text
+    };
+
+    // Skip identical annotation updates to avoid wasting time on decorations and saves
+    const existingAnnotation = annotations.find(a => a.id === updatedAnnotation.id);
+    if (existingAnnotation) {
+      const isIdentical = existingAnnotation.start === fixedUpdatedAnnotation.start &&
+                          existingAnnotation.end === fixedUpdatedAnnotation.end &&
+                          existingAnnotation.document === fixedUpdatedAnnotation.document &&
+        JSON.stringify(existingAnnotation.metadata) === JSON.stringify(fixedUpdatedAnnotation.metadata);
+      if (isIdentical) {
+        console.log("Skipping annotation update because it is identical to the existing annotation");
+        return;
+      }
+    }
     
-    // Update the annotation
-    const updatedAnnotations = annotations.map(a => 
-      a.id === updatedAnnotation.id ? updatedAnnotation : a
-    );
+    // // Update the annotation
+    // const updatedAnnotations = annotations.map(a => 
+    //   a.id === updatedAnnotation.id ? fixedUpdatedAnnotation : a
+    // );
+
+    // getUpdatedAnnotations as a function
+    const getUpdatedAnnotations = (currentDocumentText: string): Annotation[] => {
+      return annotations.map(a => 
+        a.id === updatedAnnotation.id ?
+          {
+            ...a,
+            ...updatedAnnotation,
+            ...this.documentAnnotations.get(documentKey)?.find(a => a.id === updatedAnnotation.id), // Preserve any fields not included in the update
+            document: updatedAnnotation.document || currentDocumentText // Ensure the annotation's document field is updated to match the current document text
+          } 
+        : a
+      );
+    };
     
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
+    this.documentAnnotations.set(documentKey, getUpdatedAnnotations(document.getText()));
+
+    await this.saveAnnotationsForDocument(document);
+
+    // If the annotation's document text has changed, we may need to update the document on disk to match the annotation's document
+    if (updatedAnnotation.document && updatedAnnotation.document !== document.getText()) {
+      console.debug("Annotation document text differs from current document text, updating document to match annotation");
+      // Update the document text to match the annotation's document
+      const edit = new vscode.WorkspaceEdit();
+      const fullRange = new vscode.Range(
+        document.positionAt(0),
+        document.positionAt(document.getText().length)
+      );
+      edit.replace(document.uri, fullRange, updatedAnnotation.document);
+      await vscode.workspace.applyEdit(edit).then(async success => {
+        if (!success) {
+          console.error("Failed to update document text to match annotation");
+
+          // Revert the annotation update if the document update fails
+          const revertedAnnotations = annotations.map(a => 
+            a.id === updatedAnnotation.id ? {...a, document: document.getText()} : a
+          );
+          this.documentAnnotations.set(documentKey, revertedAnnotations);
+          await this.updateDecorations(document);
+          await this.notifyAnnotationsChanged(document);
+          return;
+        }
+        this.documentAnnotations.set(documentKey, getUpdatedAnnotations(document.getText()));
+        await this.saveAnnotationsForDocument(document);
+        await this.updateDecorations(document);
+        await this.notifyAnnotationsChanged(document);
+        await this.updateDecorations(document);
+      });
+      console.debug("finished updating document text to match annotation for", updatedAnnotation);
+      const updatedDoc = await vscode.workspace.openTextDocument(document.uri);
+      await this.updateDecorations(updatedDoc);
+      return; // Wait for the document update to trigger the annotation update through the change listener
+      // NOTE I didn't think hard about this, it might not work as expected for unusual updates.
+    }
     
-    // Update decorations and save
-    this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
-    this.notifyAnnotationsChanged(document);
+    // Update decorations and save, making sure decoration updates happen after document text is updated
+    await this.updateDecorations(document);
+    await this.saveAnnotationsForDocument(document);
+    await this.notifyAnnotationsChanged(document);
+    console.debug("Finished updating annotation", updatedAnnotation);
   }
 
   /**
