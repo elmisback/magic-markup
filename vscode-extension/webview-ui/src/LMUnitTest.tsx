@@ -154,7 +154,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         // Use either the real API or the mock API based on useMock flag
         response = await (useMock ? mockLmApi : lmApi).chat(prompt, {
           vendor: 'copilot',
-          family: 'gpt-4o',
+          family: 'gpt-5.4-mini',
           temperature: 0.3
         });
         addDebugInfo("Received response from LM API");
