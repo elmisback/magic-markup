@@ -4,7 +4,7 @@
   "publisher": "codetations",
   "repository": "github:elmisback/codetations",
   "description": "Rich code annotations for VS Code",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "engines": {
     "vscode": "^1.110.0"
   },
