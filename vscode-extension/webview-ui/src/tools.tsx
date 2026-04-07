@@ -363,7 +363,7 @@ export const toolNames = {
   displayHTML: "HTML Preview",
   odyssey: "Analyze Floating-point Expression",
   yesNoQuestion: "LM Unit Test",
-  debugExample: "Show Debugged Example",
+  debugExample: "Show an Example",
   explainInEnglish: "Explain in English",
   outputVisualizer: "Output Visualizer",
   formalSpecification: "Formal Specification",

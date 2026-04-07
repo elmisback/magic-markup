@@ -263,50 +263,6 @@ Focus on making the code runnable in a browser JavaScript environment without an
   return (
     <div style={{ padding: "10px", fontFamily: "Poppins, sans-serif" }}>
       <div style={{ marginBottom: "12px" }}>
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center",
-          marginBottom: "8px"
-        }}>
-          <label style={{ fontWeight: "bold", fontSize: "14px" }}>
-            Debug Example Code:
-          </label>
-          <div>
-            <button
-              onClick={generateDebugCode}
-              disabled={isGenerating}
-              style={{
-                padding: "6px 12px",
-                backgroundColor: isGenerating ? "#cccccc" : "#0078D4",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: isGenerating ? "default" : "pointer",
-                fontSize: "14px",
-                marginRight: "8px"
-              }}
-            >
-              {isGenerating ? "Generating..." : "Regenerate"}
-            </button>
-            <button
-              onClick={executeCode}
-              disabled={isLoading || !debugCode.trim()}
-              style={{
-                padding: "6px 12px",
-                backgroundColor: isLoading ? "#cccccc" : "#107C10",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: isLoading ? "default" : "pointer",
-                fontSize: "14px"
-              }}
-            >
-              {isLoading ? "Executing..." : "Run Code"}
-            </button>
-          </div>
-        </div>
-        
         <div style={{ marginBottom: "10px" }}>
           <label style={{ 
             display: "block",
@@ -314,7 +270,7 @@ Focus on making the code runnable in a browser JavaScript environment without an
             fontSize: "14px",
             marginBottom: "5px"
           }}>
-            Debugging Instructions:
+            Describe the example you want to see debugged (optional):
           </label>
           <input
             type="text"
@@ -330,13 +286,28 @@ Focus on making the code runnable in a browser JavaScript environment without an
               marginBottom: "10px"
             }}
           />
-          <div style={{
+          {/* <div style={{
             fontSize: "12px",
             color: "#666",
             fontStyle: "italic"
           }}>
             Add natural language instructions to guide how the code is debugged
-          </div>
+          </div> */}
+          <button
+            onClick={generateDebugCode}
+            disabled={isGenerating}
+            style={{
+              padding: "6px 12px",
+              backgroundColor: isGenerating ? "#cccccc" : "#0078D4",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: isGenerating ? "default" : "pointer",
+              fontSize: "14px"
+            }}
+          >
+            {isGenerating ? "Generating..." : "Update"}
+          </button>
         </div>
         
         {explanation && (
@@ -366,6 +337,22 @@ Focus on making the code runnable in a browser JavaScript environment without an
             resize: "vertical"
           }}
         />
+        <button
+          onClick={executeCode}
+          disabled={isLoading || !debugCode.trim()}
+          style={{
+            padding: "6px 12px",
+            backgroundColor: isLoading ? "#cccccc" : "#107C10",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: isLoading ? "default" : "pointer",
+            fontSize: "14px",
+            marginTop: "8px"
+          }}
+        >
+          {isLoading ? "Executing..." : "Run Code"}
+        </button>
       </div>
 
       <div style={{ 
@@ -373,7 +360,7 @@ Focus on making the code runnable in a browser JavaScript environment without an
         alignItems: "center", 
         marginBottom: "8px"
       }}>
-        <label style={{ 
+        {/* <label style={{ 
           display: "flex", 
           alignItems: "center", 
           fontSize: "12px",
@@ -387,7 +374,7 @@ Focus on making the code runnable in a browser JavaScript environment without an
             style={{ marginRight: "5px" }}
           />
           Use mock API (for testing)
-        </label>
+        </label> */}
       </div>
 
       {error && (
@@ -410,16 +397,19 @@ Focus on making the code runnable in a browser JavaScript environment without an
             marginBottom: "5px", 
             fontSize: "14px",
             display: "flex",
-            alignItems: "center"
+            alignItems: "center",
+            justifyContent: "space-between"
           }}>
-            <div style={{ 
-              width: "10px", 
-              height: "10px", 
-              borderRadius: "50%", 
-              backgroundColor: executionResult.success ? "#107C10" : "#D83B01",
-              marginRight: "8px" 
-            }}></div>
-            Execution Results:
+              <div style={{ display: "flex", alignItems: "center" }}>
+              <div style={{ 
+                width: "10px", 
+                height: "10px", 
+                borderRadius: "50%", 
+                backgroundColor: executionResult.success ? "#107C10" : "#D83B01",
+                marginRight: "8px" 
+              }}></div>
+              Execution Results:
+            </div>
           </div>
           
           <div style={{ 

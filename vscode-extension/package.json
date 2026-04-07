@@ -46,6 +46,10 @@
       {
         "command": "codetations.moveSelected",
         "title": "Codetations: Move Selected"
+      },
+      {
+        "command": "codetations.setAnnotationColor",
+        "title": "Codetations: Set Annotation Color"
       }
     ],
     "menus": {

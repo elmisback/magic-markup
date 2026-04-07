@@ -427,10 +427,10 @@ function App() {
 
     // Check for overlapping annotations
     for (let i = 0; i < annotations.length; i++) {
-      if (annotations[i].start === start && annotations[i].end === end) {
-        showErrorMessage("Error adding annotations: annotation already exists in selected area");
-        return;
-      }
+      // if (annotations[i].start === start && annotations[i].end === end) {
+      //   showErrorMessage("Error adding annotations: annotation already exists in selected area");
+      //   return;
+      // }
     }
 
     // Pick a colorblind-friendly annotation color, rotating through a list
