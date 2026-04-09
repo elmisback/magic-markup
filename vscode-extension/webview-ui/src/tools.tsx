@@ -339,35 +339,37 @@ const Odyssey: React.FC<AnnotationEditorProps> = (props) => {
 
 /* TODO: Add all tools to be used here. */
 export const tools = {
+  MarkdownNote: MarkdownNote,
+  debugExample: ShowDebuggedExample,
+  yesNoQuestion: LMUnitTest,
+  odyssey: Odyssey,
+  Generator: Generator,
   comment: Comment,
   colorPicker: ColorPicker,
   // runCodeSegment: RunCodeSegment,
   imageUpload: ImageUpload,
   displayHTML: DisplayHTML,
-  odyssey: Odyssey,
-  yesNoQuestion: LMUnitTest,
-  debugExample: ShowDebuggedExample,
   explainInEnglish: ExplainInEnglish,
-  outputVisualizer: OutputVisualizer,
-  formalSpecification: FormalSpecification,
-  Generator: Generator,
-  MarkdownNote: MarkdownNote,
+  // outputVisualizer: OutputVisualizer,
+  // formalSpecification: FormalSpecification,
   // lmApiTest: LMAPITest,
 };
 
 export const toolNames = {
+  MarkdownNote: "Markdown Note",
+  Generator: "Annotation Generator",
+  yesNoQuestion: "LM Unit Test",
+  odyssey: "Analyze Floating-point Expression",
   comment: "Comment",
   colorPicker: "Color Picker",
   // runCodeSegment: "Run Code Segment",
   imageUpload: "Image Upload",
   displayHTML: "HTML Preview",
-  odyssey: "Analyze Floating-point Expression",
-  yesNoQuestion: "LM Unit Test",
   debugExample: "Show an Example",
   explainInEnglish: "Explain in English",
-  outputVisualizer: "Output Visualizer",
-  formalSpecification: "Formal Specification",
-  Generator: "Annotation Generator",
-  MarkdownNote: "Markdown Note",
+  // outputVisualizer: "Output Visualizer",
+  // formalSpecification: "Formal Specification",
+  
+  
   // lmApiTest: "LM API Test",
 };

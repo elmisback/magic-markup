@@ -1909,7 +1909,7 @@ REQUIREMENTS:
 2. Do NOT include: imports, export statements, or the component function declaration
 3. Use React hooks (useState, useEffect, useRef) as needed - they're available from React destructuring
 4. Store all state in metadata using props.utils.setMetadata() for persistence
-5. Use the commonTextStyle constant for consistent styling: { fontFamily: "Poppins, sans-serif", fontSize: "14px", color: "black" }
+5. Use the commonTextStyle constant for consistent styling: { fontFamily: "Poppins, sans-serif", fontSize: "14px", color: "black" }, but do not declare it, it is global.
 6. Include comprehensive console.log statements for debugging with format: console.log('[ComponentName] message', data)
 7. Handle errors gracefully with try-catch blocks
 8. The lmApi is available with this EXACT signature:
