@@ -655,12 +655,12 @@ export class AnnotationTracker implements vscode.Disposable {
 
     // getUpdatedAnnotations as a function
     const getUpdatedAnnotations = (currentDocumentText: string): Annotation[] => {
+      const annotations = this.documentAnnotations.get(documentKey) || [];
       return annotations.map(a => 
         a.id === updatedAnnotation.id ?
           {
             ...a,
             ...updatedAnnotation,
-            ...this.documentAnnotations.get(documentKey)?.find(a => a.id === updatedAnnotation.id), // Preserve any fields not included in the update
             document: updatedAnnotation.document || currentDocumentText // Ensure the annotation's document field is updated to match the current document text
           } 
         : a
