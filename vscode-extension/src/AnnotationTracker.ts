@@ -702,6 +702,7 @@ export class AnnotationTracker implements vscode.Disposable {
       });
       console.debug("finished updating document text to match annotation for", updatedAnnotation);
       const updatedDoc = await vscode.workspace.openTextDocument(document.uri);
+      await this.saveAnnotationsForDocument(updatedDoc);
       await this.updateDecorations(updatedDoc);
       return; // Wait for the document update to trigger the annotation update through the change listener
       // NOTE I didn't think hard about this, it might not work as expected for unusual updates.

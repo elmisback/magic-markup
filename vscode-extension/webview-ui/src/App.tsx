@@ -5,6 +5,7 @@ import { tools, toolNames } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
+  end?: number;
   document?: string;
   metadata?: any;
 }
@@ -44,6 +45,7 @@ function AnnotationEditorContainer(props: {
           getText: () => value.document.slice(value.start, value.end),
           setText: (newText: string) => {
             setValue({
+              end: value.start + newText.length,
               document:
                 value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata,
@@ -155,6 +157,7 @@ function AnnotationSidebarView(props: {
     
     const updatedAnnotation = {
       ...annotation,
+      ...value,
       ...(value.document ? { document: value.document } : {document: undefined}),
       ...(value.metadata ? { metadata: { ...annotation.metadata, ...value.metadata } } : {})
     };
@@ -259,15 +262,19 @@ function RetagBanner(props: {
 }) {
   return (
     <div className="retag-banner" style={{ 
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000,
       padding: "10px", 
       marginBottom: "10px", 
       backgroundColor: "#ffe0e0", 
       borderRadius: "4px",
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center"
     }}>
-      <span>Document has been edited and some annotations need updating</span>
+      <span>Document has been edited and some annotations need updating</span>&nbsp;
       <div>
         <button onClick={props.onRetag} style={{ marginRight: "8px" }}>Update Annotations</button>
       </div>

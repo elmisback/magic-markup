@@ -1913,7 +1913,7 @@ REQUIREMENTS:
 6. Include comprehensive console.log statements for debugging with format: console.log('[ComponentName] message', data)
 7. Handle errors gracefully with try-catch blocks
 8. The lmApi is available with this EXACT signature:
-   const response = await lmApi.chat(messages, { vendor: 'copilot', family: 'gpt-4o', temperature: 0.32 });
+   const response = await lmApi.chat(messages, { vendor: 'copilot', family: 'gpt-5.4-mini', temperature: 0.32 });
    IMPORTANT: lmApi.chat() returns a STRING directly, NOT an object. Use it like: const text = await lmApi.chat(messages, options);
 9. Use props.value.document to understand code context for better defaults and behavior
 10. Keep explanations and messages concise and user-friendly
