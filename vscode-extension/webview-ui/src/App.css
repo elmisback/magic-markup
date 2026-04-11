@@ -31,6 +31,16 @@ main {
   max-width: -webkit-fill-available !important;
 }
 
+.annotation-tile img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.annotation-tile pre {
+  overflow-x: auto;
+  max-width: 100% !important;
+}
+
 .annotation-tile.selected {
   background-color: #e0e0e0; /* Slightly darker background when selected */
 }
