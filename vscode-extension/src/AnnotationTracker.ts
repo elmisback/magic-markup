@@ -1,3 +1,32 @@
+/*
+
+At a high level, the update algo should be synchronous:
+    if the update is a no-op, just return the old state
+    generate just a patched annotation list
+        compute the full update, including possible modifications to the document and annotation positions for each annotation
+    effect (1): SYNCHRONOUSLY try to patch the annotation list on disk
+        if this fails, nothing to clean, just return the old state
+    if the document text needs an update
+        (2) SYNCHRONOUSLY try to patch the file on disk
+            [don't use VSCode's edit API, just write to the disk]
+            [after this synchronous chain completes, onchange may fire because we modified the document, but this is not a risk because we (need to ensure we) ignore changes that leave the file in a state identical to that pointed at by the current annotation list, which was previously synced by effect (1)]
+            if this fails and we previously patched annotations
+                clean up: SYNCHRONOUSLY revert annotations on disk -- this should (mostly) always succeed since we just wrote to it
+                just return the old state
+    now apply decorations (also synchronously)
+    finally, the disk representation of the document and annotations are in sync and align with our state, so we can safely notify the panel that there has been an update
+
+Other plans:
+
+Principle of least power: I don't want to see withAnnotations or other state constructions occuring outside of the top level. (I don't want to see withAnnotations at all, it's cruft, just explicitly construct a new state at the top level from the results of helpers.) The top level function operates on the state. Everything below the top is a helper that should only need parts of the state. It's very unlikely anything below the top is so important that it should need to return an update for every part of the state at the same time. If a function returns a piece of the state, it should have to possibly modify that piece of the state.
+Anti-corruption layer/Object parsing: we need to parse datatypes like the TextDocumentContentChangeEvent and TextEditorDecorationType into our own system rather than treating raw VSCode objects like they are part of our own state.
+Reify all effects as data: pure functions in the center compute and return __what should happen__; a thin outer shell actually does it. The core never touches I/O directly, including commands for/feedback from the editor.
+
+
+All TODOs in the file should be addressed (other than diff loading)
+
+*/
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
@@ -22,16 +51,20 @@ export interface Annotation {
 }
 
 export interface TrackerState {
-  documentAnnotations: Map<string, Annotation[]>;
-  decorationTypes: Map<string, vscode.TextEditorDecorationType[]>;
-  fileChangeTimers: Map<string, NodeJS.Timeout>;
-  documentContentCache: Map<string, string>;
-  pendingChanges: Map<string, vscode.TextDocumentContentChangeEvent[]>;
+  readonly documentAnnotations: ReadonlyMap<string, Annotation[]>;
+  // TODO convert this to a set of functions () => void that just do the disposal for each file, we aren't using the rest of these objects at all
+  readonly oldDecorationCleanupFunctions: ReadonlyMap<string, vscode.TextEditorDecorationType[]>;
+  readonly fileChangeTimers: ReadonlyMap<string, NodeJS.Timeout>;
+  // TODO eliminate this cache, it's not used 
+  readonly documentContentCache: ReadonlyMap<string, string>;
+  // TODO only store the necessary data from the content changes, not the full objects
+  readonly pendingChanges: ReadonlyMap<string, vscode.TextDocumentContentChangeEvent[]>;
 }
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Pure functions — exported for testing. These never touch TrackerState.
+// (Unchanged from the original.)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
@@ -136,6 +169,7 @@ export function applyChangesToAnnotations(
     const endOffset = change.rangeOffset + change.rangeLength;
     const textLengthDiff = change.text.length - change.rangeLength;
     const isWhitespaceChange = /^\s*$/.test(change.text);
+    // TODO refactor this loop body into a separate pure function of the form `(annotation, {rangeOffset, rangeLength, text}) => updatedAnnotation` so it can be tested in isolation
 
     current = current.map((annotation) => {
       if (annotation.document !== startingContent) {
@@ -259,9 +293,28 @@ export function patchAnnotationInList(
   );
 }
 
+/**
+ * Step 1 of updateAnnotation: validate and build the updated list.
+ * Returns null if the update should be skipped (identical annotation).
+ */
+export function buildAnnotationUpdate(
+  annotations: Annotation[],
+  updatedAnnotation: Annotation,
+  currentDocText: string
+): Annotation[] | null {
+  const fixedDoc = updatedAnnotation.document || currentDocText;
+  const existing = annotations.find((a) => a.id === updatedAnnotation.id);
+  if (existing && annotationsAreIdentical(existing, { ...updatedAnnotation, document: fixedDoc })) {
+    console.log("Skipping annotation update because it is identical to the existing annotation");
+    return null;
+  }
+  return patchAnnotationInList(annotations, updatedAnnotation.id, updatedAnnotation, currentDocText);
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // I/O functions — read/write disk and VS Code APIs. No TrackerState access.
+// (Unchanged from the original.)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function readAnnotationsFromDisk(documentFsPath: string): Annotation[] | null {
@@ -396,226 +449,204 @@ function rebuildDecorations(
   return result;
 }
 
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Orchestration — these take TrackerState, call pure/IO functions, and write
-// back into state. They are the "outermost level" that owns state updates.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function refreshDecorationsAndNotify(state: TrackerState, document: vscode.TextDocument): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
-  state.decorationTypes.set(
-    documentKey,
-    rebuildDecorations(state.decorationTypes.get(documentKey), annotations, document)
-  );
-  notifyPanel(document, annotations);
-}
-
-function saveAndRefresh(state: TrackerState, document: vscode.TextDocument): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
-  writeAnnotationsToDisk(annotations, document);
-  refreshDecorationsAndNotify(state, document);
-}
-
-function loadAnnotationsForDocument(state: TrackerState, document: vscode.TextDocument): Annotation[] {
-  const documentKey = document.uri.toString();
-  const annotationsUri = getAnnotationsFilePath(document.uri.fsPath);
-  console.debug(`Loading annotations for ${documentKey} from ${annotationsUri}`);
-  // TODO we have only sort-of validated that diff loading works correctly.
-
-  if (state.documentAnnotations.has(documentKey)) {
-    return state.documentAnnotations.get(documentKey) as Annotation[];
-  }
-
-  const loaded = readAnnotationsFromDisk(document.uri.fsPath);
-  if (loaded !== null) {
-    state.documentAnnotations.set(documentKey, loaded);
-    refreshDecorationsAndNotify(state, document);
-    return loaded;
-  }
-
-  state.documentAnnotations.set(documentKey, []);
-  return [];
-}
-
-function processAccumulatedChanges(state: TrackerState, document: vscode.TextDocument): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey);
-  const changes = state.pendingChanges.get(documentKey) || [];
-
-  if (!annotations || annotations.length === 0 || changes.length === 0) {
-    return;
-  }
-
-  const startingContent = state.documentContentCache.get(documentKey)!;
-  const currentContent = document.getText();
-
-  const updated = applyChangesToAnnotations(annotations, changes, startingContent, currentContent);
-  state.documentAnnotations.set(documentKey, updated);
-  saveAndRefresh(state, document);
-}
-
-function onDocumentChanged(state: TrackerState, event: vscode.TextDocumentChangeEvent): void {
-  const docKey = event.document.uri.toString();
-
-  if (!state.documentAnnotations.has(docKey)) {
-    return;
-  }
-
-  if (!state.documentContentCache.has(docKey)) {
-    state.documentContentCache.set(docKey, event.document.getText());
-    return;
-  }
-
-  const existing = state.pendingChanges.get(docKey) || [];
-  state.pendingChanges.set(docKey, [...existing, ...event.contentChanges]);
-
-  if (state.fileChangeTimers.has(docKey)) {
-    clearTimeout(state.fileChangeTimers.get(docKey)!);
-  }
-
-  state.fileChangeTimers.set(docKey, setTimeout(() => {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.uri.toString() !== docKey) {
-      console.error("Editor not active or document not loaded", editor, editor?.document.uri.toString(), docKey);
-      state.pendingChanges.delete(docKey);
-      state.fileChangeTimers.delete(docKey);
-      return;
-    }
-
-    processAccumulatedChanges(state, editor.document);
-
-    state.documentContentCache.set(docKey, editor.document.getText());
-    state.pendingChanges.delete(docKey);
-    state.fileChangeTimers.delete(docKey);
-  }, 50));
-}
-
-function onActiveEditorChanged(state: TrackerState, editor: vscode.TextEditor | undefined): void {
-  if (!editor) { return; }
-  loadAnnotationsForDocument(state, editor.document);
-  state.documentContentCache.set(editor.document.uri.toString(), editor.document.getText());
-}
-
-function addAnnotation(state: TrackerState, document: vscode.TextDocument, annotation: Annotation): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
-  state.documentAnnotations.set(documentKey, [...annotations, annotation]);
-  saveAndRefresh(state, document);
-}
-
-function removeAnnotation(state: TrackerState, document: vscode.TextDocument, annotationId: string): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
-  const updated = annotations.filter((a) => a.id !== annotationId);
-
-  state.documentAnnotations.set(documentKey, updated);
-
-  if (updated.length === 0) {
-    deleteAnnotationsFile(document.uri.fsPath);
-    refreshDecorationsAndNotify(state, document);
-  } else {
-    saveAndRefresh(state, document);
-  }
-}
-
-/**
- * Step 1 of updateAnnotation: validate and build the updated list.
- * Returns null if the update should be skipped (identical annotation).
- */
-function buildAnnotationUpdate(
-  annotations: Annotation[],
-  updatedAnnotation: Annotation,
-  currentDocText: string
-): Annotation[] | null {
-  const fixedDoc = updatedAnnotation.document || currentDocText;
-  const existing = annotations.find((a) => a.id === updatedAnnotation.id);
-  if (existing && annotationsAreIdentical(existing, { ...updatedAnnotation, document: fixedDoc })) {
-    console.log("Skipping annotation update because it is identical to the existing annotation");
-    return null;
-  }
-  return patchAnnotationInList(annotations, updatedAnnotation.id, updatedAnnotation, currentDocText);
-}
-
-/**
- * Step 2 of updateAnnotation (only when the annotation carries new document text):
- * apply a workspace edit to bring the editor in sync with the annotation's document.
- */
-async function applyAnnotationDocumentEdit(
-  state: TrackerState,
+async function applyAnnotationDocumentTextEdit(
   document: vscode.TextDocument,
-  updatedAnnotation: Annotation,
-  previousAnnotations: Annotation[]
-): Promise<void> {
-  const documentKey = document.uri.toString();
-
-  console.debug("Annotation document text differs from current document text, updating document to match annotation");
-
+  newText: string
+): Promise<boolean> {
   const edit = new vscode.WorkspaceEdit();
   const fullRange = new vscode.Range(
     document.positionAt(0),
     document.positionAt(document.getText().length)
   );
-  edit.replace(document.uri, fullRange, updatedAnnotation.document);
-
-  const success = await vscode.workspace.applyEdit(edit);
-  if (!success) {
-    console.error("Failed to update document text to match annotation");
-    const reverted = previousAnnotations.map((a) =>
-      a.id === updatedAnnotation.id ? { ...a, document: document.getText() } : a
-    );
-    state.documentAnnotations.set(documentKey, reverted);
-    refreshDecorationsAndNotify(state, document);
-    return;
-  }
-
-  // Re-patch against the now-updated document text
-  const freshAnnotations = state.documentAnnotations.get(documentKey) || [];
-  const repatched = patchAnnotationInList(freshAnnotations, updatedAnnotation.id, updatedAnnotation, document.getText());
-  state.documentAnnotations.set(documentKey, repatched);
-  saveAndRefresh(state, document);
-
-  console.debug("finished updating document text to match annotation for", updatedAnnotation);
-  const updatedDoc = await vscode.workspace.openTextDocument(document.uri);
-  const finalAnnotations = state.documentAnnotations.get(documentKey) || [];
-  const finalPatched = patchAnnotationInList(finalAnnotations, updatedAnnotation.id, updatedAnnotation, updatedDoc.getText());
-  state.documentAnnotations.set(documentKey, finalPatched);
-  writeAnnotationsToDisk(finalPatched, updatedDoc);
-  state.decorationTypes.set(
-    documentKey,
-    rebuildDecorations(state.decorationTypes.get(documentKey), finalPatched, updatedDoc)
-  );
+  edit.replace(document.uri, fullRange, newText);
+  return vscode.workspace.applyEdit(edit);
 }
 
-async function updateAnnotation(
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Immutable state helpers. Every transition returns a new TrackerState; Maps
+// are cloned, not mutated. Object.freeze is applied at the top level (Maps
+// themselves remain structurally mutable, so correctness relies on never
+// calling .set/.delete on them outside these helpers).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function mapWith<K, V>(m: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> {
+  const next = new Map(m);
+  next.set(key, value);
+  return next;
+}
+
+function mapWithout<K, V>(m: ReadonlyMap<K, V>, key: K): ReadonlyMap<K, V> {
+  const next = new Map(m);
+  next.delete(key);
+  return next;
+}
+
+function withAnnotations(s: TrackerState, key: string, anns: Annotation[]): TrackerState {
+  return { ...s, documentAnnotations: mapWith(s.documentAnnotations, key, anns) };
+}
+function withDecorationTypes(s: TrackerState, key: string, types: vscode.TextEditorDecorationType[]): TrackerState {
+  return { ...s, oldDecorationCleanupFunctions: mapWith(s.oldDecorationCleanupFunctions, key, types) };
+}
+function withContentCache(s: TrackerState, key: string, text: string): TrackerState {
+  return { ...s, documentContentCache: mapWith(s.documentContentCache, key, text) };
+}
+function withPendingChanges(s: TrackerState, key: string, changes: vscode.TextDocumentContentChangeEvent[]): TrackerState {
+  return { ...s, pendingChanges: mapWith(s.pendingChanges, key, changes) };
+}
+function withoutPendingChanges(s: TrackerState, key: string): TrackerState {
+  return { ...s, pendingChanges: mapWithout(s.pendingChanges, key) };
+}
+function withTimer(s: TrackerState, key: string, timer: NodeJS.Timeout): TrackerState {
+  return { ...s, fileChangeTimers: mapWith(s.fileChangeTimers, key, timer) };
+}
+function withoutTimer(s: TrackerState, key: string): TrackerState {
+  return { ...s, fileChangeTimers: mapWithout(s.fileChangeTimers, key) };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// State transitions. Each takes a TrackerState and returns a new TrackerState.
+// Side effects (disk I/O, editor decorations, panel notifications) may happen,
+// but in-memory state is only updated via the returned value.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function refreshDecorationsAndNotify(state: TrackerState, document: vscode.TextDocument): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  const oldTypes = state.oldDecorationCleanupFunctions.get(key);
+  const newTypes = rebuildDecorations(oldTypes, annotations, document);
+  notifyPanel(document, annotations);
+  return withDecorationTypes(state, key, newTypes);
+}
+
+function saveAndRefresh(state: TrackerState, document: vscode.TextDocument): TrackerState {
+  const annotations = state.documentAnnotations.get(document.uri.toString()) || [];
+  writeAnnotationsToDisk(annotations, document);
+  return refreshDecorationsAndNotify(state, document);
+}
+
+function loadAnnotationsForDocument(state: TrackerState, document: vscode.TextDocument): TrackerState {
+  const key = document.uri.toString();
+  console.debug(`Loading annotations for ${key}`);
+  // TODO we have only sort-of validated that diff loading works correctly.
+  if (state.documentAnnotations.has(key)) {
+    return state;
+  }
+  const loaded = readAnnotationsFromDisk(document.uri.fsPath);
+  if (loaded !== null) {
+    return refreshDecorationsAndNotify(withAnnotations(state, key, loaded), document);
+  }
+
+  return withAnnotations(state, key, []);
+}
+
+function getAnnotationsForDocument(state: TrackerState, document: vscode.TextDocument): Annotation[] {
+  return state.documentAnnotations.get(document.uri.toString()) || [];
+}
+
+function processAccumulatedChanges(state: TrackerState, document: vscode.TextDocument): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key);
+  const changes = state.pendingChanges.get(key) || [];
+  if (!annotations || annotations.length === 0 || changes.length === 0) {
+    return state;
+  }
+  const startingContent = annotations[0].document;
+  const currentContent = document.getText();
+  const updated = applyChangesToAnnotations(annotations, changes, startingContent, currentContent);
+  return saveAndRefresh(withAnnotations(state, key, updated), document);
+}
+
+/**
+ * Triggered by the deferred flush timer. Processes whatever changes have
+ * accumulated for `documentKey`, re-seeds the content cache, and clears the
+ * pending-changes / timer entries.
+ */
+function flushAccumulatedChanges(state: TrackerState, documentKey: string): TrackerState {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.uri.toString() !== documentKey) {
+    console.error(
+      "Editor not active or document not loaded",
+      editor,
+      editor?.document.uri.toString(),
+      documentKey
+    );
+    return withoutTimer(withoutPendingChanges(state, documentKey), documentKey);
+  }
+  const afterProcess = processAccumulatedChanges(state, editor.document);
+  const afterCache = withContentCache(afterProcess, documentKey, editor.document.getText());
+  return withoutTimer(withoutPendingChanges(afterCache, documentKey), documentKey);
+}
+
+/**
+ * `scheduleFlush` is a narrow capability: it only lets the callee arrange for
+ * a known future transition (flushAccumulatedChanges) to run on docKey. It
+ * does NOT expose setState. The existing timer is cleared here because
+ * clearTimeout is a side effect on the OS, not a state mutation.
+ */
+function onDocumentChanged(
+  state: TrackerState,
+  event: vscode.TextDocumentChangeEvent,
+  scheduleFlush: (documentKey: string) => NodeJS.Timeout
+): TrackerState {
+  const docKey = event.document.uri.toString();
+
+  if (!state.documentAnnotations.has(docKey)) {
+    return state;
+  }
+
+  if (!state.documentContentCache.has(docKey)) {
+    return withContentCache(state, docKey, event.document.getText());
+  }
+
+  const existingChanges = state.pendingChanges.get(docKey) || [];
+  const nextChanges = [...existingChanges, ...event.contentChanges];
+
+  const existingTimer = state.fileChangeTimers.get(docKey);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+  const newTimer = scheduleFlush(docKey);
+
+  return withTimer(withPendingChanges(state, docKey, nextChanges), docKey, newTimer);
+}
+
+function onActiveEditorChanged(
+  state: TrackerState,
+  editor: vscode.TextEditor | undefined
+): TrackerState {
+  if (!editor) {
+    return state;
+  }
+  const afterLoad = loadAnnotationsForDocument(state, editor.document);
+  return withContentCache(afterLoad, editor.document.uri.toString(), editor.document.getText());
+}
+
+function addAnnotation(
   state: TrackerState,
   document: vscode.TextDocument,
-  updatedAnnotation: Annotation
-): Promise<void> {
-  console.log("Updating annotation", updatedAnnotation.id, "for document", document.uri.toString(), "with updated annotation", updatedAnnotation);
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
+  annotation: Annotation
+): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  return saveAndRefresh(withAnnotations(state, key, [...annotations, annotation]), document);
+}
 
-  // Step 1: build the update (pure)
-  const updated = buildAnnotationUpdate(annotations, updatedAnnotation, document.getText());
-  if (updated === null) {
-    return;
+function removeAnnotation(
+  state: TrackerState,
+  document: vscode.TextDocument,
+  annotationId: string
+): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  const updated = annotations.filter((a) => a.id !== annotationId);
+  const next = withAnnotations(state, key, updated);
+  if (updated.length === 0) {
+    deleteAnnotationsFile(document.uri.fsPath);
+    return refreshDecorationsAndNotify(next, document);
   }
-
-  state.documentAnnotations.set(documentKey, updated);
-  writeAnnotationsToDisk(updated, document);
-
-  // Step 2: if the annotation's document text differs, apply workspace edit
-  if (updatedAnnotation.document && updatedAnnotation.document !== document.getText()) {
-    await applyAnnotationDocumentEdit(state, document, updatedAnnotation, annotations);
-    return;
-  }
-
-  // Step 3: normal case — just refresh
-  refreshDecorationsAndNotify(state, document);
-  console.debug("Finished updating annotation", updatedAnnotation);
+  return saveAndRefresh(next, document);
 }
 
 function moveAnnotation(
@@ -624,35 +655,97 @@ function moveAnnotation(
   annotationId: string,
   newStart: number,
   newEnd: number
-): void {
-  const documentKey = document.uri.toString();
-  const annotations = state.documentAnnotations.get(documentKey) || [];
-
+): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
   const index = annotations.findIndex((a) => a.id === annotationId);
   if (index === -1) {
     vscode.window.showErrorMessage(`Annotation with ID ${annotationId} not found.`);
-    return;
+    return state;
   }
-
   const updated = annotations.map((a, i) =>
     i === index ? { ...a, start: newStart, end: newEnd, document: document.getText() } : a
   );
-
-  state.documentAnnotations.set(documentKey, updated);
-  saveAndRefresh(state, document);
+  return saveAndRefresh(withAnnotations(state, key, updated), document);
 }
 
-function getAnnotationsForDocument(state: TrackerState, document: vscode.TextDocument): Annotation[] {
-  return state.documentAnnotations.get(document.uri.toString()) || [];
+
+// ─── updateAnnotation phases ──────────────────────────────────────────────────
+// updateAnnotation has an async workspace-edit step that may race with other
+// events. To preserve the original's "re-read state after each await" behavior
+// without leaking getState/setState into the helper, the async orchestration
+// lives in the returned method of createAnnotationTracker; each phase below is
+// a pure state transition invoked between awaits.
+
+interface UpdateBeginResult {
+  nextState: TrackerState;
+  needsDocumentEdit: boolean;
+  skipped: boolean;
+}
+
+function beginAnnotationUpdate(
+  state: TrackerState,
+  document: vscode.TextDocument,
+  updatedAnnotation: Annotation
+): UpdateBeginResult {
+  console.log(
+    "Updating annotation", updatedAnnotation.id,
+    "for document", document.uri.toString(),
+    "with updated annotation", updatedAnnotation
+  );
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  const updated = buildAnnotationUpdate(annotations, updatedAnnotation, document.getText());
+  if (updated === null) {
+    return { nextState: state, needsDocumentEdit: false, skipped: true };
+  }
+  writeAnnotationsToDisk(updated, document);
+  const needsDocumentEdit =
+    !!updatedAnnotation.document && updatedAnnotation.document !== document.getText();
+  return {
+    nextState: withAnnotations(state, key, updated),
+    needsDocumentEdit,
+    skipped: false,
+  };
+}
+
+function completeAnnotationUpdateAfterEdit(
+  state: TrackerState,
+  document: vscode.TextDocument,
+  updatedAnnotation: Annotation
+): TrackerState {
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  const repatched = patchAnnotationInList(
+    annotations,
+    updatedAnnotation.id,
+    updatedAnnotation,
+    document.getText()
+  );
+  return saveAndRefresh(withAnnotations(state, key, repatched), document);
+}
+
+function revertAnnotationUpdate(
+  state: TrackerState,
+  document: vscode.TextDocument,
+  updatedAnnotation: Annotation
+): TrackerState {
+  console.error("Failed to update document text to match annotation");
+  const key = document.uri.toString();
+  const annotations = state.documentAnnotations.get(key) || [];
+  const reverted = annotations.map((a) =>
+    a.id === updatedAnnotation.id ? { ...a, document: document.getText() } : a
+  );
+  return refreshDecorationsAndNotify(withAnnotations(state, key, reverted), document);
 }
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Setup — creates state, wires VS Code events, returns a handle.
+// createAnnotationTracker — the only place that owns state.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface TrackerHandle extends vscode.Disposable {
-  state: TrackerState;
+  readonly state: Readonly<TrackerState>;
   loadAnnotationsForDocument(document: vscode.TextDocument): Promise<Annotation[]>;
   saveAnnotationsForDocument(document: vscode.TextDocument): Promise<void>;
   addAnnotation(document: vscode.TextDocument, annotation: Annotation): void;
@@ -665,38 +758,95 @@ export interface TrackerHandle extends vscode.Disposable {
 }
 
 export function createAnnotationTracker(_context: vscode.ExtensionContext): TrackerHandle {
-  const state: TrackerState = {
+  let state: Readonly<TrackerState> = {
     documentAnnotations: new Map(),
-    decorationTypes: new Map(),
+    oldDecorationCleanupFunctions: new Map(),
     fileChangeTimers: new Map(),
     documentContentCache: new Map(),
     pendingChanges: new Map(),
   };
 
+  const getState = (): TrackerState => state;
+  const setState = (next: TrackerState): void => { state = next; };
+
+  // Narrow capability handed to onDocumentChanged. Not setState — only the
+  // ability to schedule a known future transition on a known docKey.
+  const scheduleFlush = (docKey: string): NodeJS.Timeout =>
+    setTimeout(() => setState(flushAccumulatedChanges(getState(), docKey)), 50);
+
   const disposables = [
-    vscode.workspace.onDidChangeTextDocument((e) => onDocumentChanged(state, e)),
-    vscode.window.onDidChangeActiveTextEditor((e) => onActiveEditorChanged(state, e)),
+    vscode.workspace.onDidChangeTextDocument((e) =>
+      setState(onDocumentChanged(getState(), e, scheduleFlush))
+    ),
+    vscode.window.onDidChangeActiveTextEditor((editor) =>
+      setState(onActiveEditorChanged(getState(), editor))
+    ),
   ];
 
-  if (vscode.window.activeTextEditor) {
-    loadAnnotationsForDocument(state, vscode.window.activeTextEditor.document);
-  }
+  // Initial load. No conditional here — onActiveEditorChanged handles the
+  // undefined-editor case internally.
+  setState(onActiveEditorChanged(getState(), vscode.window.activeTextEditor));
 
   return {
-    state,
-    loadAnnotationsForDocument: (doc) => Promise.resolve(loadAnnotationsForDocument(state, doc)),
-    saveAnnotationsForDocument: (doc) => { writeAnnotationsToDisk(state.documentAnnotations.get(doc.uri.toString()) || [], doc); return Promise.resolve(); },
-    addAnnotation: (doc, ann) => addAnnotation(state, doc, ann),
-    removeAnnotation: (doc, id) => removeAnnotation(state, doc, id),
-    updateAnnotation: (doc, ann) => updateAnnotation(state, doc, ann),
-    moveAnnotation: (doc, id, s, e) => moveAnnotation(state, doc, id, s, e),
-    getAnnotationsForDocument: (doc) => getAnnotationsForDocument(state, doc),
-    updateDecorations: (doc) => refreshDecorationsAndNotify(state, doc),
+    get state() { return getState(); },
+
+    loadAnnotationsForDocument: async (doc) => {
+      setState(loadAnnotationsForDocument(getState(), doc));
+      return getAnnotationsForDocument(getState(), doc);
+    },
+
+    saveAnnotationsForDocument: async (doc) => {
+      writeAnnotationsToDisk(getAnnotationsForDocument(getState(), doc), doc);
+    },
+
+    addAnnotation: (doc, ann) => setState(addAnnotation(getState(), doc, ann)),
+
+    removeAnnotation: (doc, id) => setState(removeAnnotation(getState(), doc, id)),
+
+    updateAnnotation: async (doc, ann) => {
+      // Phase 1: sync validate + patch + write.
+      const { nextState, needsDocumentEdit, skipped } = beginAnnotationUpdate(getState(), doc, ann);
+      if (skipped) { return; }
+      setState(nextState);
+
+      // Phase 2a: no workspace edit required — just refresh decorations.
+      if (!needsDocumentEdit) {
+        setState(refreshDecorationsAndNotify(getState(), doc));
+        console.debug("Finished updating annotation", ann);
+        return;
+      }
+
+      // Phase 2b: apply workspace edit. Each await re-reads state afterwards
+      // via getState() so we survive concurrent mutations.
+      console.debug("Annotation document text differs from current; applying workspace edit");
+      const success = await applyAnnotationDocumentTextEdit(doc, ann.document);
+      if (!success) {
+        setState(revertAnnotationUpdate(getState(), doc, ann));
+        return;
+      }
+
+      setState(completeAnnotationUpdateAfterEdit(getState(), doc, ann));
+
+      // Re-open the document to pick up any normalization vscode may have done
+      // (line endings, etc.) and patch one more time against that canonical text.
+      const updatedDoc = await vscode.workspace.openTextDocument(doc.uri);
+      setState(completeAnnotationUpdateAfterEdit(getState(), updatedDoc, ann));
+
+      console.debug("Finished updating annotation", ann);
+    },
+
+    moveAnnotation: (doc, id, start, end) => setState(moveAnnotation(getState(), doc, id, start, end)),
+
+    getAnnotationsForDocument: (doc) => getAnnotationsForDocument(getState(), doc),
+
+    updateDecorations: (doc) => setState(refreshDecorationsAndNotify(getState(), doc)),
+
     dispose() {
-      for (const types of state.decorationTypes.values()) {
+      const finalState = getState();
+      for (const types of finalState.oldDecorationCleanupFunctions.values()) {
         for (const t of types) { t.dispose(); }
       }
-      for (const timer of state.fileChangeTimers.values()) {
+      for (const timer of finalState.fileChangeTimers.values()) {
         clearTimeout(timer);
       }
       for (const d of disposables) { d.dispose(); }
