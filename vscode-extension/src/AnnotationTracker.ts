@@ -38,6 +38,19 @@ import * as fs from "fs";
 import { createPatch, applyPatch } from "diff";
 import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
 
+export const exportedForTesting = {
+  getAnnotationsFilePath,
+  reconstructAnnotationsFromDisk,
+  serializeAnnotationsForDisk,
+  parseContentChange,
+  applyChangeToAnnotation,
+  applyChangesToAnnotations,
+  resolveDecorationColor,
+  resolveGutterColor,
+  annotationsAreIdentical,
+  computeDecorationSpecs,
+  planAnnotationUpdate,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Domain types.
@@ -111,7 +124,7 @@ export type AnnotationUpdatePlan =
 // Pure functions — exported for testing. No I/O, no VSCode API, no TrackerState.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
+function getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
   let currentDir = path.dirname(documentPath);
 
   while (currentDir !== path.parse(currentDir).root) {
@@ -131,7 +144,7 @@ export function getAnnotationsFilePath(documentPath: string, createDir: boolean 
   return path.join(annotationsDir, path.basename(documentPath) + ".annotations.json");
 }
 
-export function reconstructAnnotationsFromDisk(diskState: {
+function reconstructAnnotationsFromDisk(diskState: {
   document: string;
   annotations: (Annotation & { documentDiff?: string })[];
 }): Annotation[] {
@@ -152,7 +165,7 @@ export function reconstructAnnotationsFromDisk(diskState: {
   });
 }
 
-export function serializeAnnotationsForDisk(
+function serializeAnnotationsForDisk(
   annotations: Annotation[],
   documentText: string,
   fileName: string
@@ -197,7 +210,7 @@ export function serializeAnnotationsForDisk(
 }
 
 /** Anti-corruption: parse a VSCode change event into our domain type. */
-export function parseContentChange(event: vscode.TextDocumentContentChangeEvent): ContentChange {
+function parseContentChange(event: vscode.TextDocumentContentChangeEvent): ContentChange {
   return {
     rangeOffset: event.rangeOffset,
     rangeLength: event.rangeLength,
@@ -210,7 +223,7 @@ export function parseContentChange(event: vscode.TextDocumentContentChangeEvent)
  * isolation. Annotations whose document doesn't match the starting content are
  * passed through unchanged.
  */
-export function applyChangeToAnnotation(
+function applyChangeToAnnotation(
   annotation: Annotation,
   change: ContentChange,
   startingContent: string
@@ -294,7 +307,7 @@ export function applyChangeToAnnotation(
   return annotation;
 }
 
-export function applyChangesToAnnotations(
+function applyChangesToAnnotations(
   annotations: Annotation[],
   changes: readonly ContentChange[],
   startingContent: string,
@@ -317,7 +330,7 @@ export function applyChangesToAnnotations(
   );
 }
 
-export function resolveDecorationColor(baseColor: string, isSelected: boolean): string {
+function resolveDecorationColor(baseColor: string, isSelected: boolean): string {
   if (!isSelected) {
     return baseColor;
   }
@@ -337,7 +350,7 @@ export function resolveDecorationColor(baseColor: string, isSelected: boolean): 
   return baseColor;
 }
 
-export function resolveGutterColor(baseColor: string): string {
+function resolveGutterColor(baseColor: string): string {
   if (baseColor.startsWith("rgba")) {
     const m = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
     if (m) { return `rgb(${m[1]}, ${m[2]}, ${m[3]})`; }
@@ -345,7 +358,7 @@ export function resolveGutterColor(baseColor: string): string {
   return baseColor;
 }
 
-export function annotationsAreIdentical(a: Annotation, b: Annotation): boolean {
+function annotationsAreIdentical(a: Annotation, b: Annotation): boolean {
   return (
     a.start === b.start &&
     a.end === b.end &&
@@ -358,7 +371,7 @@ export function annotationsAreIdentical(a: Annotation, b: Annotation): boolean {
  * Pure: compute the decoration specs for a list of annotations against a given
  * document text. Annotations whose document doesn't match are skipped.
  */
-export function computeDecorationSpecs(
+function computeDecorationSpecs(
   annotations: Annotation[],
   documentText: string,
   selectedAnnotationId: string | undefined
@@ -390,7 +403,7 @@ export function computeDecorationSpecs(
  * newDocumentText is non-null iff the updated annotation's document differs
  * from the current on-disk document text.
  */
-export function planAnnotationUpdate(
+function planAnnotationUpdate(
   currentAnnotations: Annotation[],
   updatedAnnotation: AnnotationUpdate,
   currentDocumentText: string
