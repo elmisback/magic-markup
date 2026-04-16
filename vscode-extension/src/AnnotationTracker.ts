@@ -79,9 +79,15 @@ type AnnotationUpdate = Annotation & {
 
 /** Anti-corruption: parsed form of vscode.TextDocumentContentChangeEvent. */
 export interface ContentChange {
-  readonly rangeOffset: number;
-  readonly rangeLength: number;
-  readonly text: string;
+
+  /** number of characters from the start of the document */ 
+  readonly rangeOffset: number; 
+
+  /** number of characters replaced by this change */
+  readonly rangeLength: number; 
+
+  /** new text for this range */
+  readonly text: string; 
 }
 
 /** Anti-corruption: a DecorationType collapsed down to just the capability we use. */

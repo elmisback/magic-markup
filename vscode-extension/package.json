@@ -87,6 +87,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
+    "test": "node --test out/test/AnnotationTracker.test.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
