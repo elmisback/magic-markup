@@ -8,6 +8,7 @@ interface AnnotationUpdate {
   end?: number;
   document?: string;
   metadata?: any;
+  settingAnchorTextOnly?: boolean;
 }
 
 export interface AnnotationEditorProps {
@@ -40,7 +41,7 @@ function AnnotationEditorContainer(props: {
       {toolTypes[value.tool]?.({
         value,
         setValue: (v: AnnotationUpdate) =>
-          setValue({ ...value, document: v.document, metadata: v.metadata }),
+          setValue({ ...value, document: v.document, metadata: v.metadata, settingAnchorTextOnly: v.settingAnchorTextOnly }),
         utils: {
           getText: () => value.document.slice(value.start, value.end),
           setText: (newText: string) => {
@@ -49,6 +50,7 @@ function AnnotationEditorContainer(props: {
               document:
                 value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata,
+              settingAnchorTextOnly: true 
             });
           },
           setMetadata: (newMetadata: any) => {
