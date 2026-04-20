@@ -10,6 +10,7 @@
   },
   "main": "./out/extension.js",
   "contributes": {
+    
     "viewsContainers": {
       "activitybar": [
         {
@@ -111,6 +112,7 @@
     "diff": "^8.0.0-beta",
     "express": "^4.19.2",
     "openai": "^4.53.2",
+    "react-inspector": "^9.0.0",
     "ws": "^8.18.0"
   },
   "extensionDependencies": [
