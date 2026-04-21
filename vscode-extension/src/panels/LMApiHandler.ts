@@ -28,7 +28,17 @@ export class LMApiHandler {
       console.log(`Selecting model with options:`, modelOptions);
       //console.log('HERE', await vscode.lm.selectChatModels());
       // gpt-5-mini gpt-4o-mini copilot-fast gpt-4o claude-haiku-4.5 gpt-4.1 oswe-vscode-prime auto
-      const [model] = await vscode.lm.selectChatModels(modelOptions);
+    const allModels = await vscode.lm.selectChatModels({});
+    console.log('ALL AVAILABLE MODELS:', JSON.stringify(allModels.map(m => ({
+      name: m.name,
+      vendor: m.vendor,
+      family: m.family,
+      version: m.version,
+      id: m.id
+    })), null, 2));
+
+    const [model] = await vscode.lm.selectChatModels(modelOptions);
+    console.log('SELECTED MODEL:', model ? `${model.vendor}/${model.family}` : 'NONE');
       
       if (!model) {
         this.sendErrorResponse(message, JSON.stringify({
@@ -52,9 +62,19 @@ export class LMApiHandler {
       const clientWantsStreaming = message.data.options?.stream === true;
       console.log(`Client wants streaming: ${clientWantsStreaming}`);
       
+      const formattedMessages = message.data.messages.map((msg: any) => {
+      if (msg.role === 'user') {
+        return vscode.LanguageModelChatMessage.User(msg.content);
+      } else if (msg.role === 'assistant') {
+        return vscode.LanguageModelChatMessage.Assistant(msg.content);
+      } else {
+        // system messages get treated as user messages in VSCode LM API
+        return vscode.LanguageModelChatMessage.User(msg.content);
+      }
+      });
       // Send the request - all requests return a stream in newer VSCode API
       const response = await model.sendRequest(
-        message.data.messages,
+        formattedMessages,
         message.data.options || {},
         cancelTokenSource.token
       );

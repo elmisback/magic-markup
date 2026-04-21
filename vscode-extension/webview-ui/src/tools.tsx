@@ -8,11 +8,11 @@ import { ChatMessage, lmApi, mockLmApi } from "./lm-api-client";
 import { vscode } from "./utilities/vscode";
 
 import {
-  Generator,
   FormalSpecification,
   ExplainInEnglish,
   OutputVisualizer,
 } from "./additionalTools";
+import Generator from "./Generator";
 
 import MarkdownNote from "./MarkdownEditor";
 
