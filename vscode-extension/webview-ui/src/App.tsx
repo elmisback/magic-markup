@@ -5,8 +5,10 @@ import { tools, toolNames } from "./tools";
 import React, { useState, useEffect, useRef } from "react";
 
 interface AnnotationUpdate {
+  end?: number;
   document?: string;
   metadata?: any;
+  settingAnchorTextOnly?: boolean;
 }
 
 export interface AnnotationEditorProps {
@@ -39,19 +41,21 @@ function AnnotationEditorContainer(props: {
       {toolTypes[value.tool]?.({
         value,
         setValue: (v: AnnotationUpdate) =>
-          setValue({ ...value, document: v.document, metadata: v.metadata }),
+          setValue({ ...value, document: v.document, metadata: v.metadata, settingAnchorTextOnly: v.settingAnchorTextOnly }),
         utils: {
           getText: () => value.document.slice(value.start, value.end),
           setText: (newText: string) => {
             setValue({
+              end: value.start + newText.length,
               document:
                 value.document.slice(0, value.start) + newText + value.document.slice(value.end),
               metadata: value.metadata,
+              settingAnchorTextOnly: true 
             });
           },
           setMetadata: (newMetadata: any) => {
             setValue({
-              document: value.document,
+              // document: value.document,
               metadata: { ...value.metadata, ...newMetadata },
             });
           },
@@ -148,14 +152,15 @@ function AnnotationSidebarView(props: {
   };
 
   const handleAnnotationUpdate = (id: string, value: AnnotationUpdate) => {
-    console.log("Updating annotation:", id, value);
+    console.log("Webview: updating annotation:", id, value);
     
     const annotation = annotations.find(a => a.id === id);
     if (!annotation) return;
     
     const updatedAnnotation = {
       ...annotation,
-      ...(value.document ? { document: value.document } : {}),
+      ...value,
+      ...(value.document ? { document: value.document } : {document: undefined}),
       ...(value.metadata ? { metadata: { ...annotation.metadata, ...value.metadata } } : {})
     };
     
@@ -259,15 +264,19 @@ function RetagBanner(props: {
 }) {
   return (
     <div className="retag-banner" style={{ 
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000,
       padding: "10px", 
       marginBottom: "10px", 
       backgroundColor: "#ffe0e0", 
       borderRadius: "4px",
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center"
     }}>
-      <span>Document has been edited and some annotations need updating</span>
+      <span>Document has been edited and some annotations need updating</span>&nbsp;
       <div>
         <button onClick={props.onRetag} style={{ marginRight: "8px" }}>Update Annotations</button>
       </div>
@@ -427,10 +436,10 @@ function App() {
 
     // Check for overlapping annotations
     for (let i = 0; i < annotations.length; i++) {
-      if (annotations[i].start === start && annotations[i].end === end) {
-        showErrorMessage("Error adding annotations: annotation already exists in selected area");
-        return;
-      }
+      // if (annotations[i].start === start && annotations[i].end === end) {
+      //   showErrorMessage("Error adding annotations: annotation already exists in selected area");
+      //   return;
+      // }
     }
 
     // Pick a colorblind-friendly annotation color, rotating through a list
@@ -523,7 +532,7 @@ function App() {
     // Message handler for communication with extension
     const handleMessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data);
-      console.debug("Received message:", message);
+      console.debug("Webview: handleMessage: Received message:", message);
       
       switch (message.command) {
         case "initialize":

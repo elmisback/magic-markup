@@ -9,7 +9,7 @@ import path from "path";
 
 // import retagUpdate from "./server/retag";
 import { SidebarProvider } from "./panels/AnnotationManagerPanel";
-import { AnnotationTracker } from "./AnnotationTracker";
+import { createAnnotationTracker, TrackerHandle } from "./AnnotationTracker";
 
 // Helper to run REST endpoints
 const runEndpointDictWithErrorHandlingOnPort = (
@@ -44,11 +44,11 @@ const runEndpointDictWithErrorHandlingOnPort = (
 };
 
 // Global annotation tracker instance
-export let annotationTracker: AnnotationTracker;
+export let annotationTracker: TrackerHandle;
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize the annotation tracker
-  annotationTracker = new AnnotationTracker(context);
+  annotationTracker = createAnnotationTracker(context);
   context.subscriptions.push(annotationTracker);
 
   // Register Sidebar Provider

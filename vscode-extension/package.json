@@ -4,7 +4,7 @@
   "publisher": "codetations",
   "repository": "github:elmisback/codetations",
   "description": "Rich code annotations for VS Code",
-  "version": "0.0.24",
+  "version": "0.0.28",
   "engines": {
     "vscode": "^1.110.0"
   },
@@ -47,6 +47,10 @@
       {
         "command": "codetations.moveSelected",
         "title": "Codetations: Move Selected"
+      },
+      {
+        "command": "codetations.setAnnotationColor",
+        "title": "Codetations: Set Annotation Color"
       }
     ],
     "menus": {
@@ -84,6 +88,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
+    "test": "node --test out/test/AnnotationTracker.test.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

@@ -150,6 +150,7 @@ export abstract class BaseAnnotationView {
   protected _setWebviewMessageListener(webview: Webview) {
     webview.onDidReceiveMessage(
       async (message: any) => {
+        console.log("Received message from webview:", message);
         const command = message.command;
         const editor = this._getCurrentEditor();
 
@@ -402,9 +403,9 @@ export abstract class BaseAnnotationView {
   /**
    * Sends a message to the webview context.
    */
-  public sendMessageObject(message: any) {
+  public async sendMessageObject(message: any) {
     // Implement in child classes
-    this.webview.postMessage(JSON.stringify(message));
+    await this.webview.postMessage(JSON.stringify(message));
   }
   
   /**

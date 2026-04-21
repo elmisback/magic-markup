@@ -97,15 +97,15 @@ You are responsible for placing an identical annotation on this updated file. It
 
 Describe possible sections the specific segment could be said to be located in. It is possible the segment has not changed, or that it has been refactored. Pick the most correct choice. Remember to be detailed about the start and stop of the segment. If the segment has been updated, it may need to expand or shrink. BE CAREFUL TO INCLUDE NOTHING EXTRA. Then, provide the following numbered answers as a JSON object:
 
-1) Print ONLY the text of the updated specific segment. You must print all of the text here.
+1-code) Print ONLY the text of the updated specific segment. You must print all of the text here.
 
-2) State ONLY the line number in UPDATED that (1) starts on.
+2-start) State ONLY the line number in UPDATED that (1) starts on.
 
-3) State ONLY the line number in UPDATED that (1) ends on.
+3-end) State ONLY the line number in UPDATED that (1) ends on.
 
-4) (1) may occur multiple times in the section given by [(2),(3)]. Which number occurrence, as ONLY a 1-indexed number, is (1)?
+4-occurrence) (1) may occur multiple times in the section given by [(2),(3)]. Which number occurrence, as ONLY a 1-indexed number, is (1)?
 
-The object must look like: {1: <code>, 2: <number>, 3: <number>, 4: <number>}
+The object must look like: {"code": "<code>", "start": <number>, "end": <number>, "occurrence": <number>}
 
 The answer to 1 should be a code string only, without markdown formatting or extra notes.`;
 
@@ -204,7 +204,8 @@ const retagUpdate = async (
       codeWithSnippetDelimited,
       updatedCodeWithSnippetDelimited: updatedCodeWithoutDelimiters,
       delimiter,
-    }) ) || '';
+    })) || '';
+    console.log("Raw output from model:", gptOut);
     console.log(gptOut);
   } catch (e) {
     return { error: e, errorType: "model" };
@@ -212,7 +213,7 @@ const retagUpdate = async (
   let gptRetaggingJSON;
   try {
     gptRetaggingJSON = JSON.parse(gptOut);
-    console.log(gptRetaggingJSON);
+    console.log("gptRetaggingJSON:", gptRetaggingJSON);
   } catch (e) {
     // (This should never happen based on the OpenAI documentation.)
     return { error: e, errorType: "JSON parse", gptOut };
@@ -246,6 +247,7 @@ const retagUpdate = async (
     delimiterStart: string;
     delimiterEnd: string;
   };
+  console.log("Parsed JSON from model:", gptRetaggingJSON);
 
   const computeUpdatedCodeWithSnippetRetagged = ({
     code,
@@ -265,6 +267,31 @@ const retagUpdate = async (
         would guarantee placement in the "intended" location,
         but this is slow
     */
+    // first check for the simple case where we can just split the file on the index of the starting line, find the snippet in that section, and then add the delimiters based on the index of the snippet in that section.
+    
+    // console.log("Attempting to find snippet in identified lines", { lineStart, lineEnd, snippet });
+    // const splitIdx = code
+    //   .split("\n")
+    //   .slice(0, lineStart)
+    //   .map((s) => s + "\n")
+    //   .join("").length;
+    
+    // const findIdx = code.slice(splitIdx).indexOf(snippet);
+    // console.log("Find indices:", { splitIdx, findIdx });
+    // if (findIdx !== -1) {
+    //   const leftIdx = splitIdx + findIdx;
+    //   const rightIdx = leftIdx + snippet.length;
+    //   return {
+    //     updatedCodeWithDelimiters:
+    //       code.slice(0, leftIdx) +
+    //       delimiterStart +
+    //       code.slice(leftIdx, rightIdx) +
+    //       delimiterEnd +
+    //       code.slice(rightIdx, code.length),
+    //     leftIdx,
+    //     rightIdx,
+    //   };
+    // }
 
     let sectionString = code
       .split("\n")
@@ -309,10 +336,10 @@ const retagUpdate = async (
   try {
     const out = computeUpdatedCodeWithSnippetRetagged({
       code: updatedCodeWithoutDelimiters,
-      snippet: gptRetaggingJSON[1],
-      lineStart: gptRetaggingJSON[2],
-      lineEnd: gptRetaggingJSON[3],
-      nthOccurrence: gptRetaggingJSON[4],
+      snippet: gptRetaggingJSON.code,
+      lineStart: gptRetaggingJSON.start,
+      lineEnd: gptRetaggingJSON.end,
+      nthOccurrence: gptRetaggingJSON.occurrence,
       delimiterStart: delimiter,
       delimiterEnd: delimiter,
     });

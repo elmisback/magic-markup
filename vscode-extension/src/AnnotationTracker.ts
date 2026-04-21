@@ -1,8 +1,61 @@
+/*
+
+Synchronous update algorithm:
+  - If the update is a no-op, return the old state.
+  - Compute a plan: a new annotation list plus optional new document text.
+  - Effect (1): SYNCHRONOUSLY write the annotation list to disk.
+      If it fails, there's nothing to clean up — return the old state.
+  - If the document text needs to change:
+    - Effect (2): SYNCHRONOUSLY write the new document text with fs.writeFileSync
+      (NOT VSCode's edit API).
+      If it fails, SYNCHRONOUSLY revert the annotation file and return the old state.
+    - After this completes, VSCode's file watcher may fire onchange. That's fine:
+      applyChangesToAnnotations short-circuits when startingContent === currentContent,
+      which it will be because we just patched both.
+  - Apply decorations synchronously.
+  - Notify the panel.
+
+Design principles (from the original header):
+
+  1. Minimal interface. No withAnnotations / withDecorationTypes / etc. cruft.
+     State construction happens only at the top level of createAnnotationTracker.
+     Helpers take the pieces of state they need and return just what they modify.
+
+  2. Anti-corruption layer. VSCode types like TextDocumentContentChangeEvent and
+     TextEditorDecorationType are parsed at the edge into our own domain types
+     (ContentChange, DecorationDisposer, DecorationSpec) before entering the core.
+
+  3. Reify all effects as data, all the way down. The pure core computes plans
+     (AnnotationUpdatePlan, DecorationSpec[]) describing what should happen. The
+     thin shell in createAnnotationTracker executes them. The core never touches
+     I/O or VSCode APIs.
+
+*/
+
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { createPatch, applyPatch } from "diff";
 import { AnnotationManagerPanel } from "./panels/AnnotationManagerPanel";
+
+export const exportedForTesting = {
+  getAnnotationsFilePath,
+  reconstructAnnotationsFromDisk,
+  serializeAnnotationsForDisk,
+  parseContentChange,
+  applyChangeToAnnotation,
+  applyChangesToAnnotations,
+  resolveDecorationColor,
+  resolveGutterColor,
+  annotationsAreIdentical,
+  computeDecorationSpecs,
+  planAnnotationUpdate,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Domain types.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export interface Annotation {
   // HACK this just duplicates "../webview-ui/src/Annotation.tsx"
   id: string;
@@ -20,681 +73,854 @@ export interface Annotation {
   };
 }
 
-interface AnnotationState {
-  annotations: Annotation[];
+type AnnotationUpdate = Annotation & {
+  settingAnchorTextOnly?: boolean; // if true, only update the annotation's text, not its full document
+};
+
+/** Anti-corruption: parsed form of vscode.TextDocumentContentChangeEvent. */
+export interface ContentChange {
+
+  /** number of characters from the start of the document */ 
+  readonly rangeOffset: number; 
+
+  /** number of characters replaced by this change */
+  readonly rangeLength: number; 
+
+  /** new text for this range */
+  readonly text: string; 
 }
 
-export class AnnotationTracker implements vscode.Disposable {
-  private disposables: vscode.Disposable[] = [];
-  private documentAnnotations: Map<string, Annotation[]> = new Map();
-  private decorationTypes: Map<string, vscode.TextEditorDecorationType[]> = new Map();
-  private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
-  
-  // Store the document content cache
-  private documentContentCache = new Map<string, string>();
-  
-  // Track accumulated changes for proper position updates
-  private pendingChanges = new Map<string, vscode.TextDocumentContentChangeEvent[]>();
-  
-  constructor(private context: vscode.ExtensionContext) {
-    // Setup buffer change listeners
-    this.disposables.push(
-      vscode.workspace.onDidChangeTextDocument(this.onDocumentChanged, this),
-      vscode.window.onDidChangeActiveTextEditor(this.onActiveEditorChanged, this)
-    );
-    
-    // Load initial annotations if there's an active editor
-    if (vscode.window.activeTextEditor) {
-      this.loadAnnotationsForDocument(vscode.window.activeTextEditor.document);
+/** Anti-corruption: a DecorationType collapsed down to just the capability we use. */
+export type DecorationDisposer = () => void;
+
+/**
+ * Anti-corruption: a pure description of a decoration to apply. The shell turns
+ * this into vscode.TextEditorDecorationType instances and Range objects.
+ */
+export interface DecorationSpec {
+  readonly annotationId: string;
+  readonly startOffset: number;
+  readonly endOffset: number;
+  readonly textBorderColor: string;
+  readonly gutterBorderColor: string;
+}
+
+type DocumentKey = string; // document URI as string
+
+export interface TrackerState {
+  readonly documentAnnotations: ReadonlyMap<DocumentKey, Annotation[]>;
+  // TODO don't need an array, just a single disposer per annotation file
+  readonly decorationDisposers: ReadonlyMap<DocumentKey, DecorationDisposer[]>;
+  readonly fileChangeTimers: ReadonlyMap<DocumentKey, NodeJS.Timeout>;
+  readonly pendingChanges: ReadonlyMap<DocumentKey, ContentChange[]>;
+}
+
+/** Plan returned by planAnnotationUpdate: the reified effect of an update. */
+export type AnnotationUpdatePlan =
+  | { readonly kind: "noop" }
+  | {
+      readonly kind: "update";
+      readonly newAnnotations: Annotation[];
+      /** non-null iff the document text on disk needs to change */
+      readonly newDocumentText: string | null;
+    };
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pure functions — exported for testing. No I/O, no VSCode API, no TrackerState.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
+  let currentDir = path.dirname(documentPath);
+
+  while (currentDir !== path.parse(currentDir).root) {
+    if (fs.existsSync(path.join(currentDir, ".git"))) {
+      break;
     }
+    currentDir = path.dirname(currentDir);
   }
 
-  /**
-   * Loads annotations for the given document from the associated annotations file
-   */
-  public async loadAnnotationsForDocument(document: vscode.TextDocument): Promise<Annotation[]> {
-    const documentKey = document.uri.toString();
-    const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath);
-    console.debug(`Loading annotations for ${documentKey} from ${annotationsUri}`);
-    // TODO we have only sort-of validated that diff loading works correctly.
-    if (this.documentAnnotations.has(documentKey)) {
-      // Already loaded
-      return this.documentAnnotations.get(documentKey) as Annotation[];
-    }
-    try {
-      // Check if file exists
-      if (fs.existsSync(annotationsUri)) {
-        const content = fs.readFileSync(annotationsUri, "utf8");
-        const state = JSON.parse(content) as { document: string; annotations: (Annotation & { documentDiff?: string })[] };
-        
-        // Reconstruct each annotation's document field using applyPatch
-        const reconstructedAnnotations = state.annotations.map(ann => {
-          const reconstructedDoc = 
-            ann.documentDiff ?
-              applyPatch(state.document, ann.documentDiff) || state.document
-            : ann.document || state.document;
-          const originalDoc =
-            ann.original.documentDiff ?
-              applyPatch(state.document, ann.original.documentDiff) || reconstructedDoc
-            : ann.original.document;
-          return {
-            ...ann,
-            document: reconstructedDoc,
-            original: {
-              ...ann.original,
-              document: originalDoc
-            }
-          };
-        });
-        
-        // Store annotations for this document
-        this.documentAnnotations.set(documentKey, reconstructedAnnotations as Annotation[]);
-        
-        // Update decorations
-        this.updateDecorations(document);
-        
-        // Notify the webview if it's open
-        this.notifyAnnotationsChanged(document);
-        
-        return reconstructedAnnotations as Annotation[];
-      } else {
-        // No annotations file yet
-        this.documentAnnotations.set(documentKey, []);
-        return [];
+  const relPath = path.relative(currentDir, documentPath);
+  const annotationsDir = path.join(currentDir, "codetations", path.dirname(relPath));
+
+  if (createDir && !fs.existsSync(annotationsDir)) {
+    fs.mkdirSync(annotationsDir, { recursive: true });
+  }
+
+  return path.join(annotationsDir, path.basename(documentPath) + ".annotations.json");
+}
+
+function reconstructAnnotationsFromDisk(diskState: {
+  document: string;
+  annotations: (Annotation & { documentDiff?: string })[];
+}): Annotation[] {
+  return diskState.annotations.map((ann) => {
+    const reconstructedDoc = ann.documentDiff
+      ? applyPatch(diskState.document, ann.documentDiff) || diskState.document
+      : ann.document || diskState.document;
+
+    const originalDoc = ann.original.documentDiff
+      ? applyPatch(diskState.document, ann.original.documentDiff) || reconstructedDoc
+      : ann.original.document;
+
+    return {
+      ...ann,
+      document: reconstructedDoc,
+      original: { ...ann.original, document: originalDoc },
+    };
+  });
+}
+
+function serializeAnnotationsForDisk(
+  annotations: Annotation[],
+  documentText: string,
+  fileName: string
+): { document: string; annotations: object[] } {
+  const globalDocument = annotations.length > 0 ? annotations[0].document : documentText;
+
+  const serialized = annotations.map((ann) => {
+    const { document: annDoc, ...rest } = ann;
+
+    let documentDiff: string | undefined;
+    if (annDoc !== globalDocument) {
+      try {
+        documentDiff = createPatch(fileName, globalDocument, annDoc);
+      } catch (e) {
+        documentDiff = undefined;
+        console.error("Error creating document diff:", e);
       }
-    } catch (error) {
-      console.error(`Error loading annotations for ${documentKey}:`, error);
-      this.documentAnnotations.set(documentKey, []);
-      return [];
     }
+
+    const {
+      original: { document: originalDocument, ...restOriginal },
+    } = ann;
+
+    let originalDocumentDiff: string | undefined;
+    if (originalDocument !== globalDocument) {
+      try {
+        originalDocumentDiff = createPatch(fileName, globalDocument, originalDocument);
+      } catch (e) {
+        originalDocumentDiff = undefined;
+        console.error("Error creating original document diff:", e);
+      }
+    }
+
+    return {
+      ...rest,
+      documentDiff,
+      original: { ...restOriginal, documentDiff: originalDocumentDiff },
+    };
+  });
+
+  return { document: globalDocument, annotations: serialized };
+}
+
+/** Anti-corruption: parse a VSCode change event into our domain type. */
+function parseContentChange(event: vscode.TextDocumentContentChangeEvent): ContentChange {
+  return {
+    rangeOffset: event.rangeOffset,
+    rangeLength: event.rangeLength,
+    text: event.text,
+  };
+}
+
+/**
+ * Apply a single content change to a single annotation. Pure; testable in
+ * isolation. Annotations whose document doesn't match the starting content are
+ * passed through unchanged.
+ */
+function applyChangeToAnnotation(
+  annotation: Annotation,
+  change: ContentChange,
+  startingContent: string
+): Annotation {
+  if (annotation.document !== startingContent) {
+    return annotation;
   }
 
-  /**
-   * Saves annotations for the given document to the associated annotations file
-   */
-  public async saveAnnotationsForDocument(document: vscode.TextDocument): Promise<void> {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Only save if there are annotations
-    if (annotations.length === 0) {
-      return;
-    }
-    
-    const annotationsUri = this.getAnnotationsFilePath(document.uri.fsPath, true);
+  const startOffset = change.rangeOffset;
+  const endOffset = change.rangeOffset + change.rangeLength;
+  const textLengthDiff = change.text.length - change.rangeLength;
+  const isWhitespaceChange = /^\s*$/.test(change.text);
 
-    // Ensure directory exists
-    const dir = path.dirname(annotationsUri);
+  // CASE 1: Change is completely before the annotation
+  if (endOffset < annotation.start) {
+    return {
+      ...annotation,
+      start: annotation.start + textLengthDiff,
+      end: annotation.end + textLengthDiff,
+    };
+  }
+
+  // CASE 2: Change is completely after the annotation
+  if (startOffset > annotation.end) {
+    return annotation;
+  }
+
+  // CASE 3: Change is adjacent to the annotation (immediately before)
+  if (endOffset === annotation.start) {
+    if (!isWhitespaceChange) {
+      return { ...annotation, start: startOffset, end: annotation.end + textLengthDiff };
+    }
+    return {
+      ...annotation,
+      start: annotation.start + textLengthDiff,
+      end: annotation.end + textLengthDiff,
+    };
+  }
+
+  // CASE 4: Change is adjacent to the annotation (immediately after)
+  if (startOffset === annotation.end) {
+    if (!isWhitespaceChange) {
+      return { ...annotation, end: annotation.end + change.text.length };
+    }
+    return annotation;
+  }
+
+  // CASE 5: Change is completely inside the annotation
+  if (startOffset >= annotation.start && endOffset <= annotation.end) {
+    return { ...annotation, end: annotation.end + textLengthDiff };
+  }
+
+  // CASE 6: Change partially overlaps with the start of the annotation
+  if (startOffset < annotation.start && endOffset > annotation.start && endOffset <= annotation.end) {
+    if (isWhitespaceChange) {
+      return {
+        ...annotation,
+        start: startOffset + change.text.length,
+        end: annotation.end + textLengthDiff,
+      };
+    }
+    return { ...annotation, start: startOffset, end: annotation.end + textLengthDiff };
+  }
+
+  // CASE 7: Change partially overlaps with the end of the annotation
+  if (startOffset >= annotation.start && startOffset < annotation.end && endOffset > annotation.end) {
+    if (isWhitespaceChange) {
+      return { ...annotation, end: startOffset };
+    }
+    return { ...annotation, end: startOffset + change.text.length };
+  }
+
+  // CASE 8: Change completely contains the annotation
+  if (startOffset < annotation.start && endOffset > annotation.end) {
+    if (change.text.length === 0 || isWhitespaceChange) {
+      return { ...annotation, start: startOffset, end: startOffset };
+    }
+    return { ...annotation, start: startOffset, end: startOffset + change.text.length };
+  }
+
+  return annotation;
+}
+
+function applyChangesToAnnotations(
+  annotations: Annotation[],
+  changes: readonly ContentChange[],
+  startingContent: string,
+  currentContent: string
+): Annotation[] {
+  // Short-circuit: if the document's net content is what the annotations already
+  // reflect, there's nothing to do. This is what lets the synchronous update
+  // algorithm safely ignore VSCode's onchange events after we write to disk.
+  if (startingContent === currentContent) {
+    return annotations;
+  }
+
+  let current = annotations;
+  for (const change of changes) {
+    current = current.map((a) => applyChangeToAnnotation(a, change, startingContent));
+  }
+
+  return current.map((ann) =>
+    ann.document === startingContent ? { ...ann, document: currentContent } : ann
+  );
+}
+
+function resolveDecorationColor(baseColor: string, isSelected: boolean): string {
+  if (!isSelected) {
+    return baseColor;
+  }
+  if (baseColor.startsWith("rgba")) {
+    const m = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (m) { return `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.5)`; }
+  } else if (baseColor.startsWith("rgb")) {
+    const m = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (m) { return `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.5)`; }
+  } else if (baseColor.startsWith("#")) {
+    const hex = baseColor.slice(1);
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.5)`;
+  }
+  return baseColor;
+}
+
+function resolveGutterColor(baseColor: string): string {
+  if (baseColor.startsWith("rgba")) {
+    const m = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (m) { return `rgb(${m[1]}, ${m[2]}, ${m[3]})`; }
+  }
+  return baseColor;
+}
+
+function annotationsAreIdentical(a: Annotation, b: Annotation): boolean {
+  return (
+    a.start === b.start &&
+    a.end === b.end &&
+    a.document === b.document &&
+    JSON.stringify(a.metadata) === JSON.stringify(b.metadata)
+  );
+}
+
+/**
+ * Pure: compute the decoration specs for a list of annotations against a given
+ * document text. Annotations whose document doesn't match are skipped.
+ */
+function computeDecorationSpecs(
+  annotations: Annotation[],
+  documentText: string,
+  selectedAnnotationId: string | undefined
+): DecorationSpec[] {
+  const specs: DecorationSpec[] = [];
+  for (const ann of annotations) {
+    if (ann.document !== documentText) {
+      continue;
+    }
+    const isSelected = selectedAnnotationId === ann.id;
+    const baseColor = ann.metadata?.color || "rgba(255,255,0,0.3)";
+    specs.push({
+      annotationId: ann.id,
+      startOffset: ann.start,
+      endOffset: ann.end,
+      textBorderColor: resolveDecorationColor(baseColor, isSelected),
+      gutterBorderColor: resolveGutterColor(baseColor),
+    });
+  }
+  return specs;
+}
+
+/**
+ * Pure: given the current annotations and a proposed updated annotation, plan
+ * the full update. Returns { kind: "noop" } if the update would be a no-op, or
+ * { kind: "update", newAnnotations, newDocumentText } describing what needs to
+ * be written.
+ *
+ * newDocumentText is non-null iff the updated annotation's document differs
+ * from the current on-disk document text.
+ */
+function planAnnotationUpdate(
+  currentAnnotations: Annotation[],
+  updatedAnnotation: AnnotationUpdate,
+  currentDocumentText: string
+): AnnotationUpdatePlan {
+  // TODO this isn't correctly handling mixed file writes between the user and the extension, it's very tricky
+  // fortunately we should be able to unit test to describe and validate the intended behavior
+  const currentAnnotation = currentAnnotations.find((a) => a.id === updatedAnnotation.id)!;
+  const resolvedDoc = updatedAnnotation.settingAnchorTextOnly ? currentDocumentText.slice(0, currentAnnotation.start) + updatedAnnotation.document.slice(updatedAnnotation.start, updatedAnnotation.end) + currentDocumentText.slice(currentAnnotation.end) : updatedAnnotation.document || currentDocumentText;
+  const normalized: AnnotationUpdate = { ...updatedAnnotation, document: resolvedDoc };
+
+  const existing = currentAnnotations.find((a) => a.id === updatedAnnotation.id);
+  if (existing && annotationsAreIdentical(existing, normalized)) {
+    return { kind: "noop" };
+  }
+
+  const newAnnotations = currentAnnotations.map((a) =>
+    a.id === updatedAnnotation.id ? normalized : a
+  );
+
+  const newDocumentText = resolvedDoc !== currentDocumentText ? resolvedDoc : null;
+
+  return { kind: "update", newAnnotations, newDocumentText };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shell: I/O and VSCode API. These are the only functions allowed to touch the
+// filesystem, VSCode APIs, or the panel.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function readAnnotationsFromDisk(documentFsPath: string): Annotation[] | null {
+  const annotationsPath = getAnnotationsFilePath(documentFsPath);
+  console.debug(`Loading annotations from ${annotationsPath}`);
+
+  if (!fs.existsSync(annotationsPath)) {
+    return null;
+  }
+
+  try {
+    const content = fs.readFileSync(annotationsPath, "utf8");
+    const diskState = JSON.parse(content);
+    return reconstructAnnotationsFromDisk(diskState);
+  } catch (error) {
+    console.error(`Error loading annotations from ${annotationsPath}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Synchronously write the annotation list for a document. An empty list deletes
+ * the annotations file. Returns true on success, false on failure.
+ */
+function tryWriteAnnotationsFile(
+  documentFsPath: string,
+  documentText: string,
+  fileName: string,
+  annotations: Annotation[]
+): boolean {
+  try {
+    const annotationsPath = getAnnotationsFilePath(documentFsPath, annotations.length > 0);
+
+    if (annotations.length === 0) {
+      if (fs.existsSync(annotationsPath)) {
+        fs.unlinkSync(annotationsPath);
+      }
+      return true;
+    }
+
+    const dir = path.dirname(annotationsPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    console.debug(`Saving annotations for ${documentKey} to ${annotationsUri}`);
+    const state = serializeAnnotationsForDisk(annotations, documentText, fileName);
+    fs.writeFileSync(annotationsPath, JSON.stringify(state, null, 2), "utf8");
+    console.debug(`Saved annotations to ${annotationsPath}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to write annotations for ${documentFsPath}:`, error);
+    return false;
+  }
+}
 
-    // Save the global document string
-    const globalDocument = annotations.length > 0 ? annotations[0].document : document.getText();
+/**
+ * Synchronously write new text to a document file on disk, bypassing VSCode's
+ * edit API entirely. The file watcher will eventually fire onchange; that's
+ * handled by the short-circuit in applyChangesToAnnotations.
+ */
+function tryWriteDocumentFile(documentFsPath: string, newText: string): boolean {
+  try {
+    fs.writeFileSync(documentFsPath, newText, "utf8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write document ${documentFsPath}:`, error);
+    return false;
+  }
+}
 
-    // Write annotations to file with documentDiffs
-    const state = {
-      document: globalDocument,
-      annotations: annotations.map(ann => {
-        // Remove local document field, replace with documentDiff
-        const { document: annDoc, ...rest } = ann;
-        // Compute diff from global document to annotation's document
-        let documentDiff = undefined;
-        if (annDoc !== globalDocument) {
-          try {
-            documentDiff = createPatch(document.fileName, globalDocument, annDoc);
-          } catch (e) {
-            documentDiff = undefined;
-            console.error("Error creating document diff:", e);
-          }
-        }
-        const { original: {
-          document: originalDocument,
-          ...restOriginal
-        } } = ann;
-        let originalDocumentDiff = undefined;
-        if (originalDocument !== globalDocument) {
-          try {
-            originalDocumentDiff = createPatch(document.fileName, globalDocument, originalDocument);
-          } catch (e) {
-            originalDocumentDiff = undefined;
-            console.error("Error creating original document diff:", e);
-          }
-        }
-        return {
-          ...rest,
-          documentDiff,
-          original: {
-            ...restOriginal,
-            documentDiff: originalDocumentDiff
-          }
-        };
-      })
-    };
-    fs.writeFileSync(annotationsUri, JSON.stringify(state, null, 2), "utf8");
+function notifyPanel(
+  documentUri: vscode.Uri,
+  annotations: Annotation[],
+  documentText: string
+): void {
+  if (!AnnotationManagerPanel.currentPanel) {
+    return;
+  }
+  console.log("Notifying annotation panel of changes for document", documentUri.toString());
+  AnnotationManagerPanel.currentPanel.sendMessageObject({
+    command: "updateAnnotations",
+    data: {
+      documentUri: documentUri.toString(),
+      annotations,
+      documentText,
+    },
+  });
+}
+
+/**
+ * Execute a list of decoration specs: dispose old disposers, create new VSCode
+ * decoration types for each spec, apply them to visible editors of `document`,
+ * and return the new disposer list.
+ */
+function applyDecorations(
+  oldDisposers: DecorationDisposer[] | undefined,
+  specs: DecorationSpec[],
+  document: vscode.TextDocument
+): DecorationDisposer[] {
+  if (oldDisposers) {
+    for (const dispose of oldDisposers) {
+      try { dispose(); } catch (e) { console.error("Decoration dispose failed:", e); }
+    }
   }
 
-  /**
-   * Handler for document changes - collects changes for batch processing
-   */
-  private onDocumentChanged(event: vscode.TextDocumentChangeEvent): void {
-    // Skip if document is not loaded
-    if (!this.documentAnnotations.has(event.document.uri.toString())) {
-      return;
-    }
+  const documentKey = document.uri.toString();
+  const editors = vscode.window.visibleTextEditors.filter(
+    (e) => e.document.uri.toString() === documentKey
+  );
+  if (editors.length === 0) {
+    return [];
+  }
 
-    const docKey = event.document.uri.toString();
-    
-    // Initialize document content cache if not already set
-    if (!this.documentContentCache.has(docKey)) {
-      this.documentContentCache.set(docKey, event.document.getText());
-      return;
-    }
-    
-    // Collect changes for this document
-    let pendingChanges = this.pendingChanges.get(docKey) || [];
-    pendingChanges = [...pendingChanges, ...event.contentChanges];
-    this.pendingChanges.set(docKey, pendingChanges);
-    
-    // Debounce the processing of changes
-    if (this.fileChangeTimers.has(docKey)) {
-      clearTimeout(this.fileChangeTimers.get(docKey)!);
-    }
+  const disposers: DecorationDisposer[] = [];
 
-    this.fileChangeTimers.set(docKey, setTimeout(() => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.uri.toString() !== docKey) {
-        console.error("Editor not active or document not loaded", editor, editor?.document.uri.toString(), docKey);
-        this.pendingChanges.delete(docKey);
-        this.fileChangeTimers.delete(docKey);
-        return;
+  for (const spec of specs) {
+    try {
+      const startPos = document.positionAt(spec.startOffset);
+      const endPos = document.positionAt(spec.endOffset);
+      const range = new vscode.Range(startPos, endPos);
+
+      const textDecorationType = vscode.window.createTextEditorDecorationType({
+        borderColor: spec.textBorderColor,
+        borderStyle: "none none solid none",
+      });
+      const gutterDecorationType = vscode.window.createTextEditorDecorationType({
+        isWholeLine: true,
+        borderColor: spec.gutterBorderColor,
+        borderWidth: "3px",
+        borderStyle: "none solid none none",
+      });
+
+      for (const editor of editors) {
+        editor.setDecorations(textDecorationType, [range]);
+        editor.setDecorations(gutterDecorationType, [range]);
       }
-      
-      // Process all accumulated changes at once
-      this.processAccumulatedChanges(editor.document);
-      
-      // Update cache and cleanup
-      this.documentContentCache.set(docKey, editor.document.getText());
-      this.pendingChanges.delete(docKey);
-      this.fileChangeTimers.delete(docKey);
-    }, 50));
+
+      disposers.push(() => textDecorationType.dispose());
+      disposers.push(() => gutterDecorationType.dispose());
+    } catch (error) {
+      console.error("Error creating decoration:", error);
+    }
   }
 
+  return disposers;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// createAnnotationTracker — the only place that owns state. State construction
+// happens here and only here.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface TrackerHandle extends vscode.Disposable {
+  readonly state: Readonly<TrackerState>;
+  loadAnnotationsForDocument(document: vscode.TextDocument): Annotation[];
+  saveAnnotationsForDocument(document: vscode.TextDocument): void;
+  addAnnotation(document: vscode.TextDocument, annotation: Annotation): void;
+  removeAnnotation(document: vscode.TextDocument, annotationId: string): void;
+  updateAnnotation(document: vscode.TextDocument, updatedAnnotation: AnnotationUpdate): void;
+  moveAnnotation(
+    document: vscode.TextDocument,
+    annotationId: string,
+    newStart: number,
+    newEnd: number
+  ): void;
+  getAnnotationsForDocument(document: vscode.TextDocument): Annotation[];
+  updateDecorations(document: vscode.TextDocument): void;
+  dispose(): void;
+}
+
+export function createAnnotationTracker(_context: vscode.ExtensionContext): TrackerHandle {
+  let state: TrackerState = {
+    documentAnnotations: new Map(),
+    decorationDisposers: new Map(),
+    fileChangeTimers: new Map(),
+    pendingChanges: new Map(),
+  };
+
+  const getSelectedId = (): string | undefined =>
+    AnnotationManagerPanel.currentPanel?.selectedAnnotationId;
+
   /**
-   * Process all accumulated changes for a document
+   * Top-level commit: given a document and a new annotation list, rebuild
+   * decorations against the document, update state, and notify the panel.
+   * This is the single place where decoration disposers and documentAnnotations
+   * are swapped together — it combines I/O (decoration API, panel message) with
+   * the resulting state update.
    */
-  private processAccumulatedChanges(document: vscode.TextDocument): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey);
-    const changes = this.pendingChanges.get(documentKey) || [];
-    
+  const commitAnnotations = (
+    document: vscode.TextDocument,
+    newAnnotations: Annotation[]
+  ): void => {
+    const key = document.uri.toString();
+    const specs = computeDecorationSpecs(newAnnotations, document.getText(), getSelectedId());
+    const newDisposers = applyDecorations(state.decorationDisposers.get(key), specs, document);
+
+    const nextAnnotations = new Map(state.documentAnnotations);
+    nextAnnotations.set(key, newAnnotations);
+    const nextDisposers = new Map(state.decorationDisposers);
+    nextDisposers.set(key, newDisposers);
+
+    state = {
+      documentAnnotations: nextAnnotations,
+      decorationDisposers: nextDisposers,
+      fileChangeTimers: state.fileChangeTimers,
+      pendingChanges: state.pendingChanges,
+    };
+
+    notifyPanel(document.uri, newAnnotations, document.getText());
+  };
+
+  /** Load annotations for a document if not already loaded. */
+  const ensureLoaded = (document: vscode.TextDocument): void => {
+    const key = document.uri.toString();
+    if (state.documentAnnotations.has(key)) {
+      return;
+    }
+    const loaded = readAnnotationsFromDisk(document.uri.fsPath);
+    if (loaded !== null) {
+      commitAnnotations(document, loaded);
+      return;
+    }
+    // No file on disk — record an empty entry without notifying the panel,
+    // matching the original behavior.
+    const nextAnnotations = new Map(state.documentAnnotations);
+    nextAnnotations.set(key, []);
+    state = {
+      documentAnnotations: nextAnnotations,
+      decorationDisposers: state.decorationDisposers,
+      fileChangeTimers: state.fileChangeTimers,
+      pendingChanges: state.pendingChanges,
+    };
+  };
+
+  /** Flush accumulated pending changes for a document key. */
+  const flushPendingChanges = (documentKey: string): void => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.uri.toString() !== documentKey) {
+      console.error(
+        "Editor not active or document not loaded",
+        editor?.document.uri.toString(),
+        documentKey
+      );
+      const clearedPending = new Map(state.pendingChanges);
+      clearedPending.delete(documentKey);
+      const clearedTimers = new Map(state.fileChangeTimers);
+      clearedTimers.delete(documentKey);
+      state = {
+        documentAnnotations: state.documentAnnotations,
+        decorationDisposers: state.decorationDisposers,
+        fileChangeTimers: clearedTimers,
+        pendingChanges: clearedPending,
+      };
+      return;
+    }
+
+    const document = editor.document;
+    const annotations = state.documentAnnotations.get(documentKey);
+    const changes = state.pendingChanges.get(documentKey) || [];
+
+    // Clear the pending/timer entries regardless of whether we have work to do.
+    const clearedPending = new Map(state.pendingChanges);
+    clearedPending.delete(documentKey);
+    const clearedTimers = new Map(state.fileChangeTimers);
+    clearedTimers.delete(documentKey);
+    state = {
+      documentAnnotations: state.documentAnnotations,
+      decorationDisposers: state.decorationDisposers,
+      fileChangeTimers: clearedTimers,
+      pendingChanges: clearedPending,
+    };
+
     if (!annotations || annotations.length === 0 || changes.length === 0) {
       return;
     }
-    
-    // Get the cached document content before any changes
-    const startingContent = this.documentContentCache.get(documentKey)!;
+
+    const startingContent = annotations[0].document;
     const currentContent = document.getText();
-    
-    // Skip if no actual change occurred
-    if (startingContent === currentContent) {
+    const updated = applyChangesToAnnotations(annotations, changes, startingContent, currentContent);
+
+    // Persist the (possibly-unchanged) annotations and unconditionally rebuild
+    // decorations. The unconditional rebuild matters: if updateAnnotation just
+    // rewrote the document on disk, VSCode will fire onchange with a no-op
+    // applyChangesToAnnotations result — but decorations still need to be
+    // rebuilt against the refreshed document text.
+    tryWriteAnnotationsFile(
+      document.uri.fsPath,
+      document.getText(),
+      document.fileName,
+      updated
+    );
+    commitAnnotations(document, updated);
+  };
+
+  /** Handle a VSCode text-document change event. */
+  const onDocumentChanged = (event: vscode.TextDocumentChangeEvent): void => {
+    const docKey = event.document.uri.toString();
+    if (!state.documentAnnotations.has(docKey)) {
       return;
     }
-    
-    // Create working copies of annotations that we can update
-    // These working copies will maintain their position references relative to startingContent
-    let workingAnnotations = annotations.map(ann => ({...ann}));
-    
-    // Apply each change one by one to compute the new positions
-    for (const change of changes) {
-      const startOffset = change.rangeOffset;
-      const endOffset = change.rangeOffset + change.rangeLength;
-      const textLengthDiff = change.text.length - change.rangeLength;
-      
-      // Check if the change is only whitespace
-      const isWhitespaceChange = /^\s*$/.test(change.text);
-      
-      for (let i = 0; i < workingAnnotations.length; i++) {
-        const annotation = workingAnnotations[i];
-        
-        // Skip annotations that don't match the current document content
-        if (annotation.document !== startingContent) {
-          continue;
-        }
-        
-        // CASE 1: Change is completely before the annotation
-        if (endOffset < annotation.start) {
-          // Simply shift the annotation
-          annotation.start += textLengthDiff;
-          annotation.end += textLengthDiff;
-          continue;
-        }
-        
-        // CASE 2: Change is completely after the annotation
-        if (startOffset > annotation.end) {
-          // No adjustment needed
-          continue;
-        }
-        
-        // CASE 3: Change is adjacent to the annotation (immediately before)
-        if (endOffset === annotation.start) {
-          // If not whitespace, include it in the annotation
-          if (!isWhitespaceChange) {
-            annotation.start = startOffset;
-            annotation.end += textLengthDiff;
-          } else {
-            // If whitespace, just shift the annotation
-            annotation.start += textLengthDiff;
-            annotation.end += textLengthDiff;
-          }
-          continue;
-        }
-        
-        // CASE 4: Change is adjacent to the annotation (immediately after)
-        if (startOffset === annotation.end) {
-          // If not whitespace, include it in the annotation
-          if (!isWhitespaceChange) {
-            annotation.end += change.text.length;
-          }
-          // If whitespace, don't expand the annotation
-          continue;
-        }
-        
-        // CASE 5: Change is completely inside the annotation
-        if (startOffset >= annotation.start && endOffset <= annotation.end) {
-          // Grow or shrink the annotation by the exact amount of the change
-          annotation.end += textLengthDiff;
-          continue;
-        }
-        
-        // CASE 6: Change partially overlaps with the start of the annotation
-        if (startOffset < annotation.start && endOffset > annotation.start && endOffset <= annotation.end) {
-          // If the change contains whitespace at the beginning or end, determine how to handle
-          if (isWhitespaceChange) {
-            // For whitespace changes, adjust start to after the whitespace
-            annotation.start = startOffset + change.text.length;
-            annotation.end += textLengthDiff;
-          } else {
-            // For non-whitespace changes, include the change
-            annotation.start = startOffset;
-            annotation.end += textLengthDiff;
-          }
-          continue;
-        }
-        
-        // CASE 7: Change partially overlaps with the end of the annotation
-        if (startOffset >= annotation.start && startOffset < annotation.end && endOffset > annotation.end) {
-          // If the change contains whitespace at the beginning or end, determine how to handle
-          if (isWhitespaceChange) {
-            // For whitespace changes, don't expand the annotation
-            annotation.end = startOffset;
-          } else {
-            // For non-whitespace changes, include the change
-            annotation.end = startOffset + change.text.length;
-          }
-          continue;
-        }
-        
-        // CASE 8: Change completely contains the annotation
-        if (startOffset < annotation.start && endOffset > annotation.end) {
-          if (change.text.length === 0) {
-            // If the text is deleted, collapse the annotation
-            annotation.start = startOffset;
-            annotation.end = startOffset;
-          } else if (isWhitespaceChange) {
-            // If change is whitespace, try to maintain relative position
-            annotation.start = startOffset;
-            annotation.end = startOffset;
-          } else {
-            // Otherwise, try to map to some portion of the new text
-            annotation.start = startOffset;
-            annotation.end = startOffset + change.text.length;
-          }
-          continue;
-        }
-      }
-    }
-    
-    // Update all annotations with the current document content
-    const finalAnnotations = workingAnnotations.map(ann => ({
-      ...ann,
-      document: ann.document !== startingContent ? ann.document : currentContent
-    }));
-    
-    // Update the document's annotations
-    this.documentAnnotations.set(documentKey, finalAnnotations);
-    
-    // Update decorations, save, and notify
-    this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
-    this.notifyAnnotationsChanged(document);
-  }
 
-  /**
-   * Updates the decorations in the editor
-   */
-  public updateDecorations(document: vscode.TextDocument): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Clear existing decorations
-    this.clearDecorations(documentKey);
-    
-    // Find editors displaying this document
-    const editors = vscode.window.visibleTextEditors.filter(
-      editor => editor.document.uri.toString() === documentKey
-    );
-    
-    if (editors.length === 0) {
-      return; // No visible editor for this document
-    }
-    
-    // Get selected annotation ID from the panel if available
-    const selectedAnnotationId = AnnotationManagerPanel.currentPanel?.selectedAnnotationId;
-    
-    const decorations: vscode.TextEditorDecorationType[] = [];
-    
-    // Create and apply decorations for each annotation
-    for (const annotation of annotations) {
-      // Skip if the document text doesn't match the annotation's document
-      if (annotation.document !== document.getText()) {
-        continue;
-      }
-      try {
-        // Check if this is the selected annotation
-        const isSelected = selectedAnnotationId === annotation.id;
-        
-        // Extract base color from metadata or use default
-        const baseColor = annotation.metadata?.color || "rgba(255,255,0,0.3)";
-        
-        // Increase opacity for selected annotation
-        let decorationColor = baseColor;
-        if (isSelected) {
-          if (baseColor.startsWith("rgba")) {
-            // Parse the rgba color values
-            const rgbaMatch = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-            if (rgbaMatch) {
-              const [_, r, g, b] = rgbaMatch;
-              // Use a fixed higher opacity value for selected annotations
-              decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-            }
-          } else if (baseColor.startsWith("rgb")) {
-            // For rgb format, add alpha
-            const rgbMatch = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);            
-            if (rgbMatch) {
-              const [_, r, g, b] = rgbMatch;
-              decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-            }
-          } else if (baseColor.startsWith("#")) {
-            // For hex format, convert to rgba
-            const hex = baseColor.slice(1);            
-            const r = parseInt(hex.substring(0, 2), 16);
-            const g = parseInt(hex.substring(2, 4), 16);
-            const b = parseInt(hex.substring(4, 6), 16);
-            decorationColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-          }
-        }
-        
-        // Extract solid color for gutter without transparency
-        let gutterColor = baseColor;
-        if (gutterColor.startsWith("rgba")) {
-          // Convert rgba to rgb for the gutter
-          const rgbaMatch = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-          if (rgbaMatch) {
-            const [_, r, g, b] = rgbaMatch;
-            gutterColor = `rgb(${r}, ${g}, ${b})`;
-          }
-        } else if (baseColor.startsWith("#")) {
-          // Keep hex color as is for gutter
-          gutterColor = baseColor;
-        }
-        
-        // Create the decoration range
-        const startPos = document.positionAt(annotation.start);
-        const endPos = document.positionAt(annotation.end);
-        const range = new vscode.Range(startPos, endPos);
-        
-        // 1. Create text decoration type with highlighting and potential underline
-        const textDecorationType = vscode.window.createTextEditorDecorationType({
-          // backgroundColor: decorationColor,
-          borderColor: decorationColor,
-          borderStyle: true ? 'none none solid none' : 'none',
-          // Add underline for selected annotations
-          // textDecoration: isSelected ? 'underline' : undefined,
-          
-          // Add entries to the overview ruler
-          // overviewRulerColor: gutterColor,
-          // overviewRulerLane: vscode.OverviewRulerLane.Left
-        });
-        
-        // 2. Create gutter decoration type with vertical line
-        const gutterDecorationType = vscode.window.createTextEditorDecorationType({
-          isWholeLine: true,
-          // Left margin decoration - the vertical line
-          borderColor: gutterColor,
-          borderWidth: '3px',
-          borderStyle: 'none solid none none'
-        });
-        
-        // Apply both decorations to all editors
-        for (const editor of editors) {
-          editor.setDecorations(textDecorationType, [range]);
-          editor.setDecorations(gutterDecorationType, [range]);
-        }
-        
-        // Store both decoration types
-        decorations.push(textDecorationType);
-        decorations.push(gutterDecorationType);
-        
-      } catch (error) {
-        console.error("Error creating decoration:", error);
-      }
-    }
-    
-    // Store the new decoration types
-    this.decorationTypes.set(documentKey, decorations);
-  }
+    const parsed = event.contentChanges.map(parseContentChange);
+    const existingChanges = state.pendingChanges.get(docKey) || [];
+    const nextChanges = [...existingChanges, ...parsed];
 
-  /**
-   * Clears decorations for a document
-   */
-  private clearDecorations(documentKey: string): void {
-    const types = this.decorationTypes.get(documentKey);
-    if (!types) {return;}
-    
-    for (const type of types) {
-      type.dispose();
+    const existingTimer = state.fileChangeTimers.get(docKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
     }
-    
-    this.decorationTypes.set(documentKey, []);
-  }
+    const newTimer = setTimeout(() => flushPendingChanges(docKey), 50);
 
-  /**
-   * Handler for active editor changes
-   */
-  private onActiveEditorChanged(editor: vscode.TextEditor | undefined): void {
-    if (!editor) {return;}
-    
-    // Load annotations for the new editor
-    this.loadAnnotationsForDocument(editor.document);
-    this.documentContentCache.set(editor.document.uri.toString(), editor.document.getText());
-  }
+    const nextPending = new Map(state.pendingChanges);
+    nextPending.set(docKey, nextChanges);
+    const nextTimers = new Map(state.fileChangeTimers);
+    nextTimers.set(docKey, newTimer);
 
-  /**
-   * Notifies the annotation panel of changed annotations
-   */
-  private notifyAnnotationsChanged(document: vscode.TextDocument): void {
-    if (AnnotationManagerPanel.currentPanel) {
-      const documentKey = document.uri.toString();
-      const annotations = this.documentAnnotations.get(documentKey) || [];
-      
-      AnnotationManagerPanel.currentPanel.sendMessageObject({
-        command: "updateAnnotations",
-        data: {
-          documentUri: document.uri.toString(),
-          annotations,
-          documentText: document.getText()
-        }
-      });
-    }
-  }
-
-  /**
-   * Gets the path to the annotations file for a document
-   */
-  private getAnnotationsFilePath(documentPath: string, createDir: boolean = false): string {
-    let currentDir = path.dirname(documentPath);
-    
-    // Look for git root or fall back to document directory
-    while (currentDir !== path.parse(currentDir).root) {
-      if (fs.existsSync(path.join(currentDir, ".git"))) {
-        break;
-      }
-      currentDir = path.dirname(currentDir);
-    }
-    
-    // Create the relative path for annotations
-    const relPath = path.relative(currentDir, documentPath);
-    const annotationsDir = path.join(currentDir, 'codetations', path.dirname(relPath));
-    
-    // Only ensure directory exists when createDir is true
-    // (Don't create directories when just building paths for reading)
-    if (createDir && !fs.existsSync(annotationsDir)) {
-      fs.mkdirSync(annotationsDir, { recursive: true });
-    }
-    
-    // Return full path to annotations file
-    return path.join(annotationsDir, path.basename(documentPath) + ".annotations.json");
-  }
-
-  /**
-   * Adds a new annotation for the given document
-   */
-  public addAnnotation(document: vscode.TextDocument, annotation: Annotation): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Add the new annotation
-    const updatedAnnotations = [...annotations, annotation];
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
-    
-    // Update decorations and save
-    this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
-    this.notifyAnnotationsChanged(document);
-  }
-
-  /**
-   * Removes an annotation by ID
-   */
-  public removeAnnotation(document: vscode.TextDocument, annotationId: string): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Filter out the annotation to remove
-    const updatedAnnotations = annotations.filter(a => a.id !== annotationId);
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
-    
-    // Update decorations
-    this.updateDecorations(document);
-    
-    if (updatedAnnotations.length === 0) {
-      // If no annotations left, remove the file
-      try {
-        const annotationsFilePath = this.getAnnotationsFilePath(document.uri.fsPath);
-        if (fs.existsSync(annotationsFilePath)) {
-          fs.unlinkSync(annotationsFilePath);
-        }
-      } catch (error) {
-        console.error("Failed to remove annotations file:", error);
-      }
-    } else {
-      // Otherwise save updated annotations
-      this.saveAnnotationsForDocument(document);
-    }
-    
-    // Notify the webview panel of the change
-    this.notifyAnnotationsChanged(document);
-  }
-
-  /**
-   * Updates an existing annotation
-   */
-  public updateAnnotation(document: vscode.TextDocument, updatedAnnotation: Annotation): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Update the annotation
-    const updatedAnnotations = annotations.map(a => 
-      a.id === updatedAnnotation.id ? updatedAnnotation : a
-    );
-    
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
-    
-    // Update decorations and save
-    this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
-    this.notifyAnnotationsChanged(document);
-  }
-
-  /**
-   * Moves an annotation to a new position in the document
-   */
-  public moveAnnotation(document: vscode.TextDocument, annotationId: string, newStart: number, newEnd: number): void {
-    const documentKey = document.uri.toString();
-    const annotations = this.documentAnnotations.get(documentKey) || [];
-    
-    // Find the annotation to move
-    const annotationIndex = annotations.findIndex(a => a.id === annotationId);
-    
-    if (annotationIndex === -1) {
-      vscode.window.showErrorMessage(`Annotation with ID ${annotationId} not found.`);
-      return;
-    }
-    
-    // Create a copy of the annotation with updated positions
-    const updatedAnnotation = {
-      ...annotations[annotationIndex],
-      start: newStart,
-      end: newEnd,
-      document: document.getText() // Update document text reference
+    state = {
+      documentAnnotations: state.documentAnnotations,
+      decorationDisposers: state.decorationDisposers,
+      fileChangeTimers: nextTimers,
+      pendingChanges: nextPending,
     };
-    
-    // Update the annotation in the collection
-    const updatedAnnotations = [...annotations];
-    updatedAnnotations[annotationIndex] = updatedAnnotation;
-    this.documentAnnotations.set(documentKey, updatedAnnotations);
-    
-    // Update decorations and save
-    this.updateDecorations(document);
-    this.saveAnnotationsForDocument(document);
-    this.notifyAnnotationsChanged(document);
-  }
+  };
 
-  /**
-   * Returns annotations for a document
-   */
-  public getAnnotationsForDocument(document: vscode.TextDocument): Annotation[] {
-    const documentKey = document.uri.toString();
-    return this.documentAnnotations.get(documentKey) || [];
-  }
+  /** Handle a VSCode active-editor change event. */
+  const onActiveEditorChanged = (editor: vscode.TextEditor | undefined): void => {
+    if (!editor) {
+      return;
+    }
+    ensureLoaded(editor.document);
+  };
 
-  public dispose(): void {
-    // Dispose all decoration types
-    for (const types of this.decorationTypes.values()) {
-      for (const type of types) {
-        type.dispose();
+  const disposables: vscode.Disposable[] = [
+    vscode.workspace.onDidChangeTextDocument(onDocumentChanged),
+    vscode.window.onDidChangeActiveTextEditor(onActiveEditorChanged),
+  ];
+
+  // Initial load. onActiveEditorChanged handles the undefined case internally.
+  onActiveEditorChanged(vscode.window.activeTextEditor);
+
+  return {
+    get state() { return state; },
+
+    loadAnnotationsForDocument(document) {
+      ensureLoaded(document);
+      return state.documentAnnotations.get(document.uri.toString()) || [];
+    },
+
+    saveAnnotationsForDocument(document) {
+      const annotations = state.documentAnnotations.get(document.uri.toString()) || [];
+      tryWriteAnnotationsFile(
+        document.uri.fsPath,
+        document.getText(),
+        document.fileName,
+        annotations
+      );
+    },
+
+    addAnnotation(document, annotation) {
+      const key = document.uri.toString();
+      const current = state.documentAnnotations.get(key) || [];
+      const newAnnotations = [...current, annotation];
+      tryWriteAnnotationsFile(
+        document.uri.fsPath,
+        document.getText(),
+        document.fileName,
+        newAnnotations
+      );
+      commitAnnotations(document, newAnnotations);
+    },
+
+    removeAnnotation(document, annotationId) {
+      const key = document.uri.toString();
+      const current = state.documentAnnotations.get(key) || [];
+      const newAnnotations = current.filter((a) => a.id !== annotationId);
+      tryWriteAnnotationsFile(
+        document.uri.fsPath,
+        document.getText(),
+        document.fileName,
+        newAnnotations
+      );
+      commitAnnotations(document, newAnnotations);
+    },
+
+    /**
+     * The centerpiece: fully synchronous update.
+     *
+     *   1. Plan the update (pure).
+     *   2. If no-op, return.
+     *   3. SYNC write annotations. On failure, return old state.
+     *   4. If the document text changed, SYNC write the document. On failure,
+     *      SYNC revert the annotations file and return old state.
+     *   5. Commit: rebuild decorations, update state, notify panel.
+     *
+     * The subsequent onchange from VSCode's file watcher is benign: the
+     * annotations already reflect the new text, so applyChangesToAnnotations
+     * short-circuits on startingContent === currentContent.
+     */
+    updateAnnotation(document, updatedAnnotation) {
+      const key = document.uri.toString();
+      const currentAnnotations = state.documentAnnotations.get(key) || [];
+      const plan = planAnnotationUpdate(currentAnnotations, updatedAnnotation, document.getText());
+
+      if (plan.kind === "noop") {
+        console.log("Skipping annotation update; identical to existing annotation");
+        return;
       }
-    }
-    
-    // Clear timers
-    for (const timer of this.fileChangeTimers.values()) {
-      clearTimeout(timer);
-    }
-    
-    // Dispose other resources
-    this.disposables.forEach(d => d.dispose());
-    this.disposables = [];
-  }
+
+      // Effect 1: write the new annotation list.
+      const wroteAnnotations = tryWriteAnnotationsFile(
+        document.uri.fsPath,
+        document.getText(),
+        document.fileName,
+        plan.newAnnotations
+      );
+      if (!wroteAnnotations) {
+        return;
+      }
+
+      // Effect 2 (conditional): write the new document text.
+      if (plan.newDocumentText !== null) {
+        const wroteDoc = tryWriteDocumentFile(document.uri.fsPath, plan.newDocumentText);
+        if (!wroteDoc) {
+          // Revert: put the old annotation list back. This "should (mostly)
+          // always succeed since we just wrote to it".
+          tryWriteAnnotationsFile(
+            document.uri.fsPath,
+            document.getText(),
+            document.fileName,
+            currentAnnotations
+          );
+          return;
+        }
+      }
+
+      // Commit decorations + state + panel. Note: VSCode's in-memory document
+      // may still hold the OLD text at this moment; decoration positions will
+      // briefly be computed against it. The file-watcher onchange will fire
+      // shortly after and flushPendingChanges will rebuild decorations against
+      // the refreshed document.
+      commitAnnotations(document, plan.newAnnotations);
+    },
+
+    moveAnnotation(document, annotationId, newStart, newEnd) {
+      const key = document.uri.toString();
+      const current = state.documentAnnotations.get(key) || [];
+      if (!current.some((a) => a.id === annotationId)) {
+        vscode.window.showErrorMessage(`Annotation with ID ${annotationId} not found.`);
+        return;
+      }
+      const newAnnotations = current.map((a) =>
+        a.id === annotationId
+          ? { ...a, start: newStart, end: newEnd, document: document.getText() }
+          : a
+      );
+      tryWriteAnnotationsFile(
+        document.uri.fsPath,
+        document.getText(),
+        document.fileName,
+        newAnnotations
+      );
+      commitAnnotations(document, newAnnotations);
+    },
+
+    getAnnotationsForDocument(document) {
+      return state.documentAnnotations.get(document.uri.toString()) || [];
+    },
+
+    updateDecorations(document) {
+      const current = state.documentAnnotations.get(document.uri.toString()) || [];
+      commitAnnotations(document, current);
+    },
+
+    dispose() {
+      for (const disposers of state.decorationDisposers.values()) {
+        for (const d of disposers) {
+          try { d(); } catch (e) { console.error("Decoration dispose failed:", e); }
+        }
+      }
+      for (const timer of state.fileChangeTimers.values()) {
+        clearTimeout(timer);
+      }
+      for (const d of disposables) { d.dispose(); }
+    },
+  };
 }
