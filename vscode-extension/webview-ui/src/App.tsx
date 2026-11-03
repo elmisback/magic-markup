@@ -603,7 +603,7 @@ function App() {
       const annotation = annotations.find(
         (annotation) => annotation.start <= charNum && annotation.end >= charNum
       );
-      if (annotation) {
+      if (annotation && (annotation.id !== selectedAnnotationId)) {
         // Set the selected annotation id
         vscode.postMessage({
           command: "setSelectedAnnotationId",
