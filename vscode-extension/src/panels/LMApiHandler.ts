@@ -26,7 +26,7 @@ export class LMApiHandler {
       };
       
       console.log(`Selecting model with options:`, modelOptions);
-      //console.log('HERE', await vscode.lm.selectChatModels());
+      console.log('AVAILABLE MODELS', await vscode.lm.selectChatModels());
       // gpt-5-mini gpt-4o-mini copilot-fast gpt-4o claude-haiku-4.5 gpt-4.1 oswe-vscode-prime auto
       const [model] = await vscode.lm.selectChatModels(modelOptions);
       
