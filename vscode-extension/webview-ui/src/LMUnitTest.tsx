@@ -153,8 +153,8 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         addDebugInfo("Sending request to language model");
         // Use either the real API or the mock API based on useMock flag
         response = await (useMock ? mockLmApi : lmApi).chat(prompt, {
-          vendor: 'copilot',
-          family: 'copilot-utility',
+          vendor: 'openrouter',
+          family: 'qwen/qwen3.8-27b',
           temperature: 0.3
         });
         addDebugInfo("Received response from LM API");
@@ -216,8 +216,8 @@ The "answer" field must be true or false. The "explanation" should be brief and 
         try {
           addDebugInfo("Calling API for format fixing");
           fixedResponse = await (useMock ? mockLmApi : lmApi).chat(fixPrompt, {
-            vendor: 'copilot',
-            family: 'gpt-4o-mini',
+            vendor: 'openrouter',
+            family: 'qwen/qwen3.8-27b',
             temperature: 0.1
           });
           addDebugInfo("Received fixed format response");
