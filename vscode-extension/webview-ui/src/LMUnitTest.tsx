@@ -217,7 +217,7 @@ The "answer" field must be true or false. The "explanation" should be brief and 
           addDebugInfo("Calling API for format fixing");
           fixedResponse = await (useMock ? mockLmApi : lmApi).chat(fixPrompt, {
             vendor: 'copilot',
-            family: 'gpt-4o',
+            family: 'gpt-4o-mini',
             temperature: 0.1
           });
           addDebugInfo("Received fixed format response");
